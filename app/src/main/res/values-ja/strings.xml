@@ -854,7 +854,7 @@
 <string name="sponsor_promote">サポーターになる</string>
 <string name="random_play_order_title">ランダムな順序</string>
 <string name="random_play_order_summary">バックグラウンドで再生する際にローカルプレイリストを自動的にシャッフルします</string>
-<string name="update_log">### 不具合修正\n\n- 一部の動画が「ページを再読み込みする必要があります」というエラーで読み込めない (YouTube)\n- 動画を開けない (NicoNico)</string>
+<string name="update_log">### バグ修正\n\n- ライブ配信が動作しない (YouTube)\n- \"ロボットではないことを確認するためにログインしてください\" が誤って \"コンテンツを利用できません\" として扱われる (YouTube)</string>
 <string name="speeding_playback_title">長時間押は再生速度を速めることができます</string>
 <string name="view_on_github">GitHubで表示</string>
 <string name="donation_dialog_title">プロジェクトをサポートする</string>
