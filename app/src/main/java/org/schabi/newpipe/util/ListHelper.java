@@ -65,13 +65,168 @@ public final class ListHelper {
 
     public static int getDefaultAudioFormat(final Context context,
                                             final List<AudioStream> audioStreams) {
-        // If the user has chosen to limit resolution to conserve mobile data
-        // usage then we should also limit our audio usage.
-        if (isLimitingDataUsage(context)) {
-            return getMostCompactAudioIndex(null, audioStreams);
-        } else {
-            return getHighestQualityAudioIndex(null, audioStreams);
+        if (audioStreams == null || audioStreams.isEmpty()) {
+            return -1;
         }
+
+        final SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
+        final String preferredAudioLanguage = prefs.getString(
+                context.getString(R.string.preferred_audio_language_key), "original");
+
+        List<AudioStream> filteredStreams = filterAudioStreamsByLanguage(
+                audioStreams, preferredAudioLanguage);
+
+        if (filteredStreams.isEmpty()) {
+            filteredStreams = audioStreams;
+        }
+
+        final AudioStream selectedStream;
+        if (isLimitingDataUsage(context)) {
+            selectedStream = getMostCompactAudioStream(null, filteredStreams);
+        } else {
+            selectedStream = getHighestQualityAudioStream(null, filteredStreams);
+        }
+
+        if (selectedStream == null) {
+            return -1;
+        }
+
+        for (int i = 0; i < audioStreams.size(); i++) {
+            if (audioStreams.get(i) == selectedStream) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    @Nullable
+    private static AudioStream getHighestQualityAudioStream(@Nullable final MediaFormat format,
+                                                            @Nullable final List<AudioStream> audioStreams) {
+        if (audioStreams == null || audioStreams.isEmpty()) {
+            return null;
+        }
+        return audioStreams.stream()
+                .filter(audioStream -> format == null || audioStream.getFormat() == format)
+                .max((s1, s2) -> compareAudioStreamBitrate(s1, s2, AUDIO_FORMAT_QUALITY_RANKING))
+                .orElse(null);
+    }
+
+    @Nullable
+    private static AudioStream getMostCompactAudioStream(@Nullable final MediaFormat format,
+                                                         @Nullable final List<AudioStream> audioStreams) {
+        if (audioStreams == null || audioStreams.isEmpty()) {
+            return null;
+        }
+        return audioStreams.stream()
+                .filter(audioStream -> format == null || audioStream.getFormat() == format)
+                .min((s1, s2) -> compareAudioStreamBitrate(s1, s2, AUDIO_FORMAT_EFFICIENCY_RANKING))
+                .orElse(null);
+    }
+
+    private static List<AudioStream> filterAudioStreamsByLanguage(
+            final List<AudioStream> audioStreams, final String preferredLanguage) {
+        if (audioStreams == null || audioStreams.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        if ("original".equals(preferredLanguage)) {
+            final List<AudioStream> originalStreams = audioStreams.stream()
+                    .filter(stream -> {
+                        final String trackName = stream.getAudioTrackName();
+                        if (trackName == null) return true;
+                        final String nameLower = trackName.toLowerCase();
+                        return nameLower.contains("original") || nameLower.contains("default");
+                    })
+                    .collect(Collectors.toList());
+            if (!originalStreams.isEmpty()) {
+                return originalStreams;
+            }
+            final List<AudioStream> noTrackInfoStreams = audioStreams.stream()
+                    .filter(stream -> stream.getAudioTrackId() == null)
+                    .collect(Collectors.toList());
+            if (!noTrackInfoStreams.isEmpty()) {
+                return noTrackInfoStreams;
+            }
+            return audioStreams;
+        }
+
+        final List<AudioStream> matchedStreams = audioStreams.stream()
+                .filter(stream -> {
+                    final String locale = stream.getAudioLocale();
+                    if (locale != null && locale.equals(preferredLanguage)) {
+                        return true;
+                    }
+                    final String trackId = stream.getAudioTrackId();
+                    if (trackId != null) {
+                        final String langCode = trackId.split("\\.")[0].split("-")[0];
+                        return langCode.equals(preferredLanguage);
+                    }
+                    return false;
+                })
+                .collect(Collectors.toList());
+
+        return matchedStreams.isEmpty() ? audioStreams : matchedStreams;
+    }
+
+    public static List<AudioStream> getFilteredAudioStreams(
+            @NonNull final Context context,
+            @Nullable final List<AudioStream> audioStreams) {
+        if (audioStreams == null) {
+            return Collections.emptyList();
+        }
+
+        final Map<String, AudioStream> collectedStreams = new LinkedHashMap<>();
+
+        final Comparator<AudioStream> cmp = (s1, s2) ->
+                compareAudioStreamBitrate(s1, s2, AUDIO_FORMAT_QUALITY_RANKING);
+
+        for (final AudioStream stream : audioStreams) {
+            if (stream.getDeliveryMethod() == DeliveryMethod.TORRENT
+                    || (stream.getDeliveryMethod() == DeliveryMethod.HLS
+                    && stream.getFormat() == MediaFormat.OPUS)) {
+                continue;
+            }
+
+            final String trackId = Objects.toString(stream.getAudioTrackId(), "");
+
+            final AudioStream presentStream = collectedStreams.get(trackId);
+            if (presentStream == null || cmp.compare(stream, presentStream) > 0) {
+                collectedStreams.put(trackId, stream);
+            }
+        }
+
+        if (collectedStreams.size() > 1) {
+            collectedStreams.remove("");
+        }
+
+        return collectedStreams.values().stream()
+                .sorted(getAudioTrackNameComparator())
+                .collect(Collectors.toList());
+    }
+
+    public static int getAudioFormatIndex(final Context context,
+                                          final List<AudioStream> audioStreams,
+                                          @Nullable final String trackId) {
+        if (trackId != null) {
+            for (int i = 0; i < audioStreams.size(); i++) {
+                final AudioStream s = audioStreams.get(i);
+                if (s.getAudioTrackId() != null
+                        && s.getAudioTrackId().equals(trackId)) {
+                    return i;
+                }
+            }
+        }
+        return getDefaultAudioFormat(context, audioStreams);
+    }
+
+    private static Comparator<AudioStream> getAudioTrackNameComparator() {
+        return (s1, s2) -> {
+            final String name1 = s1.getAudioTrackName() != null
+                    ? s1.getAudioTrackName() : "";
+            final String name2 = s2.getAudioTrackName() != null
+                    ? s2.getAudioTrackName() : "";
+            return name1.compareToIgnoreCase(name2);
+        };
     }
 
     /**

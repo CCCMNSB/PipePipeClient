@@ -45,6 +45,8 @@ public class VideoPlaybackResolver implements PlaybackResolver {
     private SourceType streamSourceType;
 
     private int selectedIndex = -1;
+    @Nullable
+    private String audioTrack;
 
     private List<String> blacklistUrls = new ArrayList<>();
 
@@ -107,16 +109,17 @@ public class VideoPlaybackResolver implements PlaybackResolver {
         }
 
         // Create optional audio stream source
-        List<AudioStream> audioStreams = info.getAudioStreams()
-                .stream().filter(s -> !blacklistUrls.contains(s.getContent())).collect(Collectors.toList());
-        removeTorrentStreams(audioStreams);
-        audioStreams = filterUnsupportedFormats(audioStreams, context);
-        final AudioStream audio = audioStreams.isEmpty() ? null : audioStreams.get(
-                ListHelper.getDefaultAudioFormat(context, audioStreams));
+        final List<AudioStream> audioStreams = ListHelper.getFilteredAudioStreams(context,
+                info.getAudioStreams()
+                        .stream().filter(s -> !blacklistUrls.contains(s.getContent()))
+                        .collect(Collectors.toList()));
+        final int audioIndex = ListHelper.getAudioFormatIndex(context, audioStreams, audioTrack);
+        final AudioStream audio = audioStreams.isEmpty() || audioIndex == -1
+                ? null : audioStreams.get(audioIndex);
 
         // Use the audio stream if there is no video stream, or
         // merge with audio stream in case if video does not contain audio
-        if (audio != null && (video == null || video.isVideoOnly())) {
+        if (audio != null && (video == null || video.isVideoOnly() || audioTrack != null)) {
             try {
                 final MediaSource audioSource = PlaybackResolver.buildMediaSource(
                         dataSource, audio, info, PlayerHelper.cacheKeyOf(info, audio), tag);
@@ -207,5 +210,14 @@ public class VideoPlaybackResolver implements PlaybackResolver {
 
     public List<String> getBlacklistUrls() {
         return blacklistUrls;
+    }
+
+    @Nullable
+    public String getAudioTrack() {
+        return audioTrack;
+    }
+
+    public void setAudioTrack(@Nullable final String audioTrack) {
+        this.audioTrack = audioTrack;
     }
 }

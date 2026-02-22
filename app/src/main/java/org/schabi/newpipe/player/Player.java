@@ -83,6 +83,8 @@ import com.google.android.exoplayer2.Player.PositionInfo;
 import com.google.android.exoplayer2.Timeline;
 import com.google.android.exoplayer2.Tracks;
 import com.google.android.exoplayer2.source.MediaSource;
+import com.google.android.exoplayer2.source.TrackGroup;
+import com.google.android.exoplayer2.source.TrackGroupArray;
 import com.google.android.exoplayer2.text.CueGroup;
 import com.google.android.exoplayer2.trackselection.DefaultTrackSelector;
 import com.google.android.exoplayer2.trackselection.MappingTrackSelector;
@@ -306,11 +308,13 @@ public final class Player implements
     private static final int POPUP_MENU_ID_QUALITY = 69;
     private static final int POPUP_MENU_ID_PLAYBACK_SPEED = 79;
     private static final int POPUP_MENU_ID_CAPTION = 89;
+    private static final int POPUP_MENU_ID_AUDIO_TRACK = 99;
 
     private boolean isSomePopupMenuVisible = false;
     private PopupMenu qualityPopupMenu;
     private PopupMenu playbackSpeedPopupMenu;
     private PopupMenu captionPopupMenu;
+    private PopupMenu audioTrackPopupMenu;
 
     /*//////////////////////////////////////////////////////////////////////////
     // Popup player
@@ -503,6 +507,7 @@ public final class Player implements
         qualityPopupMenu = new PopupMenu(themeWrapper, binding.qualityTextView);
         playbackSpeedPopupMenu = new PopupMenu(context, binding.playbackSpeed);
         captionPopupMenu = new PopupMenu(themeWrapper, binding.captionTextView);
+        audioTrackPopupMenu = new PopupMenu(themeWrapper, binding.audioTrackTextView);
 
         binding.progressBarLoadingPanel.getIndeterminateDrawable()
                 .setColorFilter(new PorterDuffColorFilter(Color.WHITE, PorterDuff.Mode.MULTIPLY));
@@ -562,6 +567,7 @@ public final class Player implements
 
         binding.playbackSeekBar.setOnSeekBarChangeListener(this);
         binding.captionTextView.setOnClickListener(this);
+        binding.audioTrackTextView.setOnClickListener(this);
         binding.resizeTextView.setOnClickListener(this);
         binding.playbackLiveSync.setOnClickListener(this);
 
@@ -3516,6 +3522,8 @@ public final class Player implements
 
         notifyMetadataUpdateToListeners();
 
+        onAudioTracksChanged();
+
         if (areSegmentsVisible) {
             if (segmentAdapter.setItems(info)) {
                 final int adapterPosition = getNearestStreamSegmentPosition(
@@ -4218,6 +4226,91 @@ public final class Player implements
                 availableLanguages.isEmpty() ? View.GONE : View.VISIBLE);
     }
 
+    private void onAudioTracksChanged() {
+        if (binding == null) {
+            return;
+        }
+
+        final Optional<StreamInfo> optStreamInfo = getCurrentStreamInfo();
+        if (!optStreamInfo.isPresent()) {
+            binding.audioTrackTextView.setVisibility(View.GONE);
+            return;
+        }
+
+        final StreamInfo streamInfo = optStreamInfo.get();
+        final List<AudioStream> audioStreams = ListHelper.getFilteredAudioStreams(
+                context, streamInfo.getAudioStreams());
+
+        if (audioStreams.size() <= 1) {
+            binding.audioTrackTextView.setVisibility(View.GONE);
+            return;
+        }
+
+        buildAudioTrackMenu(audioStreams);
+
+        final String currentAudioTrack = videoResolver.getAudioTrack();
+        final int selectedIndex;
+        if (currentAudioTrack != null) {
+            int idx = -1;
+            for (int i = 0; i < audioStreams.size(); i++) {
+                if (currentAudioTrack.equals(audioStreams.get(i).getAudioTrackId())) {
+                    idx = i;
+                    break;
+                }
+            }
+            selectedIndex = idx >= 0 ? idx : 0;
+        } else {
+            selectedIndex = ListHelper.getDefaultAudioFormat(context, audioStreams);
+        }
+
+        if (selectedIndex >= 0 && selectedIndex < audioStreams.size()) {
+            final AudioStream selected = audioStreams.get(selectedIndex);
+            binding.audioTrackTextView.setText(
+                    selected.getAudioTrackName() != null
+                            ? selected.getAudioTrackName()
+                            : (selected.getAudioLocale() != null ? selected.getAudioLocale() : "Unknown"));
+        }
+
+        binding.audioTrackTextView.setVisibility(View.VISIBLE);
+    }
+
+    private void buildAudioTrackMenu(@NonNull final List<AudioStream> audioStreams) {
+        if (audioTrackPopupMenu == null) {
+            return;
+        }
+        audioTrackPopupMenu.getMenu().removeGroup(POPUP_MENU_ID_AUDIO_TRACK);
+        audioTrackPopupMenu.setOnDismissListener(this);
+
+        for (int i = 0; i < audioStreams.size(); i++) {
+            final AudioStream audioStream = audioStreams.get(i);
+            final String trackName = audioStream.getAudioTrackName() != null
+                    ? audioStream.getAudioTrackName()
+                    : (audioStream.getAudioLocale() != null ? audioStream.getAudioLocale() : "Unknown");
+            final MenuItem audioTrackItem = audioTrackPopupMenu.getMenu().add(
+                    POPUP_MENU_ID_AUDIO_TRACK, i, Menu.NONE, trackName);
+            final String trackId = audioStream.getAudioTrackId();
+            audioTrackItem.setOnMenuItemClickListener(menuItem -> {
+                setAudioTrack(trackId);
+                return true;
+            });
+        }
+    }
+
+    private void setAudioTrack(@Nullable final String audioTrackId) {
+        saveStreamProgressState();
+        setRecovery();
+        videoResolver.setAudioTrack(audioTrackId);
+        reloadPlayQueueManager();
+    }
+
+    private void onAudioTrackClicked() {
+        if (DEBUG) {
+            Log.d(TAG, "onAudioTrackClicked() called");
+        }
+        audioTrackPopupMenu.show();
+        isSomePopupMenuVisible = true;
+    }
+
     private int getCaptionRendererIndex() {
         if (exoPlayerIsNull()) {
             return RENDERER_UNAVAILABLE;
@@ -4249,6 +4342,8 @@ public final class Player implements
             onResizeClicked();
         } else if (v.getId() == binding.captionTextView.getId()) {
             onCaptionClicked();
+        } else if (v.getId() == binding.audioTrackTextView.getId()) {
+            onAudioTrackClicked();
         } else if (v.getId() == binding.playbackLiveSync.getId()) {
             seekToDefault();
         } else if (v.getId() == binding.playPauseButton.getId()) {
