@@ -207,7 +207,7 @@ public class HistoryRecordManager {
     }
 
     private boolean isStreamHistoryEnabled() {
-        return sharedPreferences.getBoolean(streamHistoryKey, false);
+        return sharedPreferences.getBoolean(streamHistoryKey, true);
     }
 
     ///////////////////////////////////////////////////////

@@ -284,7 +284,7 @@ public final class InfoItemDialog {
         public Builder addMarkAsWatchedEntryIfNeeded() {
             final boolean isWatchHistoryEnabled = PreferenceManager
                     .getDefaultSharedPreferences(context)
-                    .getBoolean(context.getString(R.string.enable_watch_history_key), false);
+                    .getBoolean(context.getString(R.string.enable_watch_history_key), true);
             if (isWatchHistoryEnabled
                     && infoItem.getStreamType() != StreamType.LIVE_STREAM
                     && infoItem.getStreamType() != StreamType.AUDIO_LIVE_STREAM) {
