@@ -279,6 +279,7 @@ public final class Player implements
     private boolean isAudioOnly = false;
     private boolean isPrepared = false;
     private boolean wasPlaying = false;
+    private boolean wasAtLiveEdge = false;
     private boolean isFullscreen = false;
     private boolean isVerticalVideo = false;
     private boolean fragmentIsVisible = false;
@@ -1792,6 +1793,12 @@ public final class Player implements
                     + "duration = [" + duration + "], bufferPercent = [" + bufferPercent + "]");
         }
         binding.playbackLiveSync.setClickable(!isLiveEdge());
+
+        final boolean isCurrentlyAtLiveEdge = isLiveEdge();
+        if (isCurrentlyAtLiveEdge && !wasAtLiveEdge && getPlaybackSpeed() != 1.0f) {
+            setPlaybackSpeed(1.0f);
+        }
+        wasAtLiveEdge = isCurrentlyAtLiveEdge;
 
         notifyProgressUpdateToListeners(currentProgress, duration, bufferPercent);
 
