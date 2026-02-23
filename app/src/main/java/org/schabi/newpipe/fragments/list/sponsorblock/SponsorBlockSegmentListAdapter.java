@@ -3,7 +3,6 @@ package org.schabi.newpipe.fragments.list.sponsorblock;
 import static org.schabi.newpipe.util.TimeUtils.millisecondsToString;
 
 import android.content.Context;
-import android.content.SharedPreferences;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -12,7 +11,6 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
-import androidx.preference.PreferenceManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import org.schabi.newpipe.R;
@@ -236,11 +234,12 @@ public class SponsorBlockSegmentListAdapter extends
             }
 
             final Context context = itemView.getContext();
+            final String userId = SponsorBlockHelper.getUserId(context);
 
             voteSubscriber = Single.fromCallable(() -> {
                         isVoting = true;
                         return SponsorBlockExtractorHelper.submitSponsorBlockSegmentVote(
-                                segmentUuid, SponsorBlockExtractorHelper.getApiUrl(segmentServiceId), value);
+                                segmentUuid, SponsorBlockExtractorHelper.getApiUrl(segmentServiceId), value, userId);
                     })
                     .subscribeOn(Schedulers.io())
                     .observeOn(AndroidSchedulers.mainThread())

@@ -11,7 +11,6 @@ import com.grack.nanojson.JsonObject;
 import com.grack.nanojson.JsonParser;
 import com.grack.nanojson.JsonParserException;
 
-import org.schabi.newpipe.DownloaderImpl;
 import org.schabi.newpipe.R;
 import org.schabi.newpipe.extractor.NewPipe;
 import org.schabi.newpipe.extractor.ServiceList;
@@ -20,14 +19,11 @@ import org.schabi.newpipe.extractor.exceptions.ExtractionException;
 import org.schabi.newpipe.extractor.services.peertube.PeertubeInstance;
 import org.schabi.newpipe.extractor.sponsorblock.SponsorBlockApiSettings;
 import org.schabi.newpipe.extractor.InfoItemsCollector.FilterConfig;
-import org.schabi.newpipe.extractor.utils.Utils;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 
 import static org.schabi.newpipe.extractor.ServiceList.NicoNico;
 import static org.schabi.newpipe.extractor.ServiceList.SoundCloud;
@@ -342,6 +338,8 @@ public final class ServiceHelper {
         final SponsorBlockApiSettings result = new SponsorBlockApiSettings();
         result.apiUrl =
                 prefs.getString(context.getString(R.string.sponsor_block_api_url_key), null);
+        result.userId = SponsorBlockHelper.getUserId(context);
+
         result.includeSponsorCategory =
                 prefs.getBoolean(context
                         .getString(R.string.sponsor_block_category_sponsor_key), false);

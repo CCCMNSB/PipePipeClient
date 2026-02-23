@@ -11,13 +11,30 @@ import org.schabi.newpipe.R;
 import org.schabi.newpipe.extractor.sponsorblock.SponsorBlockCategory;
 import org.schabi.newpipe.extractor.sponsorblock.SponsorBlockSegment;
 import org.schabi.newpipe.extractor.stream.StreamInfo;
+import org.schabi.newpipe.extractor.utils.RandomStringFromAlphabetGenerator;
 import org.schabi.newpipe.views.MarkableSeekBar;
 import org.schabi.newpipe.views.SeekBarMarker;
 
+import java.security.SecureRandom;
+
 public final class SponsorBlockHelper {
 
+    private static final String USER_ID_ALPHABET =
+            "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
 
     private SponsorBlockHelper() {
+    }
+
+    public static String getUserId(final Context context) {
+        final SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
+        final String key = context.getString(R.string.sponsor_block_user_id_key);
+        String userId = prefs.getString(key, null);
+        if (userId == null) {
+            userId = RandomStringFromAlphabetGenerator.generate(
+                    USER_ID_ALPHABET, 32, new SecureRandom());
+            prefs.edit().putString(key, userId).apply();
+        }
+        return userId;
     }
 
     public static Integer convertCategoryToColor(

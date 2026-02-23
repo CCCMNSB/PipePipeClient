@@ -2766,12 +2766,14 @@ public final class VideoDetailFragment
         }
 
         final Context context = requireContext();
+        final String userId = SponsorBlockHelper.getUserId(context);
 
         submitSegmentSubscriber = Single.fromCallable(() ->
                         SponsorBlockExtractorHelper.submitSponsorBlockSegment(
                                 currentInfo,
                                 newSegment,
-                                SponsorBlockExtractorHelper.getApiUrl(currentInfo)))
+                                SponsorBlockExtractorHelper.getApiUrl(currentInfo),
+                                userId))
                 .subscribeOn(Schedulers.io())
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(response -> {
