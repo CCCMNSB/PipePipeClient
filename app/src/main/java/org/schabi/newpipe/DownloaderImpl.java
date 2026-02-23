@@ -202,16 +202,25 @@ public final class DownloaderImpl extends Downloader {
             requestBody = RequestBody.create("", null);
         }
 
-        final okhttp3.Request.Builder requestBuilder = new okhttp3.Request.Builder().method(httpMethod, requestBody).url(url);
-        if (requestBuilder.getHeaders$okhttp().get("User-Agent") == null) {
+        // Check if extractor headers already contain User-Agent or Cookie
+        final boolean hasUserAgent = headers.containsKey("User-Agent");
+        final boolean hasCookie = headers.containsKey("Cookie");
+
+        final okhttp3.Request.Builder requestBuilder = new okhttp3.Request.Builder()
+                .method(httpMethod, requestBody).url(url);
+
+        // Add default User-Agent only if extractor didn't provide one
+        if (!hasUserAgent) {
             requestBuilder.header("User-Agent", USER_AGENT);
         }
 
         final String cookies = getCookies(url);
-        if (!cookies.isEmpty() && requestBuilder.getHeaders$okhttp().get("Cookie") == null) {
+        // Add app-level Cookie only if extractor didn't provide one
+        if (!hasCookie && !cookies.isEmpty()) {
             requestBuilder.header("Cookie", cookies);
         }
 
+        // Add extractor headers (these override any defaults)
         for (final Map.Entry<String, List<String>> pair : headers.entrySet()) {
             final String headerName = pair.getKey();
             final List<String> headerValueList = pair.getValue();
@@ -224,7 +233,6 @@ public final class DownloaderImpl extends Downloader {
             } else if (headerValueList.size() == 1) {
                 requestBuilder.header(headerName, headerValueList.get(0));
             }
-
         }
 
         OkHttpClient tmpClient = client;
