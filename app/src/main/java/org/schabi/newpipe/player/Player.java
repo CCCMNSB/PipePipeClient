@@ -858,9 +858,6 @@ public final class Player implements
         }
 
         if (oldPlayerType != playerType && playQueue != null) {
-            // If playerType changes from one to another we should reload the player
-            // (to disable/enable video stream or to set quality)
-            setRecovery();
             reloadPlayQueueManager();
         }
 
