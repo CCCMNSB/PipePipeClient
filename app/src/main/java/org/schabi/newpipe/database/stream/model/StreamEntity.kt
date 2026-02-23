@@ -66,7 +66,7 @@ data class StreamEntity(
     @Ignore
     constructor(item: StreamInfoItem) : this(
         serviceId = item.serviceId, url = item.url, title = item.name,
-        streamType = item.streamType, duration = item.duration, uploader = item.uploaderName,
+        streamType = item.streamType, duration = item.duration, uploader = item.uploaderName ?: "",
         uploaderUrl = item.uploaderUrl, thumbnailUrl = item.thumbnailUrl, viewCount = item.viewCount,
         textualUploadDate = item.textualUploadDate, uploadDate = item.uploadDate?.offsetDateTime(),
         isUploadDateApproximation = item.uploadDate?.isApproximation
