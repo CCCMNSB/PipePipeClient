@@ -158,13 +158,6 @@
             android:layout_marginBottom="16dp"
             android:text="@string/sponsor_block_skip_marked_segments" />
 
-        <androidx.appcompat.widget.SwitchCompat
-            android:id="@+id/channel_is_whitelisted_switch"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="16dp"
-            android:text="@string/sponsor_block_whitelist_channel" />
-
         <View
             android:layout_width="match_parent"
             android:layout_height="1dp"

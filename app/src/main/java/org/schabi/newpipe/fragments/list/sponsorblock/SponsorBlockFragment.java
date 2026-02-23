@@ -25,13 +25,8 @@ import org.schabi.newpipe.extractor.sponsorblock.SponsorBlockAction;
 import org.schabi.newpipe.extractor.sponsorblock.SponsorBlockCategory;
 import org.schabi.newpipe.extractor.sponsorblock.SponsorBlockSegment;
 import org.schabi.newpipe.extractor.stream.StreamInfo;
-import org.schabi.newpipe.local.sponsorblock.SponsorBlockDataManager;
 import org.schabi.newpipe.util.SponsorBlockHelper;
 import org.schabi.newpipe.util.SponsorBlockMode;
-
-import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
-import io.reactivex.rxjava3.disposables.Disposable;
-import io.reactivex.rxjava3.schedulers.Schedulers;
 
 public class SponsorBlockFragment
         extends BaseFragment
@@ -47,11 +42,7 @@ public class SponsorBlockFragment
     private SponsorBlockSegmentListAdapter segmentListAdapter;
     private int currentProgress = -1;
     private @Nullable SponsorBlockFragmentListener sponsorBlockFragmentListener;
-    private SponsorBlockDataManager sponsorBlockDataManager;
-    private Disposable workerAddToWhitelisted;
-    private Disposable workerRemoveFromWhitelisted;
     private SponsorBlockMode currentSponsorBlockMode = null;
-    private boolean currentIsWhitelisted;
 
     public SponsorBlockFragment() {
     }
@@ -63,8 +54,6 @@ public class SponsorBlockFragment
     @Override
     public void onCreate(final Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
-        sponsorBlockDataManager = new SponsorBlockDataManager(getContext());
     }
 
     @Override
@@ -82,23 +71,12 @@ public class SponsorBlockFragment
     @Override
     public void onDetach() {
         super.onDetach();
-
-        if (workerAddToWhitelisted != null) {
-            workerAddToWhitelisted.dispose();
-        }
-        if (workerRemoveFromWhitelisted != null) {
-            workerRemoveFromWhitelisted.dispose();
-        }
     }
 
     @Override
     public View onCreateView(@NonNull final LayoutInflater inflater,
                              @Nullable final ViewGroup container,
                              @Nullable final Bundle savedInstanceState) {
-        if (sponsorBlockDataManager != null) {
-            sponsorBlockDataManager = new SponsorBlockDataManager(getContext());
-        }
-
         binding = FragmentSponsorBlockBinding.inflate(inflater, container, false);
 
         binding.sponsorBlockControlsMarkSegmentStart.setOnClickListener(v ->
@@ -119,15 +97,7 @@ public class SponsorBlockFragment
         binding.skippingIsEnabledSwitch.setChecked(
                 currentSponsorBlockMode == SponsorBlockMode.ENABLED);
 
-        binding.channelIsWhitelistedSwitch.setChecked(currentIsWhitelisted);
-
-        if (currentIsWhitelisted) {
-            binding.skippingIsEnabledSwitch.setChecked(false);
-            binding.skippingIsEnabledSwitch.setEnabled(!currentIsWhitelisted);
-        }
-
         binding.skippingIsEnabledSwitch.setOnCheckedChangeListener(this);
-        binding.channelIsWhitelistedSwitch.setOnCheckedChangeListener(this);
 
         return binding.getRoot();
     }
@@ -138,41 +108,6 @@ public class SponsorBlockFragment
             if (sponsorBlockFragmentListener != null) {
                 sponsorBlockFragmentListener.onSkippingEnabledChanged(isChecked);
             }
-        } else if (buttonView.getId() == R.id.channel_is_whitelisted_switch) {
-            final Context context = requireContext();
-
-            final String toastText;
-
-            if (isChecked) {
-                toastText = context.getString(
-                        R.string.sponsor_block_uploader_added_to_whitelist_toast);
-
-                workerAddToWhitelisted =
-                        sponsorBlockDataManager.addToWhitelist(streamInfo.getUploaderName())
-                                .subscribeOn(Schedulers.io())
-                                .observeOn(AndroidSchedulers.mainThread())
-                                .subscribe(result -> {
-                                    Toast.makeText(context, toastText, Toast.LENGTH_LONG).show();
-                                }, error -> {
-                                    // TODO
-                                });
-            } else {
-                toastText = context.getString(
-                        R.string.sponsor_block_uploader_removed_from_whitelist_toast);
-
-                workerRemoveFromWhitelisted =
-                        sponsorBlockDataManager.removeFromWhitelist(streamInfo.getUploaderName())
-                                .subscribeOn(Schedulers.io())
-                                .observeOn(AndroidSchedulers.mainThread())
-                                .subscribe(() -> {
-                                    Toast.makeText(context, toastText, Toast.LENGTH_LONG).show();
-                                }, error -> {
-                                    // TODO
-                                });
-            }
-
-            binding.skippingIsEnabledSwitch.setChecked(false);
-            binding.skippingIsEnabledSwitch.setEnabled(!isChecked);
         }
     }
 
@@ -190,26 +125,6 @@ public class SponsorBlockFragment
         binding.skippingIsEnabledSwitch.setOnCheckedChangeListener(null);
         binding.skippingIsEnabledSwitch.setChecked(mode == SponsorBlockMode.ENABLED);
         binding.skippingIsEnabledSwitch.setOnCheckedChangeListener(this);
-    }
-
-    public void setIsWhitelisted(final boolean value) {
-        currentIsWhitelisted = value;
-
-        if (binding == null) {
-            return;
-        }
-
-        binding.channelIsWhitelistedSwitch.setOnCheckedChangeListener(null);
-        binding.channelIsWhitelistedSwitch.setChecked(value);
-        binding.channelIsWhitelistedSwitch.setOnCheckedChangeListener(this);
-
-        if (value) {
-            binding.skippingIsEnabledSwitch.setOnCheckedChangeListener(null);
-            binding.skippingIsEnabledSwitch.setChecked(false);
-            binding.skippingIsEnabledSwitch.setOnCheckedChangeListener(this);
-
-            binding.skippingIsEnabledSwitch.setEnabled(!currentIsWhitelisted);
-        }
     }
 
     public void setCurrentProgress(final int progress) {

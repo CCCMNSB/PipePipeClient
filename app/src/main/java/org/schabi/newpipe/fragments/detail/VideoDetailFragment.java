@@ -84,7 +84,6 @@ import org.schabi.newpipe.fragments.list.videos.RelatedItemsFragment;
 import org.schabi.newpipe.ktx.AnimationType;
 import org.schabi.newpipe.local.dialog.PlaylistDialog;
 import org.schabi.newpipe.local.history.HistoryRecordManager;
-import org.schabi.newpipe.local.sponsorblock.SponsorBlockDataManager;
 import org.schabi.newpipe.player.PlayerService.PlayerType;
 import org.schabi.newpipe.player.Player;
 import org.schabi.newpipe.player.event.OnKeyDownListener;
@@ -173,10 +172,9 @@ public final class VideoDetailFragment
     @NonNull
     final List<Integer> tabContentDescriptions = new ArrayList<>();
     private boolean tabSettingsChanged = false;
-    private int lastAppBarVerticalOffset = Integer.MAX_VALUE; // prevents useless updates
+    private int lastAppBarVerticalOffset = Integer.MAX_VALUE;
     private final SharedPreferences.OnSharedPreferenceChangeListener preferenceChangeListener =
             this::onSharedPreferencesChanged;
-    private Disposable workerSponsorBlockModeCheck;
 
     private void onSharedPreferencesChanged(final SharedPreferences sharedPreferences,
                                             final String key) {
@@ -239,7 +237,6 @@ public final class VideoDetailFragment
     private PlayerServiceInterface playerService;
     private Player player;
     private final PlayerHolder playerHolder = PlayerHolder.getInstance();
-    private SponsorBlockDataManager sponsorBlockDataManager;
 
     /*//////////////////////////////////////////////////////////////////////////
     // Service management
@@ -341,8 +338,6 @@ public final class VideoDetailFragment
         activity.getContentResolver().registerContentObserver(
                 Settings.System.getUriFor(Settings.System.ACCELEROMETER_ROTATION), false,
                 settingsContentObserver);
-
-        sponsorBlockDataManager = new SponsorBlockDataManager(requireContext());
     }
 
     @Override
@@ -446,9 +441,6 @@ public final class VideoDetailFragment
         super.onDetach();
         if (submitSegmentSubscriber != null) {
             submitSegmentSubscriber.dispose();
-        }
-        if (workerSponsorBlockModeCheck != null) {
-            workerSponsorBlockModeCheck.dispose();
         }
     }
 
@@ -1212,20 +1204,10 @@ public final class VideoDetailFragment
 
                 pageAdapter.updateItem(SPONSOR_BLOCK_TAB_TAG, sponsorBlockFragment);
 
-                workerSponsorBlockModeCheck =
-                        sponsorBlockDataManager
-                                .isWhiteListed(info.getUploaderName())
-                                .subscribeOn(Schedulers.io())
-                                .observeOn(AndroidSchedulers.mainThread())
-                                .subscribe(isWhitelisted -> {
-                                    if (currentSponsorBlockMode == null) {
-                                        currentSponsorBlockMode = isWhitelisted
-                                                ? SponsorBlockMode.DISABLED
-                                                : SponsorBlockMode.ENABLED;
-                                    }
-                                    sponsorBlockFragment.setSponsorBlockMode(currentSponsorBlockMode);
-                                    sponsorBlockFragment.setIsWhitelisted(isWhitelisted);
-                                });
+                if (currentSponsorBlockMode == null) {
+                    currentSponsorBlockMode = SponsorBlockMode.ENABLED;
+                }
+                sponsorBlockFragment.setSponsorBlockMode(currentSponsorBlockMode);
             }
         }
 
@@ -2111,26 +2093,12 @@ public final class VideoDetailFragment
                 prefs.getBoolean(getString(R.string.sponsor_block_enable_key), false);
 
         if (player != null && isSponsorBlockEnabled) {
-            workerSponsorBlockModeCheck =
-                    sponsorBlockDataManager
-                            .isWhiteListed(info.getUploaderName())
-                            .subscribeOn(Schedulers.io())
-                            .observeOn(AndroidSchedulers.mainThread())
-                            .subscribe(isWhitelisted -> {
-                                if (currentSponsorBlockMode == null) {
-                                    currentSponsorBlockMode = isWhitelisted
-                                            ? SponsorBlockMode.DISABLED
-                                            : SponsorBlockMode.ENABLED;
-                                }
-                                if (player != null) {
-                                    player.setSponsorBlockMode(currentSponsorBlockMode);
-                                }
-                                getSponsorBlockFragment().ifPresent(
-                                        fragment -> {
-                                            fragment.setSponsorBlockMode(currentSponsorBlockMode);
-                                            fragment.setIsWhitelisted(isWhitelisted);
-                                        });
-                            });
+            if (currentSponsorBlockMode == null) {
+                currentSponsorBlockMode = SponsorBlockMode.ENABLED;
+            }
+            player.setSponsorBlockMode(currentSponsorBlockMode);
+            getSponsorBlockFragment().ifPresent(
+                    fragment -> fragment.setSponsorBlockMode(currentSponsorBlockMode));
         }
         final StackItem item = findQueueInStack(queue);
         if (item != null) {
