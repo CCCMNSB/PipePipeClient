@@ -92,7 +92,7 @@
 <string name="download_thumbnail_summary">Deaktivieren, um das Laden von Miniaturbildern zu verhindern, und somit Daten- und Speichernutzung zu sparen. Änderungen leeren sowohl den im Speicher als auch auf der Festplatte gespeicherten Bildcache</string>
 <string name="show_comments_title">Kommentare anzeigen</string>
 <string name="show_comments_summary">Deaktivieren, um Kommentare auszublenden</string>
-<string name="show_next_and_similar_title">\</string>
+<string name="show_next_and_similar_title">\'Nächste\' und \'Ähnliche\' Videos anzeigen</string>
 <string name="show_description_title">Beschreibung anzeigen</string>
 <string name="show_description_summary">Deaktivieren, um die Videobeschreibung und zusätzliche Informationen auszublenden</string>
 <string name="show_meta_info_title">Meta-Informationen anzeigen</string>
