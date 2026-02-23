@@ -735,10 +735,8 @@ public class MainActivity extends AppCompatActivity {
      * </pre>
      */
     private void onHomeButtonPressed() {
-        // If search fragment wasn't found in the backstack...
         if (!NavigationHelper.tryGotoSearchFragment(getSupportFragmentManager())) {
-            // ...go to the main fragment
-            NavigationHelper.gotoMainFragment(getSupportFragmentManager());
+            onBackPressed();
         }
     }
 
