@@ -2,6 +2,7 @@ package org.schabi.newpipe.settings;
 
 import android.os.Bundle;
 import android.webkit.CookieManager;
+import android.webkit.CookieSyncManager;
 import android.widget.Toast;
 import androidx.preference.Preference;
 import org.schabi.newpipe.R;
@@ -22,13 +23,11 @@ public class AccountSettingsFragment extends BasePreferenceFragment {
     }
 
     private void clearWebViewCookies() {
+        CookieSyncManager.createInstance(requireContext());
         final CookieManager cookieManager = CookieManager.getInstance();
         cookieManager.removeAllCookies(success -> {
             if (getContext() != null) {
-                final String message = success 
-                    ? getString(R.string.webview_cookies_cleared)
-                    : getString(R.string.webview_cookies_clear_failed);
-                Toast.makeText(getContext(), message, Toast.LENGTH_SHORT).show();
+                Toast.makeText(getContext(), R.string.webview_cookies_cleared, Toast.LENGTH_SHORT).show();
             }
         });
         cookieManager.flush();
