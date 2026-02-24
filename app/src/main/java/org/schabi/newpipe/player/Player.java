@@ -2459,7 +2459,13 @@ public final class Player implements
                 .observeOn(AndroidSchedulers.mainThread())
                 .map(s -> {
                     Duration ret = getCurrentPositionDuration();
-                    if(currentItem!= null && currentItem.getStartAt() != -1 && currentItem.getStreamType() == StreamType.LIVE_STREAM){
+                    // YouTube livestreams use DASH and getCurrentPosition() works correctly
+                    // Other services (HLS) need startAt hack for correct comment timing
+                    if(currentItem != null
+                            && StreamTypeUtil.isLiveStream(currentItem.getStreamType())
+                            && currentMetadata != null
+                            && currentMetadata.getServiceId() != YouTube.getServiceId()
+                            && currentItem.getStartAt() != -1){
                         ret = Duration.ofMillis(new Date().getTime() - currentItem.getStartAt());
                     }
                     if(ret == null){
@@ -3176,11 +3182,16 @@ public final class Player implements
      * @param currentProgress
      */
     private void updatePlayBackElementsCurrentDuration(final int currentProgress) {
-        // Don't set seekbar progress while user is seeking
         if (currentState != STATE_PAUSED_SEEK) {
             binding.playbackSeekBar.setProgress(currentProgress);
         }
-        if(currentItem!= null && currentItem.getStartAt() != -1 && currentItem.getStreamType() == StreamType.LIVE_STREAM){
+        // YouTube livestreams use DASH and getCurrentPosition() works correctly
+        // Other services (HLS) need startAt hack to show correct time
+        if (currentItem != null
+                && StreamTypeUtil.isLiveStream(currentItem.getStreamType())
+                && currentMetadata != null
+                && currentMetadata.getServiceId() != YouTube.getServiceId()
+                && currentItem.getStartAt() != -1) {
             binding.playbackCurrentTime.setText(getTimeString((int) (new Date().getTime() - currentItem.getStartAt())));
         } else {
             binding.playbackCurrentTime.setText(getTimeString(currentProgress));

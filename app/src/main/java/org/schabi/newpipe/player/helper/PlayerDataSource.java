@@ -127,6 +127,13 @@ public class PlayerDataSource {
                 cachelessDataSourceFactory);
     }
 
+    public DashMediaSource.Factory getLiveYoutubeDashMediaSourceFactory() {
+        return new DashMediaSource.Factory(
+                getDefaultDashChunkSourceFactory(cachelessDataSourceFactory),
+                cachelessDataSourceFactory)
+                .setManifestParser(new YoutubeDashLiveManifestParser());
+    }
+
     public HlsMediaSource.Factory getHlsMediaSourceFactory(
             @Nullable final HlsPlaylistParserFactory hlsPlaylistParserFactory) {
         final HlsMediaSource.Factory factory = new HlsMediaSource.Factory(
