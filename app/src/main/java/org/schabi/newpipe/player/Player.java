@@ -4187,11 +4187,8 @@ public final class Player implements
             binding.subtitleView.setFractionalTextSize(
                     SubtitleView.DEFAULT_TEXT_SIZE_FRACTION * captionRatio);
         } else {
-            final DisplayMetrics metrics = context.getResources().getDisplayMetrics();
-            final int minimumLength = Math.min(metrics.heightPixels, metrics.widthPixels);
-            final float captionRatioInverse = 20f + 4f * (1.0f - captionScale);
-            binding.subtitleView.setFixedTextSize(
-                    TypedValue.COMPLEX_UNIT_PX, minimumLength / captionRatioInverse);
+            binding.subtitleView.setFractionalTextSize(
+                    SubtitleView.DEFAULT_TEXT_SIZE_FRACTION * captionScale);
         }
         binding.subtitleView.setApplyEmbeddedStyles(captionStyle == CaptionStyleCompat.DEFAULT);
         binding.subtitleView.setStyle(captionStyle);
