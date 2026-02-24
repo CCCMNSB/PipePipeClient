@@ -118,8 +118,6 @@ public class PlayerService extends Service implements PlayerServiceInterface {
 
         player = new Player(this);
         player.setupFromView(binding);
-
-        NotificationUtil.getInstance().createNotificationAndStartForeground(player, this);
     }
 
     @Override
@@ -138,10 +136,10 @@ public class PlayerService extends Service implements PlayerServiceInterface {
             player = new Player(this);
         }
 
-        if (Intent.ACTION_MEDIA_BUTTON.equals(intent.getAction())
-                || intent.getStringExtra(Player.PLAY_QUEUE_KEY) != null) {
-            NotificationUtil.getInstance().createNotificationAndStartForeground(player, this);
-        }
+        // Always ensure notification is created and service is in foreground
+        // This is required for Android 15+ which restricts foreground service starts
+        NotificationUtil.getInstance().createNotificationAndStartForeground(player, this);
+
         player.handleIntent(intent);
         if (player.getMediaSessionManager() != null) {
             player.getMediaSessionManager().handleMediaButtonIntent(intent);
