@@ -61,7 +61,10 @@ data class StreamEntity(
     var uploadDate: OffsetDateTime? = null,
 
     @ColumnInfo(name = STREAM_IS_UPLOAD_DATE_APPROXIMATION)
-    var isUploadDateApproximation: Boolean? = null
+    var isUploadDateApproximation: Boolean? = null,
+
+    @ColumnInfo(name = STREAM_IS_PAID)
+    var isPaid: Boolean = false
 ) : Serializable {
     @Ignore
     constructor(item: StreamInfoItem) : this(
@@ -69,7 +72,8 @@ data class StreamEntity(
         streamType = item.streamType, duration = item.duration, uploader = item.uploaderName ?: "",
         uploaderUrl = item.uploaderUrl, thumbnailUrl = item.thumbnailUrl, viewCount = item.viewCount,
         textualUploadDate = item.textualUploadDate, uploadDate = item.uploadDate?.offsetDateTime(),
-        isUploadDateApproximation = item.uploadDate?.isApproximation
+        isUploadDateApproximation = item.uploadDate?.isApproximation,
+        isPaid = item.requiresMembership()
     )
 
     @Ignore
@@ -78,7 +82,8 @@ data class StreamEntity(
         streamType = info.streamType, duration = info.duration, uploader = info.uploaderName,
         uploaderUrl = info.uploaderUrl, thumbnailUrl = info.thumbnailUrl, viewCount = info.viewCount,
         textualUploadDate = info.textualUploadDate, uploadDate = info.uploadDate?.offsetDateTime(),
-        isUploadDateApproximation = info.uploadDate?.isApproximation
+        isUploadDateApproximation = info.uploadDate?.isApproximation,
+        isPaid = info.requiresMembership()
     )
 
     @Ignore
@@ -101,6 +106,8 @@ data class StreamEntity(
             DateWrapper(it, isUploadDateApproximation ?: false)
         }
 
+        item.setRequiresMembership(isPaid)
+
         return item
     }
 
@@ -120,5 +127,6 @@ data class StreamEntity(
         const val STREAM_TEXTUAL_UPLOAD_DATE = "textual_upload_date"
         const val STREAM_UPLOAD_DATE = "upload_date"
         const val STREAM_IS_UPLOAD_DATE_APPROXIMATION = "is_upload_date_approximation"
+        const val STREAM_IS_PAID = "is_paid"
     }
 }

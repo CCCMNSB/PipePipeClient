@@ -28,6 +28,7 @@ public final class Migrations {
     public static final int DB_VER_8 = 8;
     public static final int DB_VER_9 = 9;
     public static final int DB_VER_900 = 900;
+    public static final int DB_VER_901 = 901;
 
     private static final String TAG = Migrations.class.getName();
     public static final boolean DEBUG = MainActivity.DEBUG;
@@ -416,6 +417,13 @@ public final class Migrations {
                     + "ON `remote_playlists` (`name`)");
             database.execSQL("CREATE UNIQUE INDEX `index_remote_playlists_service_id_url` "
                     + "ON `remote_playlists` (`service_id`, `url`)");
+        }
+    };
+
+    public static final Migration MIGRATION_900_901 = new Migration(DB_VER_900, DB_VER_901) {
+        @Override
+        public void migrate(@NonNull final SupportSQLiteDatabase database) {
+            database.execSQL("ALTER TABLE streams ADD COLUMN is_paid INTEGER NOT NULL DEFAULT 0");
         }
     };
 

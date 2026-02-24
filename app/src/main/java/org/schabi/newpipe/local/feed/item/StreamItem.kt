@@ -67,7 +67,17 @@ data class StreamItem(
         viewBinding.itemVideoTitleView.text = stream.title
         viewBinding.itemUploaderView.text = stream.uploader
 
-        if (stream.duration > 0) {
+        if (stream.isPaid) {
+            viewBinding.itemDurationView.setText(R.string.paid_video)
+            viewBinding.itemDurationView.setBackgroundColor(
+                ContextCompat.getColor(
+                    viewBinding.itemDurationView.context,
+                    R.color.paid_video_background_color
+                )
+            )
+            viewBinding.itemDurationView.visibility = View.VISIBLE
+            viewBinding.itemProgressView.visibility = View.GONE
+        } else if (stream.duration > 0) {
             viewBinding.itemDurationView.text = Localization.getDurationString(stream.duration)
             viewBinding.itemDurationView.setBackgroundColor(
                 ContextCompat.getColor(
