@@ -854,7 +854,7 @@
 <string name="sponsor_promote">サポーターになる</string>
 <string name="random_play_order_title">ランダムな順序</string>
 <string name="random_play_order_summary">バックグラウンドで再生する際にローカルプレイリストを自動的にシャッフルします</string>
-<string name="update_log">### バグ修正\n\n- ライブ配信が動作しない (YouTube)\n- \"ロボットではないことを確認するためにログインしてください\" が誤って \"コンテンツを利用できません\" として扱われる (YouTube)</string>
+<string name="update_log">### 新機能\n\n- ライブ配信の巻き戻しを最大4時間までサポート（YouTube）\n- 音声トラックの選択をサポート\n- 新着情報フィードでメンバー向け動画に「有料」インジケーターを追加\n- ライブ配信の端に到達したら再生速度を1xにリセット\n\n### バグ修正\n\n- 動画が読み込めないことがある（YouTube）\n- Shortsの再生リストを解析できない（YouTube）\n- チャンネルの動画の読み込みに失敗することがある（YouTube）\n- 一部の再生リスト解析時に「アップローダー名を取得できません」と表示される（YouTube）\n- Shortsでサムネイルが表示されない（YouTube）\n- ポッドキャストの再生リストが再生リストタブに表示されない（YouTube）\n- 複数クリエイターの動画を解析できない（YouTube）\n- 一部動画で弾幕が表示されない（NicoNico）\n- 動画の所有者名を正しく抽出するように修正（BiliBili）\n- ポップアッププレーヤーに切り替えると動画が数秒戻ってしまう\n- 字幕サイズがシステム設定を反映しない\n- 特定の条件下でランダムにクラッシュする問題\n- Android 15以降で予期しないクラッシュ\n- ブックマーク再生リストで「視聴済みにする」が機能しない\n- アップローダー不明の動画を再生リストに追加しようとするとUIがクラッシュ\n- 特定の条件下でアプリからWebViewのCookieを消去できない\n- Android 6でネットワークリクエストが正常に動作しない\n\n### その他\n\n- 翻訳の更新（トルコ語、ドイツ語）\n- ツールバーの戻るボタンはメイン画面ではなく前の画面に戻るべき\n- 「アップロード日で並べ替え」検索フィルターを削除（YouTube）</string>
 <string name="speeding_playback_title">長時間押は再生速度を速めることができます</string>
 <string name="view_on_github">GitHubで表示</string>
 <string name="donation_dialog_title">プロジェクトをサポートする</string>
