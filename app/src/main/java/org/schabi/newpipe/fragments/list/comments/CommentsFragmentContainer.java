@@ -43,8 +43,6 @@ public class CommentsFragmentContainer extends BaseFragment {
             final LayoutInflater inflater, @Nullable final ViewGroup container,
             final Bundle savedInstanceState) {
         final View view = inflater.inflate(R.layout.fragment_container, container, false);
-        // Only set the fragment if this is not a configuration change (like rotation)
-        // or if the fragment doesn't exist yet
         if (savedInstanceState == null) {
             setFragment(getFM(), serviceId, url, name);
         }
@@ -52,10 +50,13 @@ public class CommentsFragmentContainer extends BaseFragment {
     }
 
     public void update(final int serviceId, final String url, final String name) {
+        if (!isAdded() || isRemoving()) {
+            return;
+        }
         if (this.serviceId == serviceId
                 && Objects.equals(this.url, url)
                 && Objects.equals(this.name, name)) {
-            return; // 参数未变化时跳过更新
+            return;
         }
         this.serviceId = serviceId;
         this.url = url;
@@ -71,11 +72,15 @@ public class CommentsFragmentContainer extends BaseFragment {
             return;
         }
 
+        if (fm.isStateSaved()) {
+            return;
+        }
+
         Fragment existing = fm.findFragmentById(R.id.fragment_container_view);
         if (existing instanceof CommentsFragment) {
             CommentsFragment cf = (CommentsFragment) existing;
             if (cf.getServiceId() == sid && cf.getUrl().equals(u) && cf.getName().equals(title)) {
-                return; // 已有相同参数的Fragment存在
+                return;
             }
         }
 
@@ -89,6 +94,9 @@ public class CommentsFragmentContainer extends BaseFragment {
     public static void setFragment(
             final FragmentManager fm, final CommentsInfoItem comment
     ) throws IOException, ClassNotFoundException {
+        if (fm == null || fm.isStateSaved()) {
+            return;
+        }
         final Page reply = comment.getReplies();
         final CommentReplyFragment fragment = CommentReplyFragment.getInstance(
                 comment.getServiceId(), comment.getUrl(),
@@ -97,6 +105,6 @@ public class CommentsFragmentContainer extends BaseFragment {
         fm.beginTransaction()
                 .replace(R.id.fragment_container_view, fragment)
                 .addToBackStack(null)
-                .commit();
+                .commitAllowingStateLoss();
     }
 }
