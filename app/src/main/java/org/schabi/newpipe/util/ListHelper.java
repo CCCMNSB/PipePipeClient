@@ -123,7 +123,7 @@ public final class ListHelper {
                 .orElse(null);
     }
 
-    private static List<AudioStream> filterAudioStreamsByLanguage(
+    public static List<AudioStream> filterAudioStreamsByLanguage(
             final List<AudioStream> audioStreams, final String preferredLanguage) {
         if (audioStreams == null || audioStreams.isEmpty()) {
             return Collections.emptyList();

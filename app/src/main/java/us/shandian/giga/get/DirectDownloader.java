@@ -103,7 +103,7 @@ public class DirectDownloader {
                 continue;
             }
             final AudioStream audioStream = SecondaryStreamHelper
-                    .getAudioStreamFor(wrappedAudioStreams.getStreamsList(), videoStreams.get(i));
+                    .getAudioStreamFor(context, wrappedAudioStreams.getStreamsList(), videoStreams.get(i));
 
             if (audioStream != null) {
                 secondaryStreams
