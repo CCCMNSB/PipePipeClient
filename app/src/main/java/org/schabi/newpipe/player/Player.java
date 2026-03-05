@@ -2459,13 +2459,7 @@ public final class Player implements
                 .observeOn(AndroidSchedulers.mainThread())
                 .map(s -> {
                     Duration ret = getCurrentPositionDuration();
-                    // YouTube livestreams use DASH and getCurrentPosition() works correctly
-                    // Other services (HLS) need startAt hack for correct comment timing
-                    if(currentItem != null
-                            && StreamTypeUtil.isLiveStream(currentItem.getStreamType())
-                            && currentMetadata != null
-                            && currentMetadata.getServiceId() != YouTube.getServiceId()
-                            && currentItem.getStartAt() != -1){
+                    if(currentItem!= null && currentItem.getStartAt() != -1 && currentItem.getStreamType() == StreamType.LIVE_STREAM){
                         ret = Duration.ofMillis(new Date().getTime() - currentItem.getStartAt());
                     }
                     if(ret == null){
