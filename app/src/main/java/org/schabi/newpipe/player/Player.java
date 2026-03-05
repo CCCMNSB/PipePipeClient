@@ -4306,6 +4306,7 @@ public final class Player implements
         saveStreamProgressState();
         setRecovery();
         videoResolver.setAudioTrack(audioTrackId);
+        audioResolver.setAudioTrack(audioTrackId);
         reloadPlayQueueManager();
     }
 

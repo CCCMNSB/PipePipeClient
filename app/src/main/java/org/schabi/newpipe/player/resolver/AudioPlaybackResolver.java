@@ -32,6 +32,8 @@ public class AudioPlaybackResolver implements PlaybackResolver {
     @NonNull
     private final PlayerDataSource dataSource;
     private List<String> blacklistUrls = new ArrayList<>();
+    @Nullable
+    private String audioTrack;
 
     public AudioPlaybackResolver(@NonNull final Context context,
                                  @NonNull final PlayerDataSource dataSource) {
@@ -52,7 +54,7 @@ public class AudioPlaybackResolver implements PlaybackResolver {
         removeTorrentStreams(audioStreams);
         audioStreams = filterUnsupportedFormats(audioStreams, context);
 
-        final int index = ListHelper.getDefaultAudioFormat(context, audioStreams);
+        final int index = ListHelper.getAudioFormatIndex(context, audioStreams, audioTrack);
         if (index < 0 || index >= info.getAudioStreams().size()) {
             return null;
         }
@@ -74,5 +76,14 @@ public class AudioPlaybackResolver implements PlaybackResolver {
 
     public List<String> getBlacklistUrls() {
         return blacklistUrls;
+    }
+
+    @Nullable
+    public String getAudioTrack() {
+        return audioTrack;
+    }
+
+    public void setAudioTrack(@Nullable final String audioTrack) {
+        this.audioTrack = audioTrack;
     }
 }
