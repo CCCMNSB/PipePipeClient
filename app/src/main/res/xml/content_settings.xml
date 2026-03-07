@@ -35,7 +35,7 @@
 
     <ListPreference
         android:key="@string/preferred_audio_language_key"
-        android:defaultValue="@string/sort_origin"
+        android:defaultValue="original"
         android:entries="@array/audio_langs"
         android:entryValues="@array/audio_lang_values"
         android:title="@string/preferred_audio_language_title"

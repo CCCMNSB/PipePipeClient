@@ -83,6 +83,7 @@ import java.security.SecureRandom;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 
@@ -177,6 +178,11 @@ public class MainActivity extends AppCompatActivity {
 
         final App app = App.getApp();
         final SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(app);
+
+        String audioLang = prefs.getString(getString(R.string.preferred_audio_language_key), "original");
+        if (!Arrays.asList("original", "en", "fr", "de", "es", "pt", "ru", "tr", "zh", "ja", "hi", "ko", "th", "vi", "bn", "id", "ar").contains(audioLang)) {
+            prefs.edit().putString(getString(R.string.preferred_audio_language_key), "original").apply();
+        } // remove this after sometime
 
         if (prefs.getBoolean(app.getString(R.string.update_app_key), false)) {
             // Start the worker which is checking all conditions
