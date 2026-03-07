@@ -783,6 +783,16 @@ public final class ListHelper {
         }
     }
 
+    private static int getCodecPriority(final VideoStream stream) {
+        String codec = stream.getCodec();
+        if (codec == null) return 0;
+        if (codec.startsWith("av01")) return 4;
+        if (codec.startsWith("vp09") || codec.startsWith("vp9")) return 3;
+        if (codec.startsWith("hev1") || codec.startsWith("hvc1")) return 2;
+        if (codec.startsWith("avc")) return 1;
+        return 0;
+    }
+
     // Compares the quality of two video streams.
     private static int compareVideoStreamResolution(final VideoStream streamA,
                                                     final VideoStream streamB) {
@@ -797,6 +807,11 @@ public final class ListHelper {
                 streamB.getResolution());
         if (resComp != 0) {
             return resComp;
+        }
+
+        final int codecComp = getCodecPriority(streamA) - getCodecPriority(streamB);
+        if (codecComp != 0) {
+            return codecComp;
         }
 
         if (streamA.getBitrate() - streamB.getBitrate() != 0) {
