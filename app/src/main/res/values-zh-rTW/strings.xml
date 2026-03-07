@@ -888,7 +888,7 @@
 <string name="sponsor_promote">成為支持者</string>
 <string name="random_play_order_title">隨機順序</string>
 <string name="random_play_order_summary">在背景播放時自動隨機播放您的本地播放列表</string>
-<string name="update_log">### 新功能\n\n- 支援直播倒轉最多 4 小時（YouTube）\n- 支援選擇音軌\n- 在「最新動態」資訊流中的會員影片新增「付費」標記\n- 當播放到直播邊界時，將播放速度重設為 1x\n\n### 錯誤修正\n\n- 有時候無法載入影片（YouTube）\n- 無法解析 Shorts 播放清單（YouTube）\n- 有時候無法載入頻道影片（YouTube）\n- 解析部分播放清單時顯示「無法取得上傳者名稱」（YouTube）\n- Shorts 沒有縮圖（YouTube）\n- Podcast 播放清單未顯示在播放清單分頁（YouTube）\n- 無法解析有多位創作者的影片（YouTube）\n- 部分影片彈幕不顯示（NicoNico）\n- 正確擷取影片擁有者名稱（BiliBili）\n- 切換到懸浮播放器時，影片會倒退幾秒\n- 字幕大小未遵循系統設定\n- 在某些情況下發生各種隨機當機\n- 在 Android 15 以上版本發生意外當機\n- 書籤播放清單中的「標記為已觀看」功能無法運作\n- 嘗試將上傳者未知的影片加入播放清單時，介面當機\n- 在特定情況下，無法從應用程式清除 WebView Cookie\n- 在 Android 6 上的網路請求無法正常運作\n\n### 其他\n\n- 更新翻譯（土耳其語、德語）\n- 工具列返回按鈕應返回上一個畫面，而非主畫面\n- 移除「依上傳日期排序」搜尋篩選器（YouTube）</string>
+<string name="update_log">### 錯誤修正\n\n- 預設首選音訊語言未如預期設為「原始」\n- 播放器未優先選擇進階格式\n- 無法播放某些直播串流（YouTube）\n- 某些受年齡限制的影片被錯誤地標示為 IP 封鎖（YouTube）\n- 切換至背景播放時有時會變成錯誤的音軌（YouTube）\n- 下載時有時未使用首選音訊語言（YouTube）</string>
 <string name="speeding_playback_title">按住以加速播放</string>
 <string name="view_on_github">在 GitHub 上查看</string>
 <string name="donation_dialog_title">支持這項計畫</string>
