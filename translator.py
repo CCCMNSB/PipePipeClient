@@ -301,7 +301,7 @@ class StringTranslator:
 
 
     def add_new_entry(self, name, value):
-        self.base.add_entry('resources', 'string', {'name': name}, value)
+        self.base.add_entry('resources', 'string', {'name': name}, escape(value))
         self.base.write_to_file()
         updates = {name: value}
 
@@ -387,7 +387,7 @@ class StringTranslator:
 
         # Update the base XML with the new value
         try:
-            self.base.update_entry(f'string[name="{name}"]', new_value)
+            self.base.update_entry(f'string[name="{name}"]', escape(new_value))
             self.base.write_to_file()
             print(f"Updated base entry '{name}' with new value.")
         except Exception as e:
