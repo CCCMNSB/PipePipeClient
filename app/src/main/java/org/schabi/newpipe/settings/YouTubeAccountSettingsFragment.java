@@ -3,6 +3,7 @@ package org.schabi.newpipe.settings;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.widget.Toast;
+import androidx.appcompat.app.AlertDialog;
 import org.schabi.newpipe.R;
 import org.schabi.newpipe.extractor.services.youtube.YoutubeParsingHelper;
 import org.schabi.newpipe.views.YouTubeLoginWebViewActivity;
@@ -17,6 +18,16 @@ public class YouTubeAccountSettingsFragment extends BaseAccountSettingsFragment 
     @Override
     protected Class<?> getLoginActivityClass() {
         return YouTubeLoginWebViewActivity.class;
+    }
+
+    @Override
+    protected void onLoginClicked() {
+        new AlertDialog.Builder(requireContext())
+                .setTitle(R.string.youtube_login_warning_title)
+                .setMessage(R.string.youtube_login_warning_message)
+                .setNegativeButton(R.string.cancel, null)
+                .setPositiveButton(R.string.ok, (dialog, which) -> startLoginActivity())
+                .show();
     }
 
     @Override

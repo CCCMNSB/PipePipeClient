@@ -38,6 +38,15 @@ public abstract class BaseAccountSettingsFragment extends BasePreferenceFragment
     protected abstract void handleLoginResult(Intent data);
     protected abstract void performLogout();
 
+    protected void onLoginClicked() {
+        startLoginActivity();
+    }
+
+    protected final void startLoginActivity() {
+        Intent intent = new Intent(getContext(), getLoginActivityClass());
+        startActivityForResult(intent, REQUEST_LOGIN);
+    }
+
     private void initializePreferences() {
         login = findPreference(getString(R.string.login_key));
         logout = findPreference(getString(R.string.logout_key));
@@ -50,8 +59,7 @@ public abstract class BaseAccountSettingsFragment extends BasePreferenceFragment
 
     private void setupClickListeners() {
         login.setOnPreferenceClickListener(preference -> {
-            Intent intent = new Intent(getContext(), getLoginActivityClass());
-            startActivityForResult(intent, REQUEST_LOGIN);
+            onLoginClicked();
             return true;
         });
 
