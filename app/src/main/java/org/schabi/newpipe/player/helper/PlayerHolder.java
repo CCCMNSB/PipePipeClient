@@ -8,8 +8,6 @@ import android.os.IBinder;
 import android.util.Log;
 
 import androidx.annotation.Nullable;
-import androidx.core.content.ContextCompat;
-
 import com.google.android.exoplayer2.PlaybackException;
 import com.google.android.exoplayer2.PlaybackParameters;
 
@@ -130,7 +128,6 @@ public final class PlayerHolder {
         // and NullPointerExceptions inside the service because the service will be
         // bound twice. Prevent it with unbinding first
         unbind(context);
-        ContextCompat.startForegroundService(context, new Intent(context, DeviceUtils.getPlayerServiceClass()));
         serviceConnection.doPlayAfterConnect(playAfterConnect);
         bind(context);
     }
