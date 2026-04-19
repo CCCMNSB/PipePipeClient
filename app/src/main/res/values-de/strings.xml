@@ -836,7 +836,7 @@
 <string name="sponsor_promote">Unterstützer werden</string>
 <string name="random_play_order_title">Zufällige Reihenfolge</string>
 <string name="random_play_order_summary">Automatisch Ihre lokalen Wiedergabelisten mischen, wenn sie im Hintergrund abgespielt werden</string>
-<string name="update_log">Nach einiger Arbeit haben wir eine neue zuverlässige Methode gefunden, um den YouTube-Login wieder zum Laufen zu bringen.\n\n### Neue Funktionen\n\n- Erneute Unterstützung für den Login (YouTube)\n- Verwendung einer neuen Methode, um sicherzustellen, dass Titel nie automatisch übersetzt werden (YouTube)\n\n### Fehlerbehebungen\n\n- Gelegentlicher Fehler \"Inhalt nicht verfügbar\" aufgrund von SABR-Verschlüsselung (YouTube)\n- Verwandte Elemente haben keine Aufrufzahlen und Dauer (YouTube)\n- Erhöhung des Feed-Abrufintervalls, um IP-Sperren zu vermeiden (BiliBili)\n- Einige Links werden fälschlicherweise als PeerTube-URL erkannt\n\n### Sonstiges\n\n- Aktualisierung der Übersetzungen (Französisch)\n- Verbesserung der Stabilität</string>
+<string name="update_log">### Fehlerbehebungen\n\n- Die Wiedergabe schlug zufällig fehl, wenn man angemeldet war (YouTube)\n- Manchmal konnten Livestreams nicht mit angemeldetem Konto abgespielt werden (YouTube)\n- Die AVC1-Videowiedergabe ruckelt auf einigen Geräten\n\n### Sonstiges\n\n- Stabilität verbessert</string>
 <string name="speeding_playback_title">Langes Drücken, um die Wiedergabe zu beschleunigen</string>
 <string name="view_on_github">Auf GitHub ansehen</string>
 <string name="donation_dialog_title">Projekt unterstützen</string>

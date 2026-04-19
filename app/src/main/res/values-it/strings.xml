@@ -756,7 +756,7 @@
 <string name="sponsor_promote">Diventa un sostenitore</string>
 <string name="random_play_order_title">Ordine casuale</string>
 <string name="random_play_order_summary">Mescola automaticamente le tue playlist locali quando vengono riprodotte in background</string>
-<string name="update_log">Dopo un po\' di lavoro, abbiamo trovato un nuovo metodo affidabile per far funzionare nuovamente il login di YouTube.\n\n### Nuove funzionalità\n\n- Ripristinato il login (YouTube)\n- Utilizzato un nuovo metodo per assicurarsi che i titoli non vengano mai tradotti automaticamente (YouTube)\n\n### Correzioni di bug\n\n- Errore casuale \"Contenuto non disponibile\" dovuto alla crittografia SABR (YouTube)\n- Gli elementi correlati non mostrano conteggio visualizzazioni e durata (YouTube)\n- Aumentato l\'intervallo di recupero del feed per evitare il ban dell\'IP (BiliBili)\n- Alcuni link venivano erroneamente riconosciuti come URL PeerTube\n\n### Altro\n\n- Aggiornamento traduzioni (francese)\n- Migliorata la stabilità</string>
+<string name="update_log">### Correzioni di bug\n\n- La riproduzione falliva casualmente se effettuato l\'accesso (YouTube)\n- A volte le dirette non potevano essere riprodotte con l\'account connesso (YouTube)\n- La riproduzione video AVC1 presenta rallentamenti su alcuni dispositivi\n\n### Altro\n\n- Migliorata la stabilità</string>
 <string name="speeding_playback_title">Premi a lungo per aumentare la velocità di riproduzione</string>
 <string name="view_on_github">Visualizza su GitHub</string>
 <string name="donation_dialog_title">Supporta il progetto</string>
