@@ -1108,4 +1108,11 @@
 <string name="trending_replaced">YouTube has recently removed the Trending Videos feature, so we\'ve updated our default YouTube trending tab to show Recommended Lives instead. If you don\'t want to see this, you can remove the tab in Settings and set another one as your homepage.</string>
 <string name="youtube_login_warning_title">Log in only when needed</string>
 <string name="youtube_login_warning_message">Due to YouTube\'s encryption, logged-in playback only provides AVC formats, audio-only downloads are unavailable, in-progress live streams cannot be rewound, and extraction is less stable. \n\nYou should log in only if:\n1. You cannot watch videos anonymously because of IP blocks\n2. You need to watch age-restricted videos\n3. You are a member of a channel and need to watch its member-only videos\n\nIf video extraction or playback fails while logged in, please try logging out and report the issue on GitHub.</string>
+<string name="filter">Filter</string>
+<string name="search_type">Search type</string>
+<string name="select_service">Select service</string>
+<string name="perform_search">Perform search</string>
+<string name="done">Done</string>
+<string name="expand">Expand</string>
+<string name="collapse">Collapse</string>
 </resources>

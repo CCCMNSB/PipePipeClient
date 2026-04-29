@@ -1008,4 +1008,11 @@
 <string name="trending_replaced">YouTube hat die Funktion „Trendvideos“ kürzlich entfernt, daher haben wir unseren standardmäßigen YouTube-Trends-Tab aktualisiert, damit stattdessen empfohlene Livestreams angezeigt werden. Wenn du das nicht sehen möchtest, kannst du den Tab in den Einstellungen entfernen und einen anderen als deine Startseite festlegen.</string>
 <string name="youtube_login_warning_title">Nur bei Bedarf anmelden</string>
 <string name="youtube_login_warning_message">Aufgrund der Verschlüsselung von YouTube bietet die Wiedergabe nach der Anmeldung nur AVC-Formate; Audio-Only-Downloads sind nicht verfügbar, laufende Live-Streams können nicht zurückgespult werden, und die Extraktion ist weniger stabil. \n\nSie sollten sich nur anmelden, wenn:\n1. Sie Videos aufgrund von IP-Sperren nicht anonym ansehen können\n2. Sie altersbeschränkte Videos ansehen müssen\n3. Sie Mitglied eines Kanals sind und dessen nur für Mitglieder zugängliche Videos ansehen müssen\n\nWenn die Videoextraktion oder Wiedergabe bei angemeldetem Konto fehlschlägt, melden Sie sich bitte ab und melden Sie das Problem auf GitHub.</string>
+<string name="filter">Filter</string>
+<string name="search_type">Suchtyp</string>
+<string name="select_service">Dienst auswählen</string>
+<string name="perform_search">Suche ausführen</string>
+<string name="done">Fertig</string>
+<string name="expand">Erweitern</string>
+<string name="collapse">Reduzieren</string>
 </resources>

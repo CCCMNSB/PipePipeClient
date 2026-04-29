@@ -1116,4 +1116,11 @@ nSự khác biệt giữa hai loại này là cái nào nhanh thường thiếu 
 <string name="trending_replaced">YouTube gần đây đã gỡ bỏ tính năng Video thịnh hành, vì vậy chúng tôi đã cập nhật tab thịnh hành mặc định của YouTube để hiển thị các luồng trực tiếp được đề xuất thay vào đó. Nếu bạn không muốn thấy điều này, bạn có thể xóa tab trong Cài đặt và đặt tab khác làm trang chủ của mình.</string>
 <string name="youtube_login_warning_title">Chỉ đăng nhập khi cần thiết</string>
 <string name="youtube_login_warning_message">Do mã hóa của YouTube, phát lại khi đã đăng nhập chỉ cung cấp định dạng AVC, không thể tải xuống âm thanh בלבד, không thể tua lại các luồng trực tiếp đang diễn ra, và việc trích xuất kém ổn định hơn. \n\nBạn chỉ nên đăng nhập nếu:\n1. Bạn không thể xem video ẩn danh vì bị chặn IP\n2. Bạn cần xem các video bị giới hạn độ tuổi\n3. Bạn là thành viên của một kênh và cần xem các video chỉ dành cho thành viên của kênh đó\n\nNếu việc trích xuất video hoặc phát lại thất bại khi đã đăng nhập, vui lòng thử đăng xuất và báo cáo sự cố trên GitHub.</string>
+<string name="filter">Bộ lọc</string>
+<string name="search_type">Loại tìm kiếm</string>
+<string name="select_service">Chọn dịch vụ</string>
+<string name="perform_search">Thực hiện tìm kiếm</string>
+<string name="done">Xong</string>
+<string name="expand">Mở rộng</string>
+<string name="collapse">Thu gọn</string>
 </resources>

@@ -1062,4 +1062,11 @@
 <string name="trending_replaced">YouTube 最近移除了「發燒影片」功能，因此我們已將預設的 YouTube 發燒分頁改為顯示「推薦直播」。如果你不想看到這個分頁，可以在「設定」中將其移除，並將其他分頁設為你的首頁。</string>
 <string name="youtube_login_warning_title">僅在需要時登入</string>
 <string name="youtube_login_warning_message">由於 YouTube 的加密限制，登入後播放僅支援 AVC 格式，無法下載僅含音訊的內容，進行中的直播無法倒轉，且擷取穩定性較低。\n\n只有在以下情況下才應登入：\n1. 因 IP 封鎖而無法匿名觀看影片\n2. 需要觀看受年齡限制的影片\n3. 你是某頻道的會員，且需要觀看該頻道的會員限定影片\n\n如果登入後影片擷取或播放失敗，請先嘗試登出，並在 GitHub 上回報問題。</string>
+<string name="filter">篩選</string>
+<string name="search_type">搜尋類型</string>
+<string name="select_service">選擇服務</string>
+<string name="perform_search">執行搜尋</string>
+<string name="done">完成</string>
+<string name="expand">展開</string>
+<string name="collapse">收合</string>
 </resources>

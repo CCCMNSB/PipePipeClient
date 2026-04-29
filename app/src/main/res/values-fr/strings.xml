@@ -1032,4 +1032,11 @@ Vous devez l\'accepter pour nous envoyer le rapport de bug.</string>
 <string name="trending_replaced">YouTube a récemment supprimé la fonctionnalité Tendances, nous avons donc mis à jour notre onglet YouTube Tendances par défaut pour afficher à la place des diffusions en direct recommandées. Si vous ne souhaitez pas voir cela, vous pouvez supprimer l\'onglet dans Paramètres et en définir un autre comme page d\'accueil.</string>
 <string name="youtube_login_warning_title">Connexion uniquement si nécessaire</string>
 <string name="youtube_login_warning_message">En raison du chiffrement de YouTube, la lecture lorsque vous êtes connecté ne fournit que des formats AVC ; les téléchargements audio uniquement ne sont pas disponibles, les diffusions en direct en cours ne peuvent pas être rembobinées, et l’extraction est moins stable. \n\nVous ne devriez vous connecter que si :\n1. Vous ne pouvez pas regarder les vidéos anonymement à cause de blocages IP\n2. Vous devez regarder des vidéos soumises à une restriction d’âge\n3. Vous êtes membre d’une chaîne et devez regarder ses vidéos réservées aux membres\n\nSi l’extraction ou la lecture de la vidéo échoue lorsque vous êtes connecté, veuillez essayer de vous déconnecter et signaler le problème sur GitHub.</string>
+<string name="filter">Filtrer</string>
+<string name="search_type">Type de recherche</string>
+<string name="select_service">Sélectionner un service</string>
+<string name="perform_search">Effectuer la recherche</string>
+<string name="done">Terminé</string>
+<string name="expand">Développer</string>
+<string name="collapse">Réduire</string>
 </resources>

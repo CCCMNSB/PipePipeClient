@@ -1030,4 +1030,11 @@
 <string name="trending_replaced">YouTubeは最近「急上昇動画」機能を廃止したため、既定のYouTubeの急上昇タブは、代わりに「おすすめのライブ配信」を表示するように更新しました。これを表示したくない場合は、設定でそのタブを削除し、別のタブをホームページとして設定できます。</string>
 <string name="youtube_login_warning_title">必要な場合のみログインしてください</string>
 <string name="youtube_login_warning_message">YouTubeの暗号化のため、ログイン状態での再生ではAVC形式のみが提供され、音声のみのダウンロードは利用できず、進行中のライブ配信を巻き戻すことはできず、抽出の安定性も低くなります。\n\nログインするのは次の場合のみです:\n1. IPブロックのため匿名では動画を視聴できない\n2. 年齢制限付き動画を視聴する必要がある\n3. チャンネルのメンバーで、メンバー限定動画を視聴する必要がある\n\nログイン中に動画の抽出または再生に失敗した場合は、ログアウトしてからGitHubで問題を報告してください。</string>
+<string name="filter">フィルター</string>
+<string name="search_type">検索タイプ</string>
+<string name="select_service">サービスを選択</string>
+<string name="perform_search">検索を実行</string>
+<string name="done">完了</string>
+<string name="expand">展開</string>
+<string name="collapse">折りたたむ</string>
 </resources>

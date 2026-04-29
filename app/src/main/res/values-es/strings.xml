@@ -1065,4 +1065,11 @@
 <string name="trending_replaced">YouTube ha eliminado recientemente la función de Videos en Tendencias, así que hemos actualizado nuestra pestaña de Tendencias predeterminada de YouTube para mostrar transmisiones en vivo recomendadas en su lugar. Si no quieres ver esto, puedes eliminar la pestaña en Configuración y establecer otra como tu página de inicio.</string>
 <string name="youtube_login_warning_title">Inicia sesión solo cuando sea necesario</string>
 <string name="youtube_login_warning_message">Debido al cifrado de YouTube, la reproducción con sesión iniciada solo ofrece formatos AVC, las descargas de solo audio no están disponibles, las transmisiones en vivo en curso no se pueden rebobinar y la extracción es menos estable. \n\nDeberías iniciar sesión solo si:\n1. No puedes ver videos de forma anónima debido a bloqueos de IP\n2. Necesitas ver videos con restricción de edad\n3. Eres miembro de un canal y necesitas ver sus videos solo para miembros\n\nSi la extracción del video o la reproducción falla mientras has iniciado sesión, intenta cerrar sesión e informa del problema en GitHub.</string>
+<string name="filter">Filtro</string>
+<string name="search_type">Tipo de búsqueda</string>
+<string name="select_service">Seleccionar servicio</string>
+<string name="perform_search">Realizar búsqueda</string>
+<string name="done">Hecho</string>
+<string name="expand">Expandir</string>
+<string name="collapse">Contraer</string>
 </resources>
