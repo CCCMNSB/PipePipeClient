@@ -40,11 +40,10 @@ data class StreamItem(
 
     override fun getId(): Long = stream.uid
 
-    enum class ItemVersion { NORMAL, MINI, GRID, CARD }
+    enum class ItemVersion { NORMAL, GRID, CARD }
 
     override fun getLayout(): Int = when (itemVersion) {
         ItemVersion.NORMAL -> R.layout.list_stream_item
-        ItemVersion.MINI -> R.layout.list_stream_mini_item
         ItemVersion.GRID -> R.layout.list_stream_grid_item
         ItemVersion.CARD -> R.layout.list_stream_card_item
     }
@@ -53,10 +52,8 @@ data class StreamItem(
 
     override fun bind(viewBinding: ListStreamItemBinding, position: Int, payloads: MutableList<Any>) {
         if (payloads.contains(UPDATE_RELATIVE_TIME)) {
-            if (itemVersion != ItemVersion.MINI) {
-                viewBinding.itemAdditionalDetails.text =
-                    getStreamInfoDetailLine(viewBinding.itemAdditionalDetails.context)
-            }
+            viewBinding.itemAdditionalDetails.text =
+                getStreamInfoDetailLine(viewBinding.itemAdditionalDetails.context)
             return
         }
 
@@ -112,10 +109,8 @@ data class StreamItem(
         PicassoHelper.loadScaledDownThumbnail(viewBinding.root.context, stream.thumbnailUrl)
             .into(viewBinding.itemThumbnailView)
 
-        if (itemVersion != ItemVersion.MINI) {
-            viewBinding.itemAdditionalDetails.text =
-                getStreamInfoDetailLine(viewBinding.itemAdditionalDetails.context)
-        }
+        viewBinding.itemAdditionalDetails.text =
+            getStreamInfoDetailLine(viewBinding.itemAdditionalDetails.context)
 
         execBindEnd?.accept(viewBinding)
     }

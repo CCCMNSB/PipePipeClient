@@ -46,5 +46,4 @@
         android:textSize="@dimen/video_item_search_upload_date_text_size"
         tools:ignore="RtlHardcoded"
         tools:text="10M subscribers" />
-
 </RelativeLayout>

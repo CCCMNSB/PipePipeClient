@@ -158,6 +158,15 @@ class FeedFragment : BaseStateFragment<FeedState>() {
                 getString(R.string.list_view_mode_key) -> {
                     updateListViewModeOnResume = true
                 }
+                getString(R.string.grid_layout_enabled_key) -> {
+                    updateListViewModeOnResume = true
+                }
+                getString(R.string.grid_columns_key) -> {
+                    updateListViewModeOnResume = true
+                }
+                getString(R.string.grid_columns_landscape_key) -> {
+                    updateListViewModeOnResume = true
+                }
                 getString(R.string.pull_to_refresh_key) -> {
                     updatePullToRefreshOnResume = true
                 }
@@ -745,7 +754,6 @@ class FeedFragment : BaseStateFragment<FeedState>() {
     private fun handleLoadedState(loadedState: FeedState.LoadedState) {
         val itemVersion = when (getItemViewMode(requireContext())) {
             ItemViewMode.GRID -> StreamItem.ItemVersion.GRID
-            ItemViewMode.LARGE_GRID -> StreamItem.ItemVersion.GRID
             ItemViewMode.CARD -> StreamItem.ItemVersion.CARD
             else -> StreamItem.ItemVersion.NORMAL
         }

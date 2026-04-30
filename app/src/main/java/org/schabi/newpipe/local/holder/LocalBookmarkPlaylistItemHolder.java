@@ -13,17 +13,14 @@ import org.schabi.newpipe.local.history.HistoryRecordManager;
 import java.time.format.DateTimeFormatter;
 
 public class LocalBookmarkPlaylistItemHolder extends LocalPlaylistItemHolder {
-    private final View itemHandleView;
-
     public LocalBookmarkPlaylistItemHolder(final LocalItemBuilder infoItemBuilder,
                                            final ViewGroup parent) {
-        this(infoItemBuilder, R.layout.list_playlist_bookmark_item, parent);
+        this(infoItemBuilder, R.layout.list_playlist_item, parent);
     }
 
     LocalBookmarkPlaylistItemHolder(final LocalItemBuilder infoItemBuilder, final int layoutId,
                                     final ViewGroup parent) {
         super(infoItemBuilder, layoutId, parent);
-        itemHandleView = itemView.findViewById(R.id.itemHandle);
     }
 
     @Override
@@ -35,6 +32,7 @@ public class LocalBookmarkPlaylistItemHolder extends LocalPlaylistItemHolder {
         }
         final PlaylistMetadataEntry item = (PlaylistMetadataEntry) localItem;
 
+        itemHandleView.setVisibility(View.VISIBLE);
         itemHandleView.setOnTouchListener(getOnTouchListener(item));
 
         super.updateFromItem(localItem, historyRecordManager, dateTimeFormatter);

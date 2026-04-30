@@ -25,6 +25,7 @@ import java.util.concurrent.TimeUnit;
 public class LocalPlaylistStreamItemHolder extends LocalItemHolder {
     public final ImageView itemThumbnailView;
     public final TextView itemVideoTitleView;
+    private final TextView itemUploaderView;
     private final TextView itemAdditionalDetailsView;
     public final TextView itemDurationView;
     private final View itemHandleView;
@@ -36,6 +37,7 @@ public class LocalPlaylistStreamItemHolder extends LocalItemHolder {
 
         itemThumbnailView = itemView.findViewById(R.id.itemThumbnailView);
         itemVideoTitleView = itemView.findViewById(R.id.itemVideoTitleView);
+        itemUploaderView = itemView.findViewById(R.id.itemUploaderView);
         itemAdditionalDetailsView = itemView.findViewById(R.id.itemAdditionalDetails);
         itemDurationView = itemView.findViewById(R.id.itemDurationView);
         itemHandleView = itemView.findViewById(R.id.itemHandle);
@@ -44,7 +46,7 @@ public class LocalPlaylistStreamItemHolder extends LocalItemHolder {
 
     public LocalPlaylistStreamItemHolder(final LocalItemBuilder infoItemBuilder,
                                          final ViewGroup parent) {
-        this(infoItemBuilder, R.layout.list_stream_playlist_item, parent);
+        this(infoItemBuilder, R.layout.list_stream_item, parent);
     }
 
     @Override
@@ -57,6 +59,9 @@ public class LocalPlaylistStreamItemHolder extends LocalItemHolder {
         final PlaylistStreamEntry item = (PlaylistStreamEntry) localItem;
 
         itemVideoTitleView.setText(item.getStreamEntity().getTitle());
+        if (itemUploaderView != null) {
+            itemUploaderView.setVisibility(View.GONE);
+        }
         itemAdditionalDetailsView.setText(Localization
                 .concatenateStrings(item.getStreamEntity().getUploader(),
                         NewPipe.getNameOfService(item.getStreamEntity().getServiceId())));
@@ -98,6 +103,7 @@ public class LocalPlaylistStreamItemHolder extends LocalItemHolder {
             return true;
         });
 
+        itemHandleView.setVisibility(View.VISIBLE);
         itemHandleView.setOnTouchListener(getOnTouchListener(item));
     }
 

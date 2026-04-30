@@ -21,6 +21,7 @@ package org.schabi.newpipe.util;
 
 import android.app.Activity;
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.graphics.drawable.Drawable;
@@ -328,27 +329,20 @@ public final class ThemeHelper {
      * @return true:use grid layout, false:use list layout
      */
     public static boolean shouldUseGridLayout(final Context context) {
-        final ItemViewMode mode = getItemViewMode(context);
-        return isGrid(mode);
+        final SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(context);
+        migrateLegacyListViewMode(context, preferences);
+        return preferences.getBoolean(context.getString(R.string.grid_layout_enabled_key), true);
     }
 
     public static boolean isGrid(ItemViewMode mode)  {
-        return mode == ItemViewMode.GRID || mode == ItemViewMode.LARGE_GRID;
+        return mode == ItemViewMode.GRID;
     }
 
     public static int getGridWidth(Context context) {
-        final ItemViewMode mode = getItemViewMode(context);
-        if (mode == ItemViewMode.LARGE_GRID) {
-            return context.getResources().getDimensionPixelSize(R.dimen.video_item_grid_thumbnail_image_large_width);
-        }
         return context.getResources().getDimensionPixelSize(R.dimen.video_item_grid_thumbnail_image_width);
     }
 
     public static int getGridHeight(Context context) {
-        final ItemViewMode mode = getItemViewMode(context);
-        if (mode == ItemViewMode.LARGE_GRID) {
-            return context.getResources().getDimensionPixelSize(R.dimen.video_item_grid_thumbnail_image_large_height);
-        }
         return context.getResources().getDimensionPixelSize(R.dimen.video_item_grid_thumbnail_image_height);
     }
 
@@ -359,8 +353,9 @@ public final class ThemeHelper {
      * @return the span count of grid channel info items
      */
     public static int getGridSpanCountChannels(final Context context) {
-        return getGridSpanCount(context,
-                context.getResources().getDimensionPixelSize(R.dimen.channel_item_grid_min_width));
+        final SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(context);
+        migrateLegacyListViewMode(context, preferences);
+        return getConfiguredGridColumns(context, preferences);
     }
 
     /**
@@ -369,30 +364,12 @@ public final class ThemeHelper {
      * @return Returns one of ItemViewMode
      */
     public static ItemViewMode getItemViewMode(final Context context) {
-        final String listMode = PreferenceManager.getDefaultSharedPreferences(context)
-                .getString(context.getString(R.string.list_view_mode_key),
-                        context.getString(R.string.list_view_mode_value));
-        final ItemViewMode result;
-        if (listMode.equals(context.getString(R.string.list_view_mode_list_key))) {
-            result = ItemViewMode.LIST;
-        } else if (listMode.equals(context.getString(R.string.list_view_mode_grid_key))) {
-            result = ItemViewMode.GRID;
-        } else if (listMode.equals(context.getString(R.string.list_view_mode_large_grid_key))) {
-            result = ItemViewMode.LARGE_GRID;
-        } else if (listMode.equals(context.getString(R.string.list_view_mode_card_key))) {
-            result = ItemViewMode.CARD;
-        } else {
-            // Auto mode - evaluate whether to use Grid based on screen real estate.
-            final Configuration configuration = context.getResources().getConfiguration();
-            final boolean useGrid = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-                    && configuration.isLayoutSizeAtLeast(Configuration.SCREENLAYOUT_SIZE_LARGE);
-            if (useGrid) {
-                result = ItemViewMode.GRID;
-            } else {
-                result = ItemViewMode.LIST;
-            }
+        final SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(context);
+        migrateLegacyListViewMode(context, preferences);
+        if (preferences.getBoolean(context.getString(R.string.card_mode_enabled_key), false)) {
+            return ItemViewMode.CARD;
         }
-        return result;
+        return shouldUseGridLayout(context) ? ItemViewMode.GRID : ItemViewMode.LIST;
     }
 
     /**
@@ -404,10 +381,9 @@ public final class ThemeHelper {
      * @return the span count of grid stream info items
      */
     public static int getGridSpanCountStreams(final Context context) {
-        final Resources res = context.getResources();
-        return getGridSpanCount(context,
-                getGridWidth(context)
-                        + res.getDimensionPixelSize(R.dimen.video_item_search_padding) * 2);
+        final SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(context);
+        migrateLegacyListViewMode(context, preferences);
+        return getConfiguredGridColumns(context, preferences);
     }
 
     /**
@@ -420,5 +396,70 @@ public final class ThemeHelper {
      */
     public static int getGridSpanCount(final Context context, final int minWidth) {
         return Math.max(1, context.getResources().getDisplayMetrics().widthPixels / minWidth);
+    }
+
+    private static int getConfiguredGridColumns(final Context context,
+                                                final SharedPreferences preferences) {
+        final boolean landscape = context.getResources().getConfiguration().orientation
+                == Configuration.ORIENTATION_LANDSCAPE;
+        final String key = landscape
+                ? context.getString(R.string.grid_columns_landscape_key)
+                : context.getString(R.string.grid_columns_key);
+        final String defaultValue = landscape ? "4" : "2";
+        final String value = preferences.getString(key, defaultValue);
+        try {
+            return Math.max(1, Integer.parseInt(value));
+        } catch (final NumberFormatException e) {
+            return Integer.parseInt(defaultValue);
+        }
+    }
+
+    public static void migrateLegacyListViewMode(final Context context,
+                                                 final SharedPreferences preferences) {
+        final String migrationKey = context.getString(R.string.list_view_mode_migrated_key);
+        if (preferences.getBoolean(migrationKey, false)) {
+            return;
+        }
+
+        final String listMode = preferences.getString(context.getString(R.string.list_view_mode_key),
+                context.getString(R.string.list_view_mode_value));
+        final SharedPreferences.Editor editor = preferences.edit();
+
+        final boolean isAuto = listMode.equals(context.getString(R.string.list_view_mode_auto_key));
+        final boolean useGrid;
+        if (listMode.equals(context.getString(R.string.list_view_mode_grid_key))) {
+            useGrid = true;
+            editor.putString(context.getString(R.string.grid_columns_key), "2");
+            editor.putString(context.getString(R.string.grid_columns_landscape_key), "4");
+        } else if (listMode.equals(context.getString(R.string.list_view_mode_large_grid_key))) {
+            useGrid = true;
+            editor.putString(context.getString(R.string.grid_columns_key), "1");
+            editor.putString(context.getString(R.string.grid_columns_landscape_key), "2");
+        } else if (listMode.equals(context.getString(R.string.list_view_mode_card_key))) {
+            useGrid = false;
+            editor.putBoolean(context.getString(R.string.card_mode_enabled_key), true);
+        } else if (isAuto) {
+            final Configuration configuration = context.getResources().getConfiguration();
+            useGrid = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+                    && configuration.isLayoutSizeAtLeast(Configuration.SCREENLAYOUT_SIZE_LARGE);
+            if (useGrid) {
+                editor.putString(context.getString(R.string.grid_columns_key), "2");
+                editor.putString(context.getString(R.string.grid_columns_landscape_key), "4");
+            }
+        } else {
+            useGrid = false;
+        }
+
+        editor.putBoolean(context.getString(R.string.grid_layout_enabled_key), useGrid);
+        if (!preferences.contains(context.getString(R.string.grid_columns_key))) {
+            editor.putString(context.getString(R.string.grid_columns_key), "2");
+        }
+        if (!preferences.contains(context.getString(R.string.grid_columns_landscape_key))) {
+            editor.putString(context.getString(R.string.grid_columns_landscape_key), "4");
+        }
+        if (!preferences.contains(context.getString(R.string.card_mode_enabled_key))) {
+            editor.putBoolean(context.getString(R.string.card_mode_enabled_key), false);
+        }
+        editor.putBoolean(migrationKey, true).apply();
     }
 }

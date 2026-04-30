@@ -1684,4 +1684,30 @@
         <item>enqueue</item>
         <item>disable</item>
     </string-array>
+
+    <string name="grid_layout_enabled_key">grid_layout_enabled_key</string>
+    <string name="grid_columns_key">grid_columns_key</string>
+    <string name="grid_columns_landscape_key">grid_columns_landscape_key</string>
+    <string name="card_mode_enabled_key">card_mode_enabled_key</string>
+    <string name="list_view_mode_migrated_key">list_view_mode_migrated_key</string>
+    <string-array name="grid_columns_entries">
+        <item>1</item>
+        <item>2</item>
+        <item>3</item>
+        <item>4</item>
+        <item>5</item>
+        <item>6</item>
+        <item>7</item>
+        <item>8</item>
+    </string-array>
+    <string-array name="grid_columns_values">
+        <item>1</item>
+        <item>2</item>
+        <item>3</item>
+        <item>4</item>
+        <item>5</item>
+        <item>6</item>
+        <item>7</item>
+        <item>8</item>
+    </string-array>
 </resources>

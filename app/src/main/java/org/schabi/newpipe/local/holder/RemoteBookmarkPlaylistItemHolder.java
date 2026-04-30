@@ -13,17 +13,14 @@ import org.schabi.newpipe.local.history.HistoryRecordManager;
 import java.time.format.DateTimeFormatter;
 
 public class RemoteBookmarkPlaylistItemHolder extends RemotePlaylistItemHolder {
-    private final View itemHandleView;
-
     public RemoteBookmarkPlaylistItemHolder(final LocalItemBuilder infoItemBuilder,
                                             final ViewGroup parent) {
-        this(infoItemBuilder, R.layout.list_playlist_bookmark_item, parent);
+        this(infoItemBuilder, R.layout.list_playlist_item, parent);
     }
 
     RemoteBookmarkPlaylistItemHolder(final LocalItemBuilder infoItemBuilder, final int layoutId,
                                      final ViewGroup parent) {
         super(infoItemBuilder, layoutId, parent);
-        itemHandleView = itemView.findViewById(R.id.itemHandle);
     }
 
     @Override
@@ -35,6 +32,7 @@ public class RemoteBookmarkPlaylistItemHolder extends RemotePlaylistItemHolder {
         }
         final PlaylistRemoteEntity item = (PlaylistRemoteEntity) localItem;
 
+        itemHandleView.setVisibility(View.VISIBLE);
         itemHandleView.setOnTouchListener(getOnTouchListener(item));
 
         super.updateFromItem(localItem, historyRecordManager, dateTimeFormatter);

@@ -1,7 +1,6 @@
 package org.schabi.newpipe.local;
 
 import android.content.SharedPreferences;
-import android.content.res.Resources;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.Menu;
@@ -23,6 +22,7 @@ import org.schabi.newpipe.databinding.PignateFooterBinding;
 import org.schabi.newpipe.fragments.BaseStateFragment;
 import org.schabi.newpipe.fragments.list.ListViewContract;
 import org.schabi.newpipe.info_list.ItemViewMode;
+import org.schabi.newpipe.util.ThemeHelper;
 
 import static org.schabi.newpipe.ktx.ViewUtils.animate;
 import static org.schabi.newpipe.ktx.ViewUtils.animateHideRecyclerViewAllowingScrolling;
@@ -93,9 +93,10 @@ public abstract class BaseLocalListFragment<I, N> extends BaseStateFragment<I>
      */
     private void refreshItemViewMode() {
         final ItemViewMode itemViewMode = getItemViewMode(requireContext());
-        itemsList.setLayoutManager((isGrid(itemViewMode) && !forceUseListLayout())
+        final ItemViewMode appliedItemViewMode = forceUseListLayout() ? ItemViewMode.LIST : itemViewMode;
+        itemsList.setLayoutManager((isGrid(appliedItemViewMode))
                 ? getGridLayoutManager() : getListLayoutManager());
-        itemListAdapter.setItemViewMode(itemViewMode);
+        itemListAdapter.setItemViewMode(appliedItemViewMode);
         itemListAdapter.notifyDataSetChanged();
     }
 
@@ -113,11 +114,7 @@ public abstract class BaseLocalListFragment<I, N> extends BaseStateFragment<I>
     }
 
     protected RecyclerView.LayoutManager getGridLayoutManager() {
-        final Resources resources = activity.getResources();
-        int width = getGridWidth(activity);
-        width += (24 * resources.getDisplayMetrics().density);
-        final int spanCount = (int) Math.floor(resources.getDisplayMetrics().widthPixels
-                / (double) width);
+        final int spanCount = ThemeHelper.getGridSpanCountStreams(activity);
         final GridLayoutManager lm = new GridLayoutManager(activity, spanCount);
         lm.setSpanSizeLookup(itemListAdapter.getSpanSizeLookup(spanCount));
         return lm;
@@ -266,7 +263,10 @@ public abstract class BaseLocalListFragment<I, N> extends BaseStateFragment<I>
     @Override
     public void onSharedPreferenceChanged(final SharedPreferences sharedPreferences,
                                           final String key) {
-        if (key != null && key.equals(getString(R.string.list_view_mode_key))) {
+        if (key != null && (key.equals(getString(R.string.list_view_mode_key))
+                || key.equals(getString(R.string.grid_layout_enabled_key))
+                || key.equals(getString(R.string.grid_columns_key))
+                || key.equals(getString(R.string.grid_columns_landscape_key)))) {
             updateFlags |= LIST_MODE_UPDATE_FLAG;
         }
     }

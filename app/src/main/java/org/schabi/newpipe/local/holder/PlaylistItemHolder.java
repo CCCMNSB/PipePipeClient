@@ -1,5 +1,6 @@
 package org.schabi.newpipe.local.holder;
 
+import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.TextView;
@@ -16,6 +17,7 @@ public abstract class PlaylistItemHolder extends LocalItemHolder {
     final TextView itemStreamCountView;
     public final TextView itemTitleView;
     public final TextView itemUploaderView;
+    public final View itemHandleView;
 
     public PlaylistItemHolder(final LocalItemBuilder infoItemBuilder, final int layoutId,
                               final ViewGroup parent) {
@@ -25,6 +27,7 @@ public abstract class PlaylistItemHolder extends LocalItemHolder {
         itemTitleView = itemView.findViewById(R.id.itemTitleView);
         itemStreamCountView = itemView.findViewById(R.id.itemStreamCountView);
         itemUploaderView = itemView.findViewById(R.id.itemUploaderView);
+        itemHandleView = itemView.findViewById(R.id.itemHandle);
     }
 
     public PlaylistItemHolder(final LocalItemBuilder infoItemBuilder, final ViewGroup parent) {
@@ -48,5 +51,29 @@ public abstract class PlaylistItemHolder extends LocalItemHolder {
             }
             return true;
         });
+
+        if (itemUploaderView != null) {
+            if (android.text.TextUtils.isEmpty(itemUploaderView.getText())) {
+                itemUploaderView.setVisibility(View.GONE);
+            } else if (itemUploaderView.getVisibility() == View.GONE) {
+                itemUploaderView.setVisibility(View.VISIBLE);
+            }
+        }
+
+        if (itemHandleView != null && itemHandleView.getLayoutParams() instanceof android.widget.RelativeLayout.LayoutParams) {
+            android.widget.RelativeLayout.LayoutParams params = (android.widget.RelativeLayout.LayoutParams) itemHandleView.getLayoutParams();
+            if (itemUploaderView == null || android.text.TextUtils.isEmpty(itemUploaderView.getText()) || itemUploaderView.getVisibility() != View.VISIBLE) {
+                params.removeRule(android.widget.RelativeLayout.ALIGN_TOP);
+                params.removeRule(android.widget.RelativeLayout.ALIGN_BOTTOM);
+                params.addRule(android.widget.RelativeLayout.ALIGN_TOP, R.id.itemTitleView);
+                params.addRule(android.widget.RelativeLayout.ALIGN_BOTTOM, R.id.itemTitleView);
+            } else {
+                params.removeRule(android.widget.RelativeLayout.ALIGN_TOP);
+                params.removeRule(android.widget.RelativeLayout.ALIGN_BOTTOM);
+                params.addRule(android.widget.RelativeLayout.ALIGN_TOP, R.id.itemUploaderView);
+                params.addRule(android.widget.RelativeLayout.ALIGN_BOTTOM, R.id.itemUploaderView);
+            }
+            itemHandleView.setLayoutParams(params);
+        }
     }
 }

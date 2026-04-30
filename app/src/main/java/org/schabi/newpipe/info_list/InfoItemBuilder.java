@@ -19,7 +19,6 @@ import org.schabi.newpipe.info_list.holder.InfoItemHolder;
 import org.schabi.newpipe.info_list.holder.PlaylistInfoItemHolder;
 import org.schabi.newpipe.info_list.holder.PlaylistMiniInfoItemHolder;
 import org.schabi.newpipe.info_list.holder.StreamInfoItemHolder;
-import org.schabi.newpipe.info_list.holder.StreamMiniInfoItemHolder;
 import org.schabi.newpipe.local.history.HistoryRecordManager;
 import org.schabi.newpipe.util.OnClickGesture;
 
@@ -79,8 +78,7 @@ public class InfoItemBuilder {
                                               final boolean useMiniVariant) {
         switch (infoType) {
             case STREAM:
-                return useMiniVariant ? new StreamMiniInfoItemHolder(this, parent)
-                        : new StreamInfoItemHolder(this, parent);
+                return new StreamInfoItemHolder(this, parent);
             case CHANNEL:
                 return useMiniVariant ? new ChannelMiniInfoItemHolder(this, parent)
                         : new ChannelInfoItemHolder(this, parent);

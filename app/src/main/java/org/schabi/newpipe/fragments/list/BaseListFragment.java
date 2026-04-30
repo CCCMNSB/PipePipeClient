@@ -2,13 +2,11 @@ package org.schabi.newpipe.fragments.list;
 
 import static org.schabi.newpipe.ktx.ViewUtils.animate;
 import static org.schabi.newpipe.ktx.ViewUtils.animateHideRecyclerViewAllowingScrolling;
-import static org.schabi.newpipe.util.ThemeHelper.getGridWidth;
+import static org.schabi.newpipe.util.ThemeHelper.getGridSpanCountStreams;
 import static org.schabi.newpipe.util.ThemeHelper.isGrid;
 
 import android.content.Context;
 import android.content.SharedPreferences;
-import android.content.res.Configuration;
-import android.content.res.Resources;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.Menu;
@@ -32,7 +30,6 @@ import org.schabi.newpipe.extractor.playlist.PlaylistInfoItem;
 import org.schabi.newpipe.extractor.stream.StreamInfoItem;
 import org.schabi.newpipe.fragments.BaseStateFragment;
 import org.schabi.newpipe.fragments.OnScrollBelowItemsListener;
-import org.schabi.newpipe.info_list.InfoListAdapter;
 import org.schabi.newpipe.info_list.ItemViewMode;
 import org.schabi.newpipe.info_list.dialog.InfoItemDialog;
 import org.schabi.newpipe.info_list.InfoListAdapter;
@@ -218,11 +215,7 @@ public abstract class BaseListFragment<I, N> extends BaseStateFragment<I>
     }
 
     protected RecyclerView.LayoutManager getGridLayoutManager() {
-        final Resources resources = activity.getResources();
-        int width = getGridWidth(activity);
-        width += (24 * resources.getDisplayMetrics().density);
-        final int spanCount = (int) Math.floor(resources.getDisplayMetrics().widthPixels
-                / (double) width);
+        final int spanCount = getGridSpanCountStreams(activity);
         final GridLayoutManager lm = new GridLayoutManager(activity, spanCount);
         lm.setSpanSizeLookup(infoListAdapter.getSpanSizeLookup(spanCount));
         return lm;
@@ -530,7 +523,10 @@ public abstract class BaseListFragment<I, N> extends BaseStateFragment<I>
     public void onSharedPreferenceChanged(final SharedPreferences sharedPreferences,
                                           final String key) {
         try {
-            if (key.equals(getString(R.string.list_view_mode_key))) {
+            if (key.equals(getString(R.string.list_view_mode_key))
+                    || key.equals(getString(R.string.grid_layout_enabled_key))
+                    || key.equals(getString(R.string.grid_columns_key))
+                    || key.equals(getString(R.string.grid_columns_landscape_key))) {
                 updateFlags |= LIST_MODE_UPDATE_FLAG;
             }
         } catch (final Exception e) {

@@ -69,6 +69,8 @@ public class LocalItemListAdapter extends RecyclerView.Adapter<RecyclerView.View
     private static final int REMOTE_PLAYLIST_GRID_HOLDER_TYPE = 0x2004;
     private static final int LOCAL_BOOKMARK_PLAYLIST_HOLDER_TYPE = 0x2008;
     private static final int REMOTE_BOOKMARK_PLAYLIST_HOLDER_TYPE = 0x2010;
+    private static final int LOCAL_BOOKMARK_PLAYLIST_GRID_HOLDER_TYPE = 0x2011;
+    private static final int REMOTE_BOOKMARK_PLAYLIST_GRID_HOLDER_TYPE = 0x2012;
     private static final int LOCAL_PLAYLIST_CARD_HOLDER_TYPE = 0x2016;
     private static final int REMOTE_PLAYLIST_CARD_HOLDER_TYPE = 0x3016;
 
@@ -282,6 +284,9 @@ public class LocalItemListAdapter extends RecyclerView.Adapter<RecyclerView.View
         switch (item.getLocalItemType()) {
             case PLAYLIST_LOCAL_ITEM:
                 if (useItemHandle) {
+                    if (isGrid(itemViewMode)) {
+                        return LOCAL_BOOKMARK_PLAYLIST_GRID_HOLDER_TYPE;
+                    }
                     return LOCAL_BOOKMARK_PLAYLIST_HOLDER_TYPE;
                 }
                 if (itemViewMode == ItemViewMode.CARD) {
@@ -293,6 +298,9 @@ public class LocalItemListAdapter extends RecyclerView.Adapter<RecyclerView.View
                 }
             case PLAYLIST_REMOTE_ITEM:
                 if (useItemHandle) {
+                    if (isGrid(itemViewMode)) {
+                        return REMOTE_BOOKMARK_PLAYLIST_GRID_HOLDER_TYPE;
+                    }
                     return REMOTE_BOOKMARK_PLAYLIST_HOLDER_TYPE;
                 }
                 if (itemViewMode == ItemViewMode.CARD) {
@@ -344,6 +352,8 @@ public class LocalItemListAdapter extends RecyclerView.Adapter<RecyclerView.View
                 return new LocalPlaylistGridItemHolder(localItemBuilder, parent);
             case LOCAL_BOOKMARK_PLAYLIST_HOLDER_TYPE:
                 return new LocalBookmarkPlaylistItemHolder(localItemBuilder, parent);
+            case LOCAL_BOOKMARK_PLAYLIST_GRID_HOLDER_TYPE:
+                return new LocalBookmarkPlaylistGridItemHolder(localItemBuilder, parent);
             case LOCAL_PLAYLIST_CARD_HOLDER_TYPE:
                 return new LocalPlaylistCardItemHolder(localItemBuilder, parent);
             case REMOTE_PLAYLIST_HOLDER_TYPE:
@@ -352,6 +362,8 @@ public class LocalItemListAdapter extends RecyclerView.Adapter<RecyclerView.View
                 return new RemotePlaylistGridItemHolder(localItemBuilder, parent);
             case REMOTE_BOOKMARK_PLAYLIST_HOLDER_TYPE:
                 return new RemoteBookmarkPlaylistItemHolder(localItemBuilder, parent);
+            case REMOTE_BOOKMARK_PLAYLIST_GRID_HOLDER_TYPE:
+                return new RemoteBookmarkPlaylistGridItemHolder(localItemBuilder, parent);
             case REMOTE_PLAYLIST_CARD_HOLDER_TYPE:
                 return new RemotePlaylistCardItemHolder(localItemBuilder, parent);
             case STREAM_PLAYLIST_HOLDER_TYPE:

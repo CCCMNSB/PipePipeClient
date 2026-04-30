@@ -31,7 +31,6 @@ import org.schabi.newpipe.info_list.holder.StaffInfoItemHolder;
 import org.schabi.newpipe.info_list.holder.StreamCardInfoItemHolder;
 import org.schabi.newpipe.info_list.holder.StreamGridInfoItemHolder;
 import org.schabi.newpipe.info_list.holder.StreamInfoItemHolder;
-import org.schabi.newpipe.info_list.holder.StreamMiniInfoItemHolder;
 import org.schabi.newpipe.local.history.HistoryRecordManager;
 import org.schabi.newpipe.util.FallbackViewHolder;
 import org.schabi.newpipe.util.OnClickGesture;
@@ -69,7 +68,6 @@ public class InfoListAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
     private static final int HEADER_TYPE = 0;
     private static final int FOOTER_TYPE = 1;
 
-    private static final int MINI_STREAM_HOLDER_TYPE = 0x100;
     private static final int STREAM_HOLDER_TYPE = 0x101;
     private static final int GRID_STREAM_HOLDER_TYPE = 0x102;
     private static final int CARD_STREAM_HOLDER_TYPE = 0x103;
@@ -257,8 +255,6 @@ public class InfoListAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                     return CARD_STREAM_HOLDER_TYPE;
                 } else if (isGrid(itemMode)) {
                     return GRID_STREAM_HOLDER_TYPE;
-                } else if (useMiniVariant) {
-                    return MINI_STREAM_HOLDER_TYPE;
                 } else {
                     return STREAM_HOLDER_TYPE;
                 }
@@ -308,8 +304,6 @@ public class InfoListAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                         .inflate(layoutInflater, parent, false)
                         .getRoot()
                 );
-            case MINI_STREAM_HOLDER_TYPE:
-                return new StreamMiniInfoItemHolder(infoItemBuilder, parent);
             case STREAM_HOLDER_TYPE:
                 return new StreamInfoItemHolder(infoItemBuilder, parent);
             case GRID_STREAM_HOLDER_TYPE:
