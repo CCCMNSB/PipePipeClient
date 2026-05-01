@@ -8,6 +8,8 @@
     android:clickable="true"
     android:focusable="true"
     android:foreground="?attr/selectableItemBackground"
+    app:cardElevation="0dp"
+    app:cardCornerRadius="4dp"
     app:cardBackgroundColor="?attr/card_item_background_color">
 
     <LinearLayout
@@ -44,4 +46,10 @@
             tools:ignore="SmallSp"
             tools:text="ALL" />
     </LinearLayout>
+
+    <!-- Overlay Border -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@drawable/card_item_border" />
 </androidx.cardview.widget.CardView>

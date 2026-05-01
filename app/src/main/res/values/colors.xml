@@ -9,8 +9,8 @@
     <color name="placeholder_foreground">#6C6C6C</color>
 
     <!-- Light Theme -->
-    <color name="light_background_color">#EEEEEE</color>
-    <color name="light_dialog_background_color">#EEEEEE</color>
+    <color name="light_background_color">#FFFBFE</color>
+    <color name="light_dialog_background_color">#FFFBFE</color>
     <color name="light_settings_accent_color">#e53935</color>
     <color name="light_separator_color">#32000000</color>
     <color name="light_ripple_color">#48868686</color>
