@@ -202,9 +202,14 @@ public class MediaSessionManager {
                     builder.putBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART, bitmap);
                     builder.putBitmap(MediaMetadataCompat.METADATA_KEY_DISPLAY_ICON, bitmap);
                 });
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) { // fix incorrect thumbnail
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            final org.schabi.newpipe.player.Player currentPlayer = player;
             new Handler(Looper.getMainLooper()).postDelayed(() -> {
-                NotificationUtil.getInstance().createNotificationIfNeededAndUpdate(player, false);
+                if (currentPlayer != null
+                        && currentPlayer.getMediaSessionManager() == MediaSessionManager.this) {
+                    NotificationUtil.getInstance()
+                            .createNotificationIfNeededAndUpdate(currentPlayer, false);
+                }
             }, 100);
         }
         return builder.build();
