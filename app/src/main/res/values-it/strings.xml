@@ -756,7 +756,7 @@
 <string name="sponsor_promote">Sostienici su Ko-fi</string>
 <string name="random_play_order_title">Ordine casuale</string>
 <string name="random_play_order_summary">Mescola automaticamente le tue playlist locali quando vengono riprodotte in background</string>
-<string name="update_log">### Correzioni di bug\n\n- La riproduzione falliva casualmente se effettuato l\'accesso (YouTube)\n- A volte le dirette non potevano essere riprodotte con l\'account connesso (YouTube)\n- La riproduzione video AVC1 presenta rallentamenti su alcuni dispositivi\n\n### Altro\n\n- Migliorata la stabilità</string>
+<string name="update_log">### Nuove funzionalità\n\n- L\'interfaccia utente è stata leggermente migliorata per rendere PipePipe più moderno\n- Il menu del filtro di ricerca è stato ridisegnato \n\n### Correzioni di bug\n\n- Impossibile riprodurre video YT se si è effettuato l\'accesso in determinate condizioni (YouTube)\n- I risultati di ricerca hanno nomi dell\'uploaderr errati in determinate condizioni (YouTube) \n- Errore di analisi in determinate condizioni (YouTube)\n- Impossibile estrarre talvolta gli uploader dei canali (BiliBili)\n- Impossibile estrarre talvolta i dettagli del canale a causa del controllo del rischio (BiliBili)\n- Arresto anomalo in determinate condizioni \n\n### Altro\n\n- Migliorata la stabilità</string>
 <string name="speeding_playback_title">Premi a lungo per aumentare la velocità di riproduzione</string>
 <string name="view_on_github">Visualizza su GitHub</string>
 <string name="donation_dialog_title">Ti piace PipePipe?</string>

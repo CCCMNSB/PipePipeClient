@@ -897,7 +897,7 @@
 <string name="sponsor_promote">Apoyar en Ko-fi</string>
 <string name="random_play_order_title">Orden aleatorio</string>
 <string name="random_play_order_summary">Baraja automáticamente tus listas de reproducción locales cuando se reproduzcan en segundo plano</string>
-<string name="update_log">### Correcciones de errores\n\n- La reproducción aleatoria fallaba si había iniciado sesión (YouTube)\n- A veces los directos no se podían reproducir con la cuenta iniciada (YouTube)\n- La reproducción de video AVC1 se entrecorta en algunos dispositivos\n\n### Otros\n\n- Mejorar la estabilidad</string>
+<string name="update_log">### Nuevas funciones\n\n- Se mejoró ligeramente la interfaz para que PipePipe se vea más moderno\n- Se rediseñó el menú de filtros de búsqueda \n\n### Correcciones de errores\n\n- Fallaba al reproducir videos de YT si se había iniciado sesión bajo ciertas condiciones (YouTube)\n- Los resultados de búsqueda muestran nombres de subidor incorrectos bajo ciertas condiciones (YouTube) \n- Error de análisis bajo ciertas condiciones (YouTube)\n- A veces fallaba al extraer los subidores del canal (BiliBili)\n- A veces fallaba al extraer los detalles del canal debido al control de riesgos (BiliBili)\n- Fallo bajo ciertas condiciones \n\n### Otros\n\n- Mejorar la estabilidad</string>
 <string name="speeding_playback_title">Mantener presionado para acelerar la reproducción</string>
 <string name="view_on_github">Ver en GitHub</string>
 <string name="donation_dialog_title">¿Disfrutas de PipePipe?</string>

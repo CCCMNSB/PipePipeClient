@@ -944,7 +944,7 @@ nSự khác biệt giữa hai loại này là cái nào nhanh thường thiếu 
 <string name="sponsor_promote">Trở thành người ủng hộ</string>
 <string name="random_play_order_title">Trình tự ngẫu nhiên</string>
 <string name="random_play_order_summary">Tự động xáo trộn danh sách phát cục bộ của bạn khi phát trong nền</string>
-<string name="update_log">### Sửa lỗi\n\n- Phát lại ngẫu nhiên bị lỗi nếu đã đăng nhập (YouTube)\n- Đôi khi không thể phát livestream khi đã đăng nhập tài khoản (YouTube)\n- Phát video AVC1 bị giật trên một số thiết bị\n\n### Khác\n\n- Cải thiện độ ổn định</string>
+<string name="update_log">### Tính năng mới\n\n- Cải thiện nhẹ giao diện người dùng để PipePipe trông hiện đại hơn\n- Thiết kế lại menu bộ lọc tìm kiếm\n\n### Sửa lỗi\n\n- Không phát được video YT nếu đã đăng nhập trong một số điều kiện nhất định (YouTube)\n- Kết quả tìm kiếm hiển thị sai tên người tải lên trong một số điều kiện nhất định (YouTube)\n- Lỗi phân tích trong một số điều kiện nhất định (YouTube)\n- Thỉnh thoảng không thể trích xuất người tải lên của kênh (BiliBili)\n- Thỉnh thoảng không thể trích xuất chi tiết kênh do kiểm soát rủi ro (BiliBili)\n- Ứng dụng bị sập trong một số điều kiện nhất định\n\n### Khác\n\n- Cải thiện độ ổn định</string>
 <string name="speeding_playback_title">Nhấn và giữ để tăng tốc độ phát lại</string>
 <string name="view_on_github">Xem trên GitHub</string>
 <string name="donation_dialog_title">Hỗ trợ Dự án</string>

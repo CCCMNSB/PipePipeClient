@@ -836,7 +836,7 @@
 <string name="sponsor_promote">Auf Ko-fi unterstützen</string>
 <string name="random_play_order_title">Zufällige Reihenfolge</string>
 <string name="random_play_order_summary">Automatisch Ihre lokalen Wiedergabelisten mischen, wenn sie im Hintergrund abgespielt werden</string>
-<string name="update_log">### Fehlerbehebungen\n\n- Die Wiedergabe schlug zufällig fehl, wenn man angemeldet war (YouTube)\n- Manchmal konnten Livestreams nicht mit angemeldetem Konto abgespielt werden (YouTube)\n- Die AVC1-Videowiedergabe ruckelt auf einigen Geräten\n\n### Sonstiges\n\n- Stabilität verbessert</string>
+<string name="update_log">### Neue Funktionen\n\n- Die Benutzeroberfläche leicht verbessert, damit PipePipe moderner aussieht\n- Das Suchfilter-Menü neu gestaltet \n\n### Fehlerbehebungen\n\n- YT-Videos konnten unter bestimmten Bedingungen nicht abgespielt werden, wenn man eingeloggt war (YouTube)\n- Suchergebnisse haben unter bestimmten Bedingungen falsche Uploader-Namen (YouTube)\n- Parse-Fehler unter bestimmten Bedingungen (YouTube)\n- Kanal-Uploader konnten manchmal nicht extrahiert werden (BiliBili)\n- Kanal-Details konnten manchmal aufgrund von Risikokontrolle nicht extrahiert werden (BiliBili)\n- Absturz unter bestimmten Bedingungen \n\n### Sonstiges\n\n- Stabilität verbessern</string>
 <string name="speeding_playback_title">Langes Drücken, um die Wiedergabe zu beschleunigen</string>
 <string name="view_on_github">Auf GitHub ansehen</string>
 <string name="donation_dialog_title">Gefällt dir PipePipe?</string>

@@ -854,7 +854,7 @@
 <string name="sponsor_promote">サポーターになる</string>
 <string name="random_play_order_title">ランダムな順序</string>
 <string name="random_play_order_summary">バックグラウンドで再生する際にローカルプレイリストを自動的にシャッフルします</string>
-<string name="update_log">### バグ修正\n\n- ログインしている場合に、ランダム再生が失敗することがあった（YouTube）\n- アカウントにログインしていると、ライブが再生できないことがあった（YouTube）\n- 一部のデバイスで AVC1 動画の再生がカクつく\n\n### その他\n\n- 安定性を改善</string>
+<string name="update_log">### 新機能\n\n- PipePipe をより आधुनिकに見えるよう、UI を少し改善しました\n- 検索フィルターメニューを再設計しました\n\n### バグ修正\n\n- 特定の条件下でログイン時に YouTube 動画の再生に失敗する問題を修正しました（YouTube）\n- 特定の条件下で検索結果のアップローダー名が誤って表示される問題を修正しました（YouTube）\n- 特定の条件下で解析エラーが発生する問題を修正しました（YouTube）\n- チャンネルのアップローダーの抽出に失敗することがある問題を修正しました（BiliBili）\n- リスクコントロールのため、チャンネル詳細の抽出に失敗することがある問題を修正しました（BiliBili）\n- 特定の条件下でクラッシュする問題を修正しました\n\n### その他\n\n- 安定性を改善しました</string>
 <string name="speeding_playback_title">長時間押は再生速度を速めることができます</string>
 <string name="view_on_github">GitHubで表示</string>
 <string name="donation_dialog_title">プロジェクトをサポートする</string>

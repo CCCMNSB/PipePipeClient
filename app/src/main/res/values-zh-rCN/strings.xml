@@ -899,7 +899,7 @@
 <string name="sponsor_promote">成为支持者</string>
 <string name="random_play_order_title">随机顺序</string>
 <string name="random_play_order_summary">在后台播放时自动随机播放您的本地播放列表</string>
-<string name="update_log">### 错误修复\n\n- 登录后随机播放失败（YouTube）\n- 有时在登录账号的情况下无法播放直播（YouTube）\n- 某些设备上 AVC1 视频播放会卡顿\n\n### 其他\n\n- 提升稳定性</string>
+<string name="update_log">### 新功能\n\n- 略微改进了 UI，使 PipePipe 看起来更现代\n- 重新设计了搜索过滤菜单 \n\n### 修复问题\n\n- 在某些情况下，已登录时无法播放 YouTube 视频（YouTube）\n- 在某些情况下，搜索结果中的上传者名称错误（YouTube） \n- 在某些情况下发生解析错误（YouTube）\n- 有时无法提取频道上传者（BiliBili）\n- 有时由于风控无法提取频道详情（BiliBili）\n- 在某些情况下崩溃 \n\n### 其他\n\n- 提高稳定性</string>
 <string name="speeding_playback_title">长按以加快播放</string>
 <string name="view_on_github">在GitHub上查看</string>
 <string name="donation_dialog_title">支持该项目</string>
