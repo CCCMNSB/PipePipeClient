@@ -858,7 +858,7 @@
 <string name="speeding_playback_title">長時間押は再生速度を速めることができます</string>
 <string name="view_on_github">GitHubで表示</string>
 <string name="donation_dialog_title">プロジェクトをサポートする</string>
-<string name="donation_dialog_message">PipePipeをご利用いただきありがとうございます！役立つと感じた場合は、Ko-Fiでサポーターになることをご検討ください。あなたのサポートは私にとって重要であり、よりエキサイティングな新機能を追加するのに役立ちます。ほんの少しでも大切です！😇</string>
+<string name="donation_dialog_message">Ko‑fi で私たちを支援して、動画視聴をオープンで追跡なしのまま維持するのにご協力ください。</string>
 <string name="fullscreen_gesture_control_summary">ジェスチャーを使用してフルスクリーンに入る / 退出する</string>
 <string name="fullscreen_gesture_control_title">フルスクリーンジェスチャー制御</string>
 <string name="require_audio_focus_summary">PipePipeだけがオーディオを再生していることを確認してください</string>
@@ -1037,4 +1037,5 @@
 <string name="done">完了</string>
 <string name="expand">展開</string>
 <string name="collapse">折りたたむ</string>
+<string name="sponsor_promote_later">また後で</string>
 </resources>

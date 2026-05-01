@@ -894,14 +894,14 @@
 <string name="dont_auto_queue_long_description">Solo poner en cola automáticamente vídeos de menos de 6 min</string>
 <string name="enable_notification_text">Por favor, habilita las notificaciones para esta aplicación para asegurar su funcionamiento normal. Solo te alertaremos cuando sea necesario.</string>
 <string name="enable_notification_title">Habilitar notificación</string>
-<string name="sponsor_promote">Conviértete en un patrocinador</string>
+<string name="sponsor_promote">Apoyar en Ko-fi</string>
 <string name="random_play_order_title">Orden aleatorio</string>
 <string name="random_play_order_summary">Baraja automáticamente tus listas de reproducción locales cuando se reproduzcan en segundo plano</string>
 <string name="update_log">### Correcciones de errores\n\n- La reproducción aleatoria fallaba si había iniciado sesión (YouTube)\n- A veces los directos no se podían reproducir con la cuenta iniciada (YouTube)\n- La reproducción de video AVC1 se entrecorta en algunos dispositivos\n\n### Otros\n\n- Mejorar la estabilidad</string>
 <string name="speeding_playback_title">Mantener presionado para acelerar la reproducción</string>
 <string name="view_on_github">Ver en GitHub</string>
-<string name="donation_dialog_title">Apoya el proyecto</string>
-<string name="donation_dialog_message">Gracias por usar PipePipe. Si te resulta útil, por favor, considera convertirte en un patrocinador en Ko-Fi. Tu apoyo es importante para mí y me ayuda a añadir más características emocionantes. ¡Cualquier contribución cuenta! 😇</string>
+<string name="donation_dialog_title">¿Disfrutas de PipePipe?</string>
+<string name="donation_dialog_message">Apóyanos en Ko-fi y ayúdanos a mantener la visualización de videos abierta y libre de rastreo.</string>
 <string name="fullscreen_gesture_control_summary">Usa gestos para entrar / salir de pantalla completa</string>
 <string name="fullscreen_gesture_control_title">Control de gestos en pantalla completa</string>
 <string name="require_audio_focus_summary">Asegúrate de que solo PipePipe esté reproduciendo audio</string>
@@ -1072,4 +1072,5 @@
 <string name="done">Hecho</string>
 <string name="expand">Expandir</string>
 <string name="collapse">Contraer</string>
+<string name="sponsor_promote_later">Tal vez más tarde</string>
 </resources>

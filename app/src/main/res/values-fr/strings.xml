@@ -786,14 +786,14 @@ Vous devez l\'accepter pour nous envoyer le rapport de bug.</string>
 <string name="dont_auto_queue_long_description">Mettre automatiquement en file d\'attente uniquement les vidéos de moins de 6 minutes</string>
 <string name="enable_notification_text">Veuillez activer les notifications pour cette application pour vous assurer qu\'elle fonctionne normalement. Nous vous alerterons uniquement lorsqu\'il sera nécessaire.</string>
 <string name="enable_notification_title">Activer la notification</string>
-<string name="sponsor_promote">Devenez un supporter</string>
+<string name="sponsor_promote">Soutenez-nous sur Ko-fi</string>
 <string name="random_play_order_title">Ordre aléatoire</string>
 <string name="random_play_order_summary">Mélangez automatiquement vos listes de lecture locales lorsque vous jouez en arrière-plan</string>
 <string name="update_log">### Corrections de bugs\n\n- La lecture échouait parfois de manière aléatoire si l\'utilisateur était connecté (YouTube)\n- Parfois, les lives ne pouvaient pas être lus lorsque le compte était connecté (YouTube)\n- La lecture des vidéos AVC1 saccade sur certains appareils\n\n### Autres\n\n- Améliorer la stabilité</string>
 <string name="speeding_playback_title">Appuyer longuement pour accélérer la lecture</string>
 <string name="view_on_github">Voir sur GitHub</string>
-<string name="donation_dialog_title">Soutenez le projet</string>
-<string name="donation_dialog_message">Merci d\'utiliser PipePipe ! Si vous le trouvez utile, envisagez de devenir un supporter sur Ko-Fi. Votre soutien est important pour moi et m\'aide à ajouter de nouvelles fonctionnalités passionnantes. Chaque contribution compte ! 😇</string>
+<string name="donation_dialog_title">Vous appréciez PipePipe ?</string>
+<string name="donation_dialog_message">Soutenez-nous sur Ko-fi et aidez-nous à garder le visionnage de vidéos ouvert et sans pistage.</string>
 <string name="fullscreen_gesture_control_summary">Utilisez des gestes pour entrer / sortir du plein écran</string>
 <string name="fullscreen_gesture_control_title">Contrôle gestuel en plein écran</string>
 <string name="require_audio_focus_summary">Assurez-vous que seul PipePipe joue de l\'audio</string>
@@ -1039,4 +1039,5 @@ Vous devez l\'accepter pour nous envoyer le rapport de bug.</string>
 <string name="done">Terminé</string>
 <string name="expand">Développer</string>
 <string name="collapse">Réduire</string>
+<string name="sponsor_promote_later">Peut-être plus tard</string>
 </resources>

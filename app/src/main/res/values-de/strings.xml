@@ -833,14 +833,14 @@
 <string name="dont_auto_queue_long_description">Nur Videos kürzer als 6 Minuten automatisch in die Warteschlange stellen</string>
 <string name="enable_notification_text">Bitte aktivieren Sie Benachrichtigungen für diese App, um sicherzustellen, dass sie normal funktioniert. Wir werden Sie nur bei Bedarf benachrichtigen.</string>
 <string name="enable_notification_title">Benachrichtigungen aktivieren</string>
-<string name="sponsor_promote">Unterstützer werden</string>
+<string name="sponsor_promote">Auf Ko-fi unterstützen</string>
 <string name="random_play_order_title">Zufällige Reihenfolge</string>
 <string name="random_play_order_summary">Automatisch Ihre lokalen Wiedergabelisten mischen, wenn sie im Hintergrund abgespielt werden</string>
 <string name="update_log">### Fehlerbehebungen\n\n- Die Wiedergabe schlug zufällig fehl, wenn man angemeldet war (YouTube)\n- Manchmal konnten Livestreams nicht mit angemeldetem Konto abgespielt werden (YouTube)\n- Die AVC1-Videowiedergabe ruckelt auf einigen Geräten\n\n### Sonstiges\n\n- Stabilität verbessert</string>
 <string name="speeding_playback_title">Langes Drücken, um die Wiedergabe zu beschleunigen</string>
 <string name="view_on_github">Auf GitHub ansehen</string>
-<string name="donation_dialog_title">Projekt unterstützen</string>
-<string name="donation_dialog_message">Danke, dass Sie PipePipe verwenden! Wenn Sie es nützlich finden, ziehen Sie in Betracht, ein Unterstützer auf Ko-Fi zu werden. Ihre Unterstützung ist mir wichtig und hilft mir, mehr spannende neue Funktionen hinzuzufügen. Jede Unterstützung zählt! 😇</string>
+<string name="donation_dialog_title">Gefällt dir PipePipe?</string>
+<string name="donation_dialog_message">Unterstütze uns auf Ko‑fi und hilf dabei, das Videoschauen offen und ohne Tracking zu halten.</string>
 <string name="fullscreen_gesture_control_summary">Verwenden Sie Gesten, um den Vollbildmodus ein- oder auszuschalten</string>
 <string name="fullscreen_gesture_control_title">Vollbild-Gestenkontrolle</string>
 <string name="require_audio_focus_summary">Stellen Sie sicher, dass nur PipePipe Audio abspielt</string>
@@ -1015,4 +1015,5 @@
 <string name="done">Fertig</string>
 <string name="expand">Erweitern</string>
 <string name="collapse">Reduzieren</string>
+<string name="sponsor_promote_later">Vielleicht später</string>
 </resources>
