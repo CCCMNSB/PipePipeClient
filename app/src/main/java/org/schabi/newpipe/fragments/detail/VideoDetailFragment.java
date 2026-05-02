@@ -1102,12 +1102,12 @@ public final class VideoDetailFragment
                 // Fragment already added
                 Log.e(TAG, "initTabs() error adding description tab", e);
             }
-            if (shouldShowSponsorBlock()) {
-                // temp empty fragment. will be updated in handleResult
-                pageAdapter.addFragment(EmptyFragment.newInstance(false), SPONSOR_BLOCK_TAB_TAG);
-                tabIcons.add(R.drawable.ic_sponsor_block_enable);
-                tabContentDescriptions.add(R.string.sponsor_block);
-            }
+        }
+        if (shouldShowSponsorBlock() && currentInfo != null && currentInfo.getStreamType() != StreamType.LIVE_STREAM) {
+            // temp empty fragment. will be updated in handleResult
+            pageAdapter.addFragment(EmptyFragment.newInstance(false), SPONSOR_BLOCK_TAB_TAG);
+            tabIcons.add(R.drawable.ic_sponsor_block_enable);
+            tabContentDescriptions.add(R.string.sponsor_block);
         }
 
         if (pageAdapter.getCount() == 0) {

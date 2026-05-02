@@ -36,6 +36,11 @@ public class TabAdapter extends FragmentPagerAdapter {
         return mFragmentList.size();
     }
 
+    @Override
+    public long getItemId(final int position) {
+        return mFragmentTitleList.get(position).hashCode();
+    }
+
     public void addFragment(final Fragment fragment, final String title) {
         if(fragmentManager.isStateSaved()){
             Log.d("TabAdapter", "This should not happen: addFragment() called after onSaveInstanceState()");
