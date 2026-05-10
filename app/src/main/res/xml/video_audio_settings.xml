@@ -33,16 +33,6 @@
             app:singleLineTitle="false"
             app:iconSpaceReserved="false" />
 
-    <ListPreference
-        android:defaultValue="@string/limit_mobile_data_usage_value"
-        android:entries="@array/limit_data_usage_description_list"
-        android:entryValues="@array/limit_data_usage_values_list"
-        android:key="@string/limit_mobile_data_usage_key"
-        android:summary="%s"
-        android:title="@string/limit_mobile_data_usage_title"
-        app:singleLineTitle="false"
-        app:iconSpaceReserved="false" />
-
     <SwitchPreferenceCompat
             android:defaultValue="true"
             android:key="@string/require_audio_focus_key"
@@ -50,29 +40,6 @@
             android:title="@string/require_audio_focus_title"
             app:singleLineTitle="false"
             app:iconSpaceReserved="false" />
-
-    <SwitchPreferenceCompat
-        android:defaultValue="false"
-        android:key="@string/resume_on_audio_focus_gain_key"
-        android:summary="@string/resume_on_audio_focus_gain_summary"
-        android:title="@string/resume_on_audio_focus_gain_title"
-        app:singleLineTitle="false"
-        app:iconSpaceReserved="false" />
-
-    <SwitchPreferenceCompat
-            android:defaultValue="false"
-            android:key="@string/always_start_from_beginning_key"
-            android:title="@string/always_start_from_beginning_title"
-            app:singleLineTitle="false"
-            app:iconSpaceReserved="false" />
-
-    <SwitchPreferenceCompat
-        android:defaultValue="true"
-        android:key="@string/popup_remember_size_pos_key"
-        android:summary="@string/popup_remember_size_pos_summary"
-        android:title="@string/popup_remember_size_pos_title"
-        app:singleLineTitle="false"
-        app:iconSpaceReserved="false" />
 
     <ListPreference
         android:defaultValue="@string/seek_duration_default_value"

@@ -1301,9 +1301,7 @@ public final class VideoDetailFragment
 
     private void openBackgroundPlayer(final boolean append) {
 
-        final boolean useExternalAudioPlayer = PreferenceManager
-                .getDefaultSharedPreferences(activity)
-                .getBoolean(activity.getString(R.string.use_external_audio_player_key), false);
+        final boolean useExternalAudioPlayer = false;
 
         toggleFullscreenIfInFullscreenMode();
 

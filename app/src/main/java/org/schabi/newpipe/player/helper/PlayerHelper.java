@@ -609,8 +609,7 @@ public final class PlayerHelper {
     @SuppressLint("RtlHardcoded")
     public static WindowManager.LayoutParams retrievePopupLayoutParamsFromPrefs(
             final Player player) {
-        final boolean popupRememberSizeAndPos = player.getPrefs().getBoolean(
-                player.getContext().getString(R.string.popup_remember_size_pos_key), true);
+        final boolean popupRememberSizeAndPos = true;
         final float defaultSize =
                 player.getContext().getResources().getDimension(R.dimen.popup_default_width);
         final float popupWidth = popupRememberSizeAndPos
