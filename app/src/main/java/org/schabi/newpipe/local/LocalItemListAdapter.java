@@ -95,7 +95,7 @@ public class LocalItemListAdapter extends RecyclerView.Adapter<RecyclerView.View
         localItemBuilder = new LocalItemBuilder(context);
         localItems = new ArrayList<>();
         dateTimeFormatter = DateTimeFormatter.ofLocalizedDate(FormatStyle.SHORT)
-                .withLocale(Localization.getPreferredLocale(context));
+                .withLocale(Localization.getAppLocale(context));
         sortMode = utils.parseSortMode(PreferenceManager.getDefaultSharedPreferences(context)
                 .getString(context.getString(R.string.playlist_sort_mode_key), SortMode.ORIGIN.name()));
     }

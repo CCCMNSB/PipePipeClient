@@ -69,4 +69,22 @@
         app:singleLineTitle="false"
         app:iconSpaceReserved="false" />
 
+    <PreferenceScreen
+        android:fragment="org.schabi.newpipe.settings.tabs.ChooseTabsFragment"
+        android:key="@string/main_page_content_key"
+        android:summary="@string/main_page_content_summary"
+        android:title="@string/main_page_content"
+        app:singleLineTitle="false"
+        app:iconSpaceReserved="false" />
+
+    <MultiSelectListPreference
+        android:key="@string/show_channel_tabs_key"
+        android:summary="@string/show_channel_tabs_summary"
+        android:title="@string/show_channel_tabs"
+        android:entries="@array/show_channel_tabs_description_list"
+        android:entryValues="@array/show_channel_tabs_value_list"
+        android:defaultValue="@array/show_channel_tabs_value_list"
+        app:iconSpaceReserved="false"
+        app:singleLineTitle="false" />
+
 </PreferenceScreen>

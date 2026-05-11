@@ -3,13 +3,18 @@ package org.schabi.newpipe.settings;
 import android.content.SharedPreferences;
 import android.os.Build;
 import android.os.Bundle;
+import android.util.Log;
+import android.widget.Toast;
 
 import androidx.preference.PreferenceManager;
 import androidx.preference.SwitchPreferenceCompat;
 
 import org.schabi.newpipe.R;
 import org.schabi.newpipe.util.DeviceUtils;
+import org.schabi.newpipe.util.PicassoHelper;
 import org.schabi.newpipe.util.ServiceHelper;
+
+import java.io.IOException;
 
 public class AdvancedSettingsFragment extends BasePreferenceFragment implements SharedPreferences.OnSharedPreferenceChangeListener {
 
@@ -17,6 +22,19 @@ public class AdvancedSettingsFragment extends BasePreferenceFragment implements 
     public void onCreatePreferences(final Bundle savedInstanceState, final String rootKey) {
         addPreferencesFromResourceRegistry();
         initializeAndroidAutoPreference();
+        requirePreference(R.string.download_thumbnail_key).setOnPreferenceChangeListener(
+                (preference, newValue) -> {
+                    PicassoHelper.setShouldLoadImages((Boolean) newValue);
+                    try {
+                        PicassoHelper.clearCache(preference.getContext());
+                        Toast.makeText(preference.getContext(),
+                                R.string.thumbnail_cache_wipe_complete_notice, Toast.LENGTH_SHORT)
+                                .show();
+                    } catch (final IOException e) {
+                        Log.e(TAG, "Unable to clear Picasso cache", e);
+                    }
+                    return true;
+                });
     }
     
     private void initializeAndroidAutoPreference() {

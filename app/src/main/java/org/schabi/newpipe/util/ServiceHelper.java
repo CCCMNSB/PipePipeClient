@@ -27,8 +27,6 @@ import java.util.concurrent.TimeUnit;
 
 import static org.schabi.newpipe.extractor.ServiceList.NicoNico;
 import static org.schabi.newpipe.extractor.ServiceList.SoundCloud;
-import static org.schabi.newpipe.util.Localization.getPreferredLocalization;
-
 public final class ServiceHelper {
     private static final StreamingService DEFAULT_FALLBACK_SERVICE = ServiceList.YouTube;
 
@@ -282,7 +280,6 @@ public final class ServiceHelper {
             final String audioLanguage = sharedPreferences.getString(context.getString(
                     R.string.preferred_audio_language_key),"original");
             ServiceList.YouTube.setTokens(tokens);
-            ServiceList.YouTube.setContentLanguage(getPreferredLocalization(context));
             ServiceList.YouTube.setAudioLanguage(audioLanguage);
             final String pot = sharedPreferences.getString(context.getString(R.string.youtube_po_token_key), null);
             ServiceList.YouTube.setAdditionalTokens(pot);
