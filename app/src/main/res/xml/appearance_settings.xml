@@ -39,24 +39,6 @@
         app:singleLineTitle="false"
         app:iconSpaceReserved="false" />
 
-    <SwitchPreference
-            android:key="feed_groups_grid_layout"
-            android:title="@string/feed_groups_grid_layout_title"
-            android:summary="@string/feed_groups_grid_layout_summary"
-            app:singleLineTitle="false"
-            app:iconSpaceReserved="false"
-            android:defaultValue="false" />
-
-    <ListPreference
-        android:defaultValue="@string/tablet_mode_auto_key"
-        android:entries="@array/tablet_mode_description"
-        android:entryValues="@array/tablet_mode_values"
-        android:key="@string/tablet_mode_key"
-        android:summary="%s"
-        android:title="@string/tablet_mode_title"
-        app:singleLineTitle="false"
-        app:iconSpaceReserved="false" />
-
     <SwitchPreferenceCompat
         android:defaultValue="true"
         android:key="@string/grid_layout_enabled_key"
@@ -86,20 +68,5 @@
         android:title="@string/grid_columns_landscape_title"
         app:singleLineTitle="false"
         app:iconSpaceReserved="false" />
-
-    <SwitchPreferenceCompat
-            android:defaultValue="false"
-            android:key="@string/always_list_mode_for_bookmark_key"
-            android:title="@string/always_list_mode_for_bookmark_title"
-            app:singleLineTitle="false"
-            app:iconSpaceReserved="false" />
-
-    <SwitchPreferenceCompat
-            android:defaultValue="false"
-            android:key="@string/auto_ellipsize_key"
-            android:summary="@string/auto_ellipsize_summary"
-            android:title="@string/auto_ellipsize_title"
-            app:singleLineTitle="false"
-            app:iconSpaceReserved="false" />
 
 </PreferenceScreen>

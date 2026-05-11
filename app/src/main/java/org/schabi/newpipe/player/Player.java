@@ -3610,7 +3610,7 @@ public final class Player implements
             return;
         }
         List<StreamInfoItem> partitions = info.getPartitions();
-        if(partitions.size() > 1 && prefs.getBoolean(context.getString(R.string.auto_queue_partition_key), true)
+        if(partitions.size() > 1
                 && playQueue.getStreams().stream()
                 .map(result -> result.getUrl().split("p="))
                 .filter(parts -> parts.length == 2)

@@ -3,15 +3,15 @@ package org.schabi.newpipe.settings;
 import android.content.SharedPreferences;
 import android.os.Build;
 import android.os.Bundle;
+
 import androidx.preference.PreferenceManager;
 import androidx.preference.SwitchPreferenceCompat;
+
 import org.schabi.newpipe.R;
 import org.schabi.newpipe.util.DeviceUtils;
 import org.schabi.newpipe.util.ServiceHelper;
 
-public class AdvancedSettingsFragment extends BasePreferenceFragment implements SharedPreferences.OnSharedPreferenceChangeListener{
-
-    private SharedPreferences.OnSharedPreferenceChangeListener listener;
+public class AdvancedSettingsFragment extends BasePreferenceFragment implements SharedPreferences.OnSharedPreferenceChangeListener {
 
     @Override
     public void onCreatePreferences(final Bundle savedInstanceState, final String rootKey) {
@@ -39,10 +39,26 @@ public class AdvancedSettingsFragment extends BasePreferenceFragment implements 
 
     @Override
     public void onSharedPreferenceChanged(SharedPreferences sharedPreferences, String key) {
-        if(key.equals(getString(R.string.loading_timeout_key))) {
+        if (key.equals(getString(R.string.loading_timeout_key))) {
             ServiceHelper.initServices(this.getContext());
-        } else if(key.equals(getString(R.string.disable_android_auto_key))) {
+        } else if (key.equals(getString(R.string.disable_android_auto_key))) {
             DeviceUtils.updateAndroidAutoComponentState(requireContext());
+        } else if (key.equals(getString(R.string.fetch_full_playlist_key))) {
+            ServiceHelper.initServices(this.getContext());
         }
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        getPreferenceManager().getSharedPreferences()
+                .registerOnSharedPreferenceChangeListener(this);
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+        getPreferenceManager().getSharedPreferences()
+                .unregisterOnSharedPreferenceChangeListener(this);
     }
 }

@@ -11,7 +11,6 @@ import androidx.activity.result.contract.ActivityResultContracts.StartActivityFo
 import androidx.appcompat.app.AlertDialog
 import androidx.lifecycle.ViewModelProvider
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
-import androidx.preference.PreferenceManager
 import androidx.recyclerview.widget.GridLayoutManager
 import com.xwray.groupie.Group
 import com.xwray.groupie.GroupAdapter
@@ -277,9 +276,7 @@ class SubscriptionFragment : BaseStateFragment<SubscriptionState>() {
     }
 
     private fun getFeedGroupLayoutPreference(): Boolean {
-        // Replace with your actual preference key
-        return PreferenceManager.getDefaultSharedPreferences(requireContext())
-            .getBoolean("feed_groups_grid_layout", false)
+        return true
     }
 
     private fun getFeedGroupGridSpanCount(): Int {
