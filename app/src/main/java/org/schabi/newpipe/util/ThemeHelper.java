@@ -330,7 +330,6 @@ public final class ThemeHelper {
      */
     public static boolean shouldUseGridLayout(final Context context) {
         final SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(context);
-        migrateLegacyListViewMode(context, preferences);
         return preferences.getBoolean(context.getString(R.string.grid_layout_enabled_key), true);
     }
 
@@ -354,7 +353,6 @@ public final class ThemeHelper {
      */
     public static int getGridSpanCountChannels(final Context context) {
         final SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(context);
-        migrateLegacyListViewMode(context, preferences);
         return getConfiguredGridColumns(context, preferences);
     }
 
@@ -365,7 +363,6 @@ public final class ThemeHelper {
      */
     public static ItemViewMode getItemViewMode(final Context context) {
         final SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(context);
-        migrateLegacyListViewMode(context, preferences);
         if (preferences.getBoolean(context.getString(R.string.card_mode_enabled_key), false)) {
             return ItemViewMode.CARD;
         }
@@ -382,7 +379,6 @@ public final class ThemeHelper {
      */
     public static int getGridSpanCountStreams(final Context context) {
         final SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(context);
-        migrateLegacyListViewMode(context, preferences);
         return getConfiguredGridColumns(context, preferences);
     }
 
@@ -414,52 +410,4 @@ public final class ThemeHelper {
         }
     }
 
-    public static void migrateLegacyListViewMode(final Context context,
-                                                 final SharedPreferences preferences) {
-        final String migrationKey = context.getString(R.string.list_view_mode_migrated_key);
-        if (preferences.getBoolean(migrationKey, false)) {
-            return;
-        }
-
-        final String listMode = preferences.getString(context.getString(R.string.list_view_mode_key),
-                context.getString(R.string.list_view_mode_value));
-        final SharedPreferences.Editor editor = preferences.edit();
-
-        final boolean isAuto = listMode.equals(context.getString(R.string.list_view_mode_auto_key));
-        final boolean useGrid;
-        if (listMode.equals(context.getString(R.string.list_view_mode_grid_key))) {
-            useGrid = true;
-            editor.putString(context.getString(R.string.grid_columns_key), "2");
-            editor.putString(context.getString(R.string.grid_columns_landscape_key), "4");
-        } else if (listMode.equals(context.getString(R.string.list_view_mode_large_grid_key))) {
-            useGrid = true;
-            editor.putString(context.getString(R.string.grid_columns_key), "1");
-            editor.putString(context.getString(R.string.grid_columns_landscape_key), "2");
-        } else if (listMode.equals(context.getString(R.string.list_view_mode_card_key))) {
-            useGrid = false;
-            editor.putBoolean(context.getString(R.string.card_mode_enabled_key), true);
-        } else if (isAuto) {
-            final Configuration configuration = context.getResources().getConfiguration();
-            useGrid = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-                    && configuration.isLayoutSizeAtLeast(Configuration.SCREENLAYOUT_SIZE_LARGE);
-            if (useGrid) {
-                editor.putString(context.getString(R.string.grid_columns_key), "2");
-                editor.putString(context.getString(R.string.grid_columns_landscape_key), "4");
-            }
-        } else {
-            useGrid = false;
-        }
-
-        editor.putBoolean(context.getString(R.string.grid_layout_enabled_key), useGrid);
-        if (!preferences.contains(context.getString(R.string.grid_columns_key))) {
-            editor.putString(context.getString(R.string.grid_columns_key), "2");
-        }
-        if (!preferences.contains(context.getString(R.string.grid_columns_landscape_key))) {
-            editor.putString(context.getString(R.string.grid_columns_landscape_key), "4");
-        }
-        if (!preferences.contains(context.getString(R.string.card_mode_enabled_key))) {
-            editor.putBoolean(context.getString(R.string.card_mode_enabled_key), false);
-        }
-        editor.putBoolean(migrationKey, true).apply();
-    }
 }

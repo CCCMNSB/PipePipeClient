@@ -19,8 +19,6 @@ public class AppearanceSettingsFragment extends BasePreferenceFragment {
     @Override
     public void onCreatePreferences(final Bundle savedInstanceState, final String rootKey) {
         addPreferencesFromResourceRegistry();
-        ThemeHelper.migrateLegacyListViewMode(requireContext(), defaultPreferences);
-
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             removePreference(getString(R.string.player_notification_screen_key));
         }

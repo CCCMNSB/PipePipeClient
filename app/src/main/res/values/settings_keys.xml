@@ -1713,4 +1713,5 @@
     </string-array>
 
     <string name="show_channel_tabs_podcasts">show_channel_tabs_podcasts</string>
+    <string name="last_used_pipepipe_preferences_version">last_used_pipepipe_preferences_version</string>
 </resources>
