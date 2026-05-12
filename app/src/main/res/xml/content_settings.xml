@@ -43,29 +43,6 @@
 
     <SwitchPreferenceCompat
         android:defaultValue="true"
-        android:key="@string/show_comments_key"
-        android:summary="@string/show_comments_summary"
-        android:title="@string/show_comments_title"
-        app:singleLineTitle="false"
-        app:iconSpaceReserved="false" />
-
-    <SwitchPreferenceCompat
-        android:defaultValue="true"
-        android:key="@string/show_next_video_key"
-        android:title="@string/show_next_and_similar_title"
-        app:singleLineTitle="false"
-        app:iconSpaceReserved="false" />
-
-    <SwitchPreferenceCompat
-        android:defaultValue="true"
-        android:key="@string/show_description_key"
-        android:summary="@string/show_description_summary"
-        android:title="@string/show_description_title"
-        app:singleLineTitle="false"
-        app:iconSpaceReserved="false" />
-
-    <SwitchPreferenceCompat
-        android:defaultValue="true"
         android:key="@string/show_meta_info_key"
         android:summary="@string/show_meta_info_summary"
         android:title="@string/show_meta_info_title"

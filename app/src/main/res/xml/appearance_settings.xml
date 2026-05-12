@@ -78,6 +78,16 @@
         app:iconSpaceReserved="false" />
 
     <MultiSelectListPreference
+        android:key="@string/video_tabs_key"
+        android:summary="@string/video_tabs_summary"
+        android:title="@string/video_tabs_title"
+        android:entries="@array/video_tabs_description_list"
+        android:entryValues="@array/video_tabs_value_list"
+        android:defaultValue="@array/video_tabs_value_list"
+        app:iconSpaceReserved="false"
+        app:singleLineTitle="false" />
+
+    <MultiSelectListPreference
         android:key="@string/show_channel_tabs_key"
         android:summary="@string/show_channel_tabs_summary"
         android:title="@string/show_channel_tabs"

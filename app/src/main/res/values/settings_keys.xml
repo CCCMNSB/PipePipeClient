@@ -1714,4 +1714,17 @@
 
     <string name="show_channel_tabs_podcasts">show_channel_tabs_podcasts</string>
     <string name="last_used_pipepipe_preferences_version">last_used_pipepipe_preferences_version</string>
+    <string name="video_tabs_key">video_tabs_key</string>
+    <string-array name="video_tabs_value_list">
+        <item>comments</item>
+        <item>related</item>
+        <item>sponsorblock</item>
+        <item>description</item>
+    </string-array>
+    <string-array name="video_tabs_description_list">
+        <item>@string/comments_tab_description</item>
+        <item>@string/related_items_tab_description</item>
+        <item>@string/sponsor_block</item>
+        <item>@string/description_tab_description</item>
+    </string-array>
 </resources>

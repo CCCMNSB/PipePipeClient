@@ -156,6 +156,10 @@ public final class VideoDetailFragment
     private static final String DESCRIPTION_TAB_TAG = "DESCRIPTION TAB";
     private static final String SPONSOR_BLOCK_TAB_TAG = "SPONSOR_BLOCK TAB";
     private static final String EMPTY_TAB_TAG = "EMPTY TAB";
+    private static final String VIDEO_TAB_COMMENTS = "comments";
+    private static final String VIDEO_TAB_RELATED = "related";
+    private static final String VIDEO_TAB_DESCRIPTION = "description";
+    private static final String VIDEO_TAB_SPONSORBLOCK = "sponsorblock";
 
     private static final String PICASSO_VIDEO_DETAILS_TAG = "PICASSO_VIDEO_DETAILS_TAG";
 
@@ -178,17 +182,17 @@ public final class VideoDetailFragment
 
     private void onSharedPreferencesChanged(final SharedPreferences sharedPreferences,
                                             final String key) {
-        if (getString(R.string.show_comments_key).equals(key)) {
-            showComments = sharedPreferences.getBoolean(key, true);
-            tabSettingsChanged = true;
-        } else if (getString(R.string.show_next_video_key).equals(key)) {
-            showRelatedItems = sharedPreferences.getBoolean(key, true);
-            tabSettingsChanged = true;
-        } else if (getString(R.string.show_description_key).equals(key)) {
-            showDescription = sharedPreferences.getBoolean(key, true);
+        if (getString(R.string.video_tabs_key).equals(key)) {
+            final Set<String> videoTabs = getVideoTabs(sharedPreferences);
+            showComments = videoTabs.contains(VIDEO_TAB_COMMENTS);
+            showRelatedItems = videoTabs.contains(VIDEO_TAB_RELATED);
+            showDescription = videoTabs.contains(VIDEO_TAB_DESCRIPTION);
+            showSponsorBlock = videoTabs.contains(VIDEO_TAB_SPONSORBLOCK)
+                    && sharedPreferences.getBoolean(getString(R.string.sponsor_block_enable_key), false);
             tabSettingsChanged = true;
         } else if (getString(R.string.sponsor_block_enable_key).equals(key)) {
-            showSponsorBlock = sharedPreferences.getBoolean(key, false);
+            showSponsorBlock = getVideoTabs(sharedPreferences).contains(VIDEO_TAB_SPONSORBLOCK)
+                    && sharedPreferences.getBoolean(key, false);
             tabSettingsChanged = true;
         }
     }
@@ -317,10 +321,12 @@ public final class VideoDetailFragment
         super.onCreate(savedInstanceState);
 
         final SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(activity);
-        showComments = prefs.getBoolean(getString(R.string.show_comments_key), true);
-        showRelatedItems = prefs.getBoolean(getString(R.string.show_next_video_key), true);
-        showDescription = prefs.getBoolean(getString(R.string.show_description_key), true);
-        showSponsorBlock = prefs.getBoolean(getString(R.string.sponsor_block_enable_key), false);
+        final Set<String> videoTabs = getVideoTabs(prefs);
+        showComments = videoTabs.contains(VIDEO_TAB_COMMENTS);
+        showRelatedItems = videoTabs.contains(VIDEO_TAB_RELATED);
+        showDescription = videoTabs.contains(VIDEO_TAB_DESCRIPTION);
+        showSponsorBlock = videoTabs.contains(VIDEO_TAB_SPONSORBLOCK)
+                && prefs.getBoolean(getString(R.string.sponsor_block_enable_key), false);
         selectedTabTag = prefs.getString(
                 getString(R.string.stream_info_selected_tab_key), COMMENTS_TAB_TAG);
         prefs.registerOnSharedPreferenceChangeListener(preferenceChangeListener);
@@ -468,14 +474,17 @@ public final class VideoDetailFragment
         if(key == null){
             return ;
         }
-        if (key.equals(getString(R.string.show_comments_key))) {
-            showComments = sharedPreferences.getBoolean(key, true);
+        if (key.equals(getString(R.string.video_tabs_key))) {
+            final Set<String> videoTabs = getVideoTabs(sharedPreferences);
+            showComments = videoTabs.contains(VIDEO_TAB_COMMENTS);
+            showRelatedItems = videoTabs.contains(VIDEO_TAB_RELATED);
+            showDescription = videoTabs.contains(VIDEO_TAB_DESCRIPTION);
+            showSponsorBlock = videoTabs.contains(VIDEO_TAB_SPONSORBLOCK)
+                    && sharedPreferences.getBoolean(getString(R.string.sponsor_block_enable_key), false);
             tabSettingsChanged = true;
-        } else if (key.equals(getString(R.string.show_next_video_key))) {
-            showRelatedItems = sharedPreferences.getBoolean(key, true);
-            tabSettingsChanged = true;
-        } else if (key.equals(getString(R.string.show_description_key))) {
-            showDescription = sharedPreferences.getBoolean(key, true);
+        } else if (key.equals(getString(R.string.sponsor_block_enable_key))) {
+            showSponsorBlock = getVideoTabs(sharedPreferences).contains(VIDEO_TAB_SPONSORBLOCK)
+                    && sharedPreferences.getBoolean(key, false);
             tabSettingsChanged = true;
         }
     }
@@ -1238,6 +1247,16 @@ public final class VideoDetailFragment
         } catch (final ExtractionException e) {
             return false;
         }
+    }
+
+    private Set<String> getVideoTabs(final SharedPreferences sharedPreferences) {
+        return sharedPreferences.getStringSet(getString(R.string.video_tabs_key),
+                new HashSet<>(Arrays.asList(
+                        VIDEO_TAB_COMMENTS,
+                        VIDEO_TAB_RELATED,
+                        VIDEO_TAB_SPONSORBLOCK,
+                        VIDEO_TAB_DESCRIPTION
+                )));
     }
 
     public void updateTabLayoutVisibility() {
