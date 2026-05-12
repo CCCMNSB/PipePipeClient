@@ -41,21 +41,6 @@
         app:singleLineTitle="false"
         app:iconSpaceReserved="false" />
 
-    <SwitchPreferenceCompat
-        android:defaultValue="true"
-        android:key="@string/show_meta_info_key"
-        android:summary="@string/show_meta_info_summary"
-        android:title="@string/show_meta_info_title"
-        app:singleLineTitle="false"
-        app:iconSpaceReserved="false" />
-
-    <SwitchPreference
-            android:defaultValue="false"
-            android:key="@string/show_dislike_key"
-            android:title="@string/show_dislike_title"
-            app:singleLineTitle="false"
-            app:iconSpaceReserved="false"/>
-
     <SwitchPreference
         android:defaultValue="false"
         android:key="@string/toggle_show_future_items_key"
