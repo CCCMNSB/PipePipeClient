@@ -18,6 +18,7 @@ public final class PipePipeMigrations {
             migrateLegacyListViewMode(context, preferences);
             migrateLegacyChannelTabs(context, preferences);
             migrateLegacyVideoTabs(context, preferences);
+            migrateShowFutureItemsToFilterFutureItems(context, preferences);
         }
     };
 
@@ -136,6 +137,21 @@ public final class PipePipeMigrations {
             editor.putBoolean(context.getString(R.string.card_mode_enabled_key), false);
         }
         editor.putBoolean(migrationKey, true).apply();
+    }
+
+    private static void migrateShowFutureItemsToFilterFutureItems(
+            final Context context,
+            final SharedPreferences preferences) {
+        final String oldKey = context.getString(R.string.toggle_show_future_items_key);
+        if (!preferences.contains(oldKey)) {
+            return;
+        }
+
+        final String newKey = context.getString(R.string.filter_future_items_key);
+        preferences.edit()
+                .putBoolean(newKey, !preferences.getBoolean(oldKey, false))
+                .remove(oldKey)
+                .apply();
     }
 
     private PipePipeMigrations() { }

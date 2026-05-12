@@ -1727,4 +1727,5 @@
         <item>@string/sponsor_block</item>
         <item>@string/description_tab_description</item>
     </string-array>
+    <string name="filter_future_items_key">filter_future_items_key</string>
 </resources>

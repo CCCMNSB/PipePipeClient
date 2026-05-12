@@ -8,6 +8,8 @@ import android.view.View;
 import androidx.annotation.NonNull;
 
 import androidx.preference.PreferenceManager;
+
+import org.schabi.newpipe.R;
 import org.schabi.newpipe.error.ErrorInfo;
 import org.schabi.newpipe.error.UserAction;
 import org.schabi.newpipe.extractor.InfoItem;
@@ -45,7 +47,7 @@ public abstract class BaseListInfoFragment<I extends InfoItem, L extends ListInf
     protected L currentInfo;
     protected Page currentNextPage;
     protected Disposable currentWorker;
-    protected boolean showFutureItems;
+    protected boolean filterFutureItems;
 
     protected BaseListInfoFragment(final UserAction errorUserAction) {
         this.errorUserAction = errorUserAction;
@@ -61,7 +63,8 @@ public abstract class BaseListInfoFragment<I extends InfoItem, L extends ListInf
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        showFutureItems = PreferenceManager.getDefaultSharedPreferences(getActivity()).getBoolean("toggle_show_future_items_key", false);
+        filterFutureItems = PreferenceManager.getDefaultSharedPreferences(getActivity())
+                .getBoolean(getString(R.string.filter_future_items_key), true);
     }
 
     @Override
@@ -239,7 +242,7 @@ public abstract class BaseListInfoFragment<I extends InfoItem, L extends ListInf
         if (infoListAdapter.getItemsList().isEmpty()) {
             if (!result.getRelatedItems().isEmpty()) {
                 infoListAdapter.addInfoItemList(result.getRelatedItems().stream()
-                        .filter(item -> showFutureItems || !(item instanceof StreamInfoItem) ||((StreamInfoItem)item).getUploadDate() == null
+                        .filter(item -> !filterFutureItems || !(item instanceof StreamInfoItem) || ((StreamInfoItem) item).getUploadDate() == null
                                 || ((StreamInfoItem)item).getUploadDate().offsetDateTime().isBefore(OffsetDateTime.now()))
                                 .collect(Collectors.toList()));
                 showListFooter(hasMoreItems());
