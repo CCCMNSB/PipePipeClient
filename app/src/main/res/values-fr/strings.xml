@@ -809,8 +809,6 @@ Vous devez l\'accepter pour nous envoyer le rapport de bug.</string>
 <string name="advanced_formats_summary">Si votre appareil est compatible, l\'activation des formats avancés peut réduire la consommation de données et offrir des résolutions plus élevées. \nWEBM ou AV1 doivent être activés pour afficher des contenus en 2k/4k sur YouTube. \nUtiliser un format que votre appareil ne prend pas en charge entraînera un écran noir ou un plantage.</string>
 <string name="advanced_formats_title">Activer les formats avancés</string>
 <string name="preferred_audio_language_title">Langue audio préférée</string>
-<string name="comments_inner_scroll_title">Défilement intérieur des commentaires</string>
-<string name="comments_inner_scroll_summary">Rendre le positionnement de la vidéo fixe lors du défilement des commentaires</string>
 <string name="ip_blocked_summary">Votre IP a été temporairement bloquée par YouTube. Pendant un certain temps, vous rencontrerez des problèmes lors de la lecture de certaines vidéos. Si l\'erreur persiste, veuillez vous connecter via les Paramètres pour continuer.</string>
 <string name="settings_category_filter_title">Filtre de contenu</string>
 <string name="filter_by_keyword_title">Filtrer par mots-clés</string>

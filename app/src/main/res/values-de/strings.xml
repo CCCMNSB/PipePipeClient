@@ -856,8 +856,6 @@
 <string name="advanced_formats_summary">Wenn Ihr Gerät Unterstützung bietet, kann das Aktivieren erweiterter Formate den Datenverbrauch reduzieren und höhere Auflösungen bereitstellen. \nWEBM oder AV1 müssen aktiviert sein, um 2k/4k-Inhalte auf YouTube anzuzeigen. \nDie Verwendung eines Formats, das Ihr Gerät nicht unterstützt, führt zu einem schwarzen Bildschirm oder Absturz.</string>
 <string name="advanced_formats_title">Erweiterte Formate aktivieren</string>
 <string name="preferred_audio_language_title">Bevorzugte Audiosprache</string>
-<string name="comments_inner_scroll_title">Kommentare innerer Bildlauf</string>
-<string name="comments_inner_scroll_summary">Video-Position beim Scrollen durch Kommentare fixieren</string>
 <string name="ip_blocked_summary">Ihre IP wurde von YouTube vorübergehend blockiert. Für eine gewisse Zeit werden Sie Probleme beim Abspielen bestimmter Videos haben. Wenn der Fehler weiterhin besteht, melden Sie sich bitte über die Einstellungen an, um fortzufahren.</string>
 <string name="settings_category_filter_title">Inhaltsfilter</string>
 <string name="filter_by_keyword_title">Nach Schlüsselwörtern filtern</string>

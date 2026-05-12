@@ -30,6 +30,7 @@ import android.view.WindowManager;
 import android.view.animation.DecelerateInterpolator;
 import android.widget.FrameLayout;
 import android.widget.RelativeLayout;
+import android.widget.LinearLayout;
 
 import android.widget.Toast;
 import androidx.annotation.AttrRes;
@@ -177,6 +178,7 @@ public final class VideoDetailFragment
     final List<Integer> tabContentDescriptions = new ArrayList<>();
     private boolean tabSettingsChanged = false;
     private int lastAppBarVerticalOffset = Integer.MAX_VALUE;
+    private boolean stickyPlayerEnabled;
     private final SharedPreferences.OnSharedPreferenceChangeListener preferenceChangeListener =
             this::onSharedPreferencesChanged;
 
@@ -194,6 +196,8 @@ public final class VideoDetailFragment
             showSponsorBlock = getVideoTabs(sharedPreferences).contains(VIDEO_TAB_SPONSORBLOCK)
                     && sharedPreferences.getBoolean(key, false);
             tabSettingsChanged = true;
+        } else if (getString(R.string.pin_video_to_top_key).equals(key)) {
+            updateStickyPlayerMode();
         }
     }
 
@@ -383,6 +387,8 @@ public final class VideoDetailFragment
             updateTabs(currentInfo);
         }
 
+        updateStickyPlayerMode();
+
         // Check if it was loading when the fragment was stopped/paused
         if (wasLoading.getAndSet(false) && !wasCleared()) {
             startLoading(false);
@@ -438,6 +444,7 @@ public final class VideoDetailFragment
 
     @Override
     public void onDestroyView() {
+        moveThumbnailToContainer(binding.detailThumbnailContainer);
         super.onDestroyView();
         binding = null;
     }
@@ -486,6 +493,8 @@ public final class VideoDetailFragment
             showSponsorBlock = getVideoTabs(sharedPreferences).contains(VIDEO_TAB_SPONSORBLOCK)
                     && sharedPreferences.getBoolean(key, false);
             tabSettingsChanged = true;
+        } else if (key.equals(getString(R.string.pin_video_to_top_key))) {
+            updateStickyPlayerMode();
         }
     }
 
@@ -719,6 +728,7 @@ public final class VideoDetailFragment
         pageAdapter = new TabAdapter(getChildFragmentManager());
         binding.viewPager.setAdapter(pageAdapter);
         binding.tabLayout.setupWithViewPager(binding.viewPager);
+        updateStickyPlayerMode();
 
         binding.detailThumbnailRootLayout.requestFocus();
 
@@ -1594,10 +1604,73 @@ public final class VideoDetailFragment
                 new FrameLayout.LayoutParams(
                         RelativeLayout.LayoutParams.MATCH_PARENT, newHeight));
         binding.detailThumbnailImageView.setMinimumHeight(newHeight);
+        updateStickyPlayerLayout(newHeight);
         if (isPlayerAvailable()) {
             final int maxHeight = (int) (metrics.heightPixels * MAX_PLAYER_HEIGHT);
             player.getSurfaceView()
                     .setHeights(newHeight, player.isFullscreen() ? newHeight : maxHeight);
+        }
+    }
+
+    private void updateStickyPlayerMode() {
+        if (binding == null || activity == null) {
+            return;
+        }
+
+        final SharedPreferences preferences = PreferenceManager
+                .getDefaultSharedPreferences(requireContext());
+        final boolean enableStickyPlayer = preferences.getBoolean(
+                getString(R.string.pin_video_to_top_key), true)
+                && !DeviceUtils.isLandscape(requireContext())
+                && bottomSheetState == BottomSheetBehavior.STATE_EXPANDED;
+        if (stickyPlayerEnabled == enableStickyPlayer) {
+            updateStickyPlayerLayout(binding.detailThumbnailRootLayout.getHeight());
+            return;
+        }
+
+        stickyPlayerEnabled = enableStickyPlayer;
+        moveThumbnailToContainer(enableStickyPlayer
+                ? binding.stickyPlayerContainer
+                : binding.detailThumbnailContainer);
+        binding.stickyPlayerContainer.setVisibility(enableStickyPlayer ? View.VISIBLE : View.GONE);
+        updateStickyPlayerLayout(binding.detailThumbnailRootLayout.getHeight());
+    }
+
+    private void moveThumbnailToContainer(@NonNull final ViewGroup targetParent) {
+        final ViewGroup currentParent = (ViewGroup) binding.detailThumbnailRootLayout.getParent();
+        if (currentParent == targetParent) {
+            return;
+        }
+        if (currentParent != null) {
+            currentParent.removeView(binding.detailThumbnailRootLayout);
+        }
+        targetParent.addView(binding.detailThumbnailRootLayout);
+    }
+
+    private void updateStickyPlayerLayout(final int playerHeight) {
+        if (binding == null) {
+            return;
+        }
+
+        final int height = Math.max(playerHeight, binding.detailThumbnailImageView.getMinimumHeight());
+        final ViewGroup.LayoutParams stickyParams = binding.stickyPlayerContainer.getLayoutParams();
+        if (stickyParams != null) {
+            stickyParams.height = stickyPlayerEnabled ? height : 0;
+            binding.stickyPlayerContainer.setLayoutParams(stickyParams);
+        }
+
+        final ViewGroup.LayoutParams mainContentParams = binding.detailMainContent.getLayoutParams();
+        if (mainContentParams instanceof FrameLayout.LayoutParams) {
+            final FrameLayout.LayoutParams frameLayoutParams = (FrameLayout.LayoutParams) mainContentParams;
+            final int topMargin = stickyPlayerEnabled ? height : 0;
+            if (frameLayoutParams.topMargin != topMargin) {
+                frameLayoutParams.topMargin = topMargin;
+                binding.detailMainContent.setLayoutParams(frameLayoutParams);
+            }
+        } else if (mainContentParams instanceof LinearLayout.LayoutParams) {
+            final LinearLayout.LayoutParams linearLayoutParams = (LinearLayout.LayoutParams) mainContentParams;
+            linearLayoutParams.topMargin = 0;
+            binding.detailMainContent.setLayoutParams(linearLayoutParams);
         }
     }
 
@@ -2541,6 +2614,7 @@ public final class VideoDetailFragment
                 try {
                     switch (newState) {
                         case BottomSheetBehavior.STATE_HIDDEN:
+                            updateStickyPlayerMode();
                             moveFocusToMainFragment(true);
                             manageSpaceAtTheBottom(true);
 
@@ -2548,6 +2622,7 @@ public final class VideoDetailFragment
                             cleanUp();
                             break;
                         case BottomSheetBehavior.STATE_EXPANDED:
+                            updateStickyPlayerMode();
                             moveFocusToMainFragment(false);
                             manageSpaceAtTheBottom(false);
 
@@ -2573,6 +2648,7 @@ public final class VideoDetailFragment
                             setOverlayLook(binding.appBarLayout, behavior, 1);
                             break;
                         case BottomSheetBehavior.STATE_COLLAPSED:
+                            updateStickyPlayerMode();
                             moveFocusToMainFragment(true);
                             manageSpaceAtTheBottom(false);
 
@@ -2588,6 +2664,7 @@ public final class VideoDetailFragment
                             break;
                         case BottomSheetBehavior.STATE_DRAGGING:
                         case BottomSheetBehavior.STATE_SETTLING:
+                            updateStickyPlayerMode();
                             if (isPlayerAvailable() && player.isFullscreen()) {
                                 showSystemUi();
                             }

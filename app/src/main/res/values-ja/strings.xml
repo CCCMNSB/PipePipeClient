@@ -874,8 +874,6 @@
 <string name="advanced_formats_summary">デバイスがサポートしている場合、高度なフォーマットを有効にするとデータ消費を削減し、高解像度を提供できます。 \nYouTubeで2k/4kコンテンツを表示するには、WEBMまたはAV1を有効にする必要があります。 \nデバイスがサポートしていないフォーマットを使用すると、黒い画面やクラッシュが発生する可能性があります。</string>
 <string name="advanced_formats_title">高度な形式を有効にする</string>
 <string name="preferred_audio_language_title">優先オーディオ言語</string>
-<string name="comments_inner_scroll_title">コメントの内側スクロール</string>
-<string name="comments_inner_scroll_summary">コメントをスクロールする際に動画の位置を固定します</string>
 <string name="ip_blocked_summary">あなたのIPはYouTubeによって一時的にブロックされています。\n        しばらくの間、特定の動画を再生する際に問題が発生する場合があります。\n        エラーが続く場合は、設定からログインして続行してください。</string>
 <string name="settings_category_filter_title">コンテンツフィルター</string>
 <string name="filter_by_keyword_title">キーワードでフィルター</string>

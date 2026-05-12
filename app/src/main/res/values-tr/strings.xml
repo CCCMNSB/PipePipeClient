@@ -1021,8 +1021,6 @@
 <string name="advanced_formats_summary">Cihazınız destekliyorsa, gelişmiş formatları etkinleştirmek veri tüketimini azaltabilir ve daha yüksek çözünürlükler sağlayabilir. \nYouTube\'da 2k/4k içerikleri göstermek için WEBM veya AV1 etkinleştirilmelidir. \nCihazınızın desteklemediği bir format kullanmak siyah ekrana veya çökmeye neden olur.</string>
 <string name="advanced_formats_title">Gelişmiş formatları etkinleştir</string>
 <string name="preferred_audio_language_title">Tercih edilen ses dili</string>
-<string name="comments_inner_scroll_title">Yorumlar iç kaydırma</string>
-<string name="comments_inner_scroll_summary">Yorumları kaydırırken video konumunu sabit yap</string>
 <string name="ip_blocked_summary">IP adresiniz YouTube tarafından geçici olarak engellendi. Bir süre boyunca, belirli videoları oynatırken sorunlar yaşayacaksınız. Hata devam ederse, devam etmek için lütfen Ayarlar üzerinden giriş yapın.</string>
 <string name="settings_category_filter_title">İçerik Filtresi</string>
 <string name="filter_by_keyword_title">Anahtar kelimeye göre filtrele</string>

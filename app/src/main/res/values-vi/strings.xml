@@ -964,8 +964,6 @@ nSự khác biệt giữa hai loại này là cái nào nhanh thường thiếu 
 <string name="advanced_formats_summary">Nếu thiết bị của bạn có hỗ trợ, việc bật các định dạng nâng cao có thể giảm tiêu thụ dữ liệu và cung cấp độ phân giải cao hơn. \nWEBM hoặc AV1 phải được bật để hiển thị nội dung 2k/4k trên YouTube. \nSử dụng định dạng mà thiết bị của bạn không hỗ trợ sẽ dẫn đến màn hình đen hoặc sự cố.</string>
 <string name="advanced_formats_title">Kích hoạt định dạng nâng cao</string>
 <string name="preferred_audio_language_title">Ngôn ngữ âm thanh ưu tiên</string>
-<string name="comments_inner_scroll_title">Bình luận cuộn bên trong</string>
-<string name="comments_inner_scroll_summary">Làm cho vị trí video cố định khi cuộn bình luận</string>
 <string name="ip_blocked_summary">IP của bạn đã bị YouTube tạm thời chặn. Trong một khoảng thời gian, bạn sẽ gặp sự cố khi phát một số video nhất định. Nếu lỗi vẫn tiếp diễn, vui lòng đăng nhập qua Cài đặt để tiếp tục.</string>
 <string name="settings_category_filter_title">Bộ lọc nội dung</string>
 <string name="filter_by_keyword_title">Lọc theo từ khóa</string>

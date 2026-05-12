@@ -19,6 +19,7 @@ public final class PipePipeMigrations {
             migrateLegacyChannelTabs(context, preferences);
             migrateLegacyVideoTabs(context, preferences);
             migrateShowFutureItemsToFilterFutureItems(context, preferences);
+            migrateLegacyCommentsInnerScroll(context, preferences);
         }
     };
 
@@ -150,6 +151,21 @@ public final class PipePipeMigrations {
         final String newKey = context.getString(R.string.filter_future_items_key);
         preferences.edit()
                 .putBoolean(newKey, !preferences.getBoolean(oldKey, false))
+                .remove(oldKey)
+                .apply();
+    }
+
+    private static void migrateLegacyCommentsInnerScroll(
+            final Context context,
+            final SharedPreferences preferences) {
+        final String oldKey = "comments_inner_scroll_key";
+        if (!preferences.contains(oldKey)) {
+            return;
+        }
+
+        final String newKey = context.getString(R.string.pin_video_to_top_key);
+        preferences.edit()
+                .putBoolean(newKey, preferences.getBoolean(oldKey, true))
                 .remove(oldKey)
                 .apply();
     }

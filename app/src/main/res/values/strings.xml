@@ -1022,8 +1022,6 @@
 <string name="advanced_formats_summary">If your device has support, enabling advanced formats can reduce data consumption and provide higher resolutions. \nWEBM or AV1 must be enabled to show 2k/4k contents on YouTube. \nUse a format that your device doesn\'t support will result in a black screen or crash.</string>
 <string name="advanced_formats_title">Enable advanced formats</string>
 <string name="preferred_audio_language_title">Preferred audio language</string>
-<string name="comments_inner_scroll_title">Comments inner scroll</string>
-<string name="comments_inner_scroll_summary">Make video position fixed when scrolling comments</string>
 <string name="ip_blocked_summary">Your IP has been temporarily blocked by YouTube. For a period of time, you will experience issues when playing certain videos. If the error persists, please log in through Settings to continue.</string>
 <string name="settings_category_filter_title">Content Filter</string>
 <string name="filter_by_keyword_title">Filter by keywords</string>
@@ -1125,4 +1123,6 @@
 <string name="video_tabs_summary">Configure which tabs to show on video detail screen</string>
 <string name="filter_future_items_title">Filter future items</string>
 <string name="filter_future_items_summary">Remove items scheduled for a future release</string>
+<string name="pin_video_to_top_title">Pin video to top</string>
+<string name="pin_video_to_top_summary">Keep the video pinned to the top while scrolling the video detail page</string>
 </resources>
