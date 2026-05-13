@@ -100,43 +100,37 @@ public final class PipePipeMigrations {
         final String listMode = preferences.getString(context.getString(R.string.list_view_mode_key),
                 context.getString(R.string.list_view_mode_value));
         final SharedPreferences.Editor editor = preferences.edit();
-
+        final Configuration configuration = context.getResources().getConfiguration();
+        final boolean isLargeScreen = configuration.isLayoutSizeAtLeast(
+                Configuration.SCREENLAYOUT_SIZE_LARGE);
         final boolean isAuto = listMode.equals(context.getString(R.string.list_view_mode_auto_key));
-        final boolean useGrid;
-        if (listMode.equals(context.getString(R.string.list_view_mode_grid_key))) {
-            useGrid = true;
+        final boolean isCard = listMode.equals(context.getString(R.string.list_view_mode_card_key));
+        final boolean isList = listMode.equals(context.getString(R.string.list_view_mode_list_key));
+        final boolean autoUseGrid = isAuto
+                && configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+                && isLargeScreen;
+        final boolean useGrid = !isCard && !isList && (
+                listMode.equals(context.getString(R.string.list_view_mode_grid_key))
+                        || listMode.equals(context.getString(R.string.list_view_mode_large_grid_key))
+                        || autoUseGrid);
+
+        if (isCard) {
+            editor.putString(context.getString(R.string.grid_columns_key), "1");
+            editor.putString(context.getString(R.string.grid_columns_landscape_key), "1");
+        } else if (isLargeScreen
+                && listMode.equals(context.getString(R.string.list_view_mode_grid_key))) {
+            editor.putString(context.getString(R.string.grid_columns_key), "4");
+            editor.putString(context.getString(R.string.grid_columns_landscape_key), "8");
+        } else if (isLargeScreen) {
+            editor.putString(context.getString(R.string.grid_columns_key), "3");
+            editor.putString(context.getString(R.string.grid_columns_landscape_key), "6");
+        } else {
             editor.putString(context.getString(R.string.grid_columns_key), "2");
             editor.putString(context.getString(R.string.grid_columns_landscape_key), "4");
-        } else if (listMode.equals(context.getString(R.string.list_view_mode_large_grid_key))) {
-            useGrid = true;
-            editor.putString(context.getString(R.string.grid_columns_key), "1");
-            editor.putString(context.getString(R.string.grid_columns_landscape_key), "2");
-        } else if (listMode.equals(context.getString(R.string.list_view_mode_card_key))) {
-            useGrid = false;
-            editor.putBoolean(context.getString(R.string.card_mode_enabled_key), true);
-        } else if (isAuto) {
-            final Configuration configuration = context.getResources().getConfiguration();
-            final boolean autoUseGrid = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-                    && configuration.isLayoutSizeAtLeast(Configuration.SCREENLAYOUT_SIZE_LARGE);
-            if (autoUseGrid) {
-                editor.putString(context.getString(R.string.grid_columns_key), "2");
-                editor.putString(context.getString(R.string.grid_columns_landscape_key), "4");
-            }
-            useGrid = autoUseGrid;
-        } else {
-            useGrid = false;
         }
 
         editor.putBoolean(context.getString(R.string.grid_layout_enabled_key), useGrid);
-        if (!preferences.contains(context.getString(R.string.grid_columns_key))) {
-            editor.putString(context.getString(R.string.grid_columns_key), "2");
-        }
-        if (!preferences.contains(context.getString(R.string.grid_columns_landscape_key))) {
-            editor.putString(context.getString(R.string.grid_columns_landscape_key), "4");
-        }
-        if (!preferences.contains(context.getString(R.string.card_mode_enabled_key))) {
-            editor.putBoolean(context.getString(R.string.card_mode_enabled_key), false);
-        }
+        editor.putBoolean(context.getString(R.string.card_mode_enabled_key), isCard);
         editor.putBoolean(migrationKey, true).apply();
     }
 
