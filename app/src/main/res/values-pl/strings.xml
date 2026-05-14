@@ -10,8 +10,6 @@
     <string name="settings">Ustawienia</string>
     <string name="did_you_mean">Czy chodziło Ci o „%1$s”\?</string>
     <string name="share_dialog_title">Udostępnij</string>
-    <string name="use_external_video_player_title">Używaj zewnętrznego odtwarzacza wideo</string>
-    <string name="use_external_audio_player_title">Używaj zewnętrznego odtwarzacza audio</string>
     <string name="upload_date_text">Opublikowano %1$s</string>
     <string name="no_player_found">Nie znaleziono odtwarzacza strumieni. Zainstalować VLC\?</string>
     <string name="download_path_title">Folder zapisywania wideo</string>
@@ -23,22 +21,15 @@
     <string name="default_resolution_title">Domyślna rozdzielczość</string>
     <string name="play_with_kodi_title">Odtwórz w Kodi</string>
     <string name="kore_not_found">Czy zainstalować brakującą aplikację Kore\?</string>
-    <string name="show_play_with_kodi_title">Pokazuj opcję „Odtwórz z Kodi”</string>
-    <string name="show_play_with_kodi_summary">Wyświetlaj opcję odtwarzania wideo przez centrum multimedialne Kodi</string>
     <string name="play_audio">Dźwięk</string>
-    <string name="default_audio_format_title">Domyślny format audio</string>
     <string name="theme_title">Motyw</string>
     <string name="dark_theme_title">Ciemny</string>
     <string name="light_theme_title">Jasny</string>
     <string name="download_dialog_title">Pobierz</string>
-    <string name="show_next_and_similar_title">Pokazuj następne i powiązane wideo</string>
     <string name="unsupported_url">Nieobsługiwany adres URL</string>
-    <string name="content_language_title">Domyślny język treści</string>
-    <string name="settings_category_video_audio_title">Wideo i audio</string>
     <string name="settings_category_appearance_title">Wygląd</string>
     <string name="background_player_playing_toast">Odtwarzanie w tle</string>
     <string name="content">Zawartość</string>
-    <string name="show_age_restricted_content_title">Pokazuj treści z ograniczeniami wiekowymi</string>
     <string name="duration_live">Na żywo</string>
     <string name="downloads">Pobrane</string>
     <string name="downloads_title">Pobrane</string>
@@ -82,15 +73,9 @@
     <string name="start">Rozpocznij</string>
     <string name="title_activity_recaptcha">Zadanie reCAPTCHA</string>
     <string name="recaptcha_request_toast">Zażądano rozwiązania reCAPTCHA</string>
-    <string name="use_external_video_player_summary">Usuwa dźwięk w niektórych rozdzielczościach</string>
     <string name="controls_background_title">W tle</string>
     <string name="default_popup_resolution_title">Domyślna rozdzielczość trybu okienkowego</string>
-    <string name="show_higher_resolutions_title">Pokazuj wyższe rozdzielczości</string>
-    <string name="show_higher_resolutions_summary">Tylko niektóre urządzenia mogą odtwarzać wideo w 2K/4K</string>
-    <string name="default_video_format_title">Domyślny format wideo</string>
     <string name="black_theme_title">Czarny</string>
-    <string name="popup_remember_size_pos_title">Pamiętaj właściwości trybu okienkowego</string>
-    <string name="popup_remember_size_pos_summary">Zapamiętaj ostatni rozmiar i pozycję trybu okienkowego</string>
     <string name="show_search_suggestions_title">Podpowiedzi wyszukiwania</string>
     <string name="show_search_suggestions_summary">Wybierz podpowiedzi, które będą wyświetlane podczas wyszukiwania</string>
     <string name="popup_playing_toast">Odtwarzanie w trybie okienkowym</string>
@@ -106,12 +91,10 @@
     <string name="controls_popup_title">Tryb okienkowy</string>
     <string name="best_resolution">Najlepsza rozdzielczość</string>
     <string name="settings_category_downloads_title">Pobieranie</string>
-    <string name="settings_file_replacement_character_summary">Nieprawidłowe znaki są zastępowane tą wartością</string>
     <string name="charset_letters_and_digits">Litery i cyfry</string>
     <string name="title_activity_about">O NewPipe</string>
     <string name="title_licenses">Licencje innych firm</string>
     <string name="tab_about">O aplikacji</string>
-    <string name="tab_licenses">Licencje</string>
     <string name="app_description">Lekkie przesyłanie strumieniowe w systemie Android.</string>
     <string name="view_on_github">Zobacz na GitHubie</string>
     <string name="app_license_title">Licencja NewPipe</string>
@@ -119,7 +102,6 @@
     <string name="read_full_license">Przeczytaj licencję</string>
     <string name="contribution_title">Wkład</string>
     <string name="settings_file_charset_title">Dozwolone znaki w nazwach plików</string>
-    <string name="settings_file_replacement_character_title">Znak zastępczy</string>
     <string name="copyright" formatted="true">©%1$s %2$s na licencji %3$s</string>
     <string name="subscribe_button_title">Subskrybuj</string>
     <string name="subscribed_button_title">Subskrybujesz</string>
@@ -139,13 +121,10 @@
     <string name="title_activity_history">Historia</string>
     <string name="action_history">Historia</string>
     <string name="settings_category_player_title">Odtwarzacz</string>
-    <string name="settings_category_player_behavior_title">Zachowanie</string>
     <string name="settings_category_history_title">Historia i pamięć podręczna</string>
     <string name="undo">Cofnij</string>
     <string name="search_no_results">Brak wyników</string>
     <string name="no_views">Brak wyświetleń</string>
-    <string name="show_hold_to_append_title">Pokazuj poradę „Przytrzymaj, aby dodać”</string>
-    <string name="show_hold_to_append_summary">Pokaż wskazówkę po naciśnięciu tła lub wyskakującego przycisku „Szczegóły” w odtwarzaczu</string>
     <string name="play_all">Odtwórz wszystkie</string>
     <string name="unknown_content">[Nieznane]</string>
     <string name="player_stream_failure">Nie udało się odtworzyć tego strumienia</string>
@@ -175,7 +154,6 @@
     <string name="charset_most_special_characters">Większość znaków specjalnych</string>
     <string name="donation_title">Dotacja</string>
     <string name="donation_encouragement">NewPipe jest rozwijany przez wolontariuszy, którzy poświęcają swój wolny czas, zapewniając Ci najlepsze wrażenia z użytkowania. To dobry moment na wsparcie programistów i sprawienie, aby NewPipe był jeszcze lepszy, podczas gdy oni będą mogli delektować się filiżanką kawy.</string>
-    <string name="give_back">Wspomóż</string>
     <string name="website_title">Strona internetowa</string>
     <string name="website_encouragement">Odwiedź stronę NewPipe, aby uzyskać więcej informacji i najnowsze wiadomości.</string>
     <string name="delete_item_search_history">Czy chcesz usunąć tę pozycję z historii wyszukiwania?</string>
@@ -320,11 +298,8 @@
     <string name="privacy_policy_title">Polityka prywatności NewPipe</string>
     <string name="privacy_policy_encouragement">Projekt NewPipe bardzo poważnie traktuje Twoją prywatność, dlatego aplikacja nie gromadzi żadnych danych bez Twojej zgody.
 \nPolityka prywatności NewPipe szczegółowo wyjaśnia, jakie dane są zbierane i przesyłane, kiedy wysyłasz raport o awarii aplikacji.</string>
-    <string name="read_privacy_policy">Przeczytaj politykę prywatności</string>
     <string name="start_accept_privacy_policy">Ze względu na wprowadzenie Ogólnego rozporządzenia o ochronie danych (RODO), chcielibyśmy zwrócić Twoją uwagę na politykę prywatności NewPipe. Prosimy przeczytać ją uważnie.
 \nMusisz ją zaakceptować, aby przesyłać nam raporty o błędach.</string>
-    <string name="accept">Akceptuj</string>
-    <string name="decline">Odrzuć</string>
     <string name="limit_data_usage_none_description">Bez limitu</string>
     <string name="limit_mobile_data_usage_title">Ograniczaj rozdzielczość podczas korzystania z danych mobilnych</string>
     <string name="channels">Kanały</string>
@@ -393,16 +368,12 @@
     <string name="events">Wydarzenia</string>
     <string name="conferences">Konferencje</string>
     <string name="missions_header_pending">Oczekujące</string>
-    <string name="show_comments_title">Pokazuj komentarze</string>
-    <string name="show_comments_summary">Wyłącz, aby ukryć komentarze</string>
     <string name="autoplay_title">Automatyczne odtwarzanie</string>
     <string name="no_comments">Brak komentarzy</string>
     <string name="error_unable_to_load_comments">Nie udało się załadować komentarzy</string>
     <string name="close">Zamknij</string>
     <string name="enable_playback_resume_title">Wznawiaj odtwarzanie</string>
     <string name="enable_playback_resume_summary">Przywracaj odtwarzanie od ostatniej pozycji</string>
-    <string name="enable_playback_state_lists_title">Pozycje odtwarzania na listach</string>
-    <string name="enable_playback_state_lists_summary">Pokazuj wskaźniki pozycji odtwarzania na listach</string>
     <string name="settings_category_clear_data_title">Wyczyść dane</string>
     <string name="watch_history_states_deleted">Usunięto pozycje odtwarzania</string>
     <string name="missing_file">Plik usunięty albo przeniesiony</string>
@@ -471,7 +442,6 @@
         <item quantity="few">%d sekundy</item>
         <item quantity="many">%d sekund</item>
     </plurals>
-    <string name="new_seek_duration_toast">Ze względu na ograniczenia odtwarzacza ExoPlayer, wielkość skoku przewijania została ustawiona na %d sekund</string>
     <string name="mute">Wycisz</string>
     <string name="unmute">Wyłącz wyciszenie</string>
     <string name="feed_use_dedicated_fetch_method_help_text">Czy uważasz, że ładowanie kanałów jest zbyt powolne\? Jeśli tak, spróbuj włączyć szybkie ładowanie (możesz je zmienić w ustawieniach lub naciskając przycisk poniżej).
@@ -543,7 +513,6 @@
     <string name="remove_watched">Usuń obejrzane</string>
     <string name="show_original_time_ago_summary">Oryginalne teksty z usług będą widoczne w strumieniowanych pozycjach</string>
     <string name="show_original_time_ago_title">Pokazuj oryginalny czas na pozycjach</string>
-    <string name="youtube_restricted_mode_enabled_title">Włącz tryb ograniczonego dostępu YouTube\'a</string>
     <string name="video_detail_by">Przez %s</string>
     <string name="channel_created_by">Utworzony przez %s</string>
     <string name="detail_sub_channel_thumbnail_view_description">Miniatura awatara kanału</string>
@@ -583,8 +552,6 @@
     <string name="clear_cookie_summary">Wyczyść ciasteczka, które NewPipe przechowuje po rozwiązaniu reCAPTCHA</string>
     <string name="recaptcha_cookies_cleared">Ciasteczka reCAPTCHA zostały wyczyszczone</string>
     <string name="clear_cookie_title">Wyczyść ciasteczka reCAPTCHA</string>
-    <string name="youtube_restricted_mode_enabled_summary">YouTube udostępnia „Tryb ograniczonego dostępu”, który ukrywa potencjalne treści dla dorosłych</string>
-    <string name="show_age_restricted_content_summary">Pokazuj treści nieodpowiednie dla dzieci ze względu na ograniczenia wiekowe (np. 18+)</string>
     <string name="notification_colorize_summary">Niech Android dostosuje kolor powiadomienia zgodnie z głównym kolorem na miniaturze (nie jest to dostępne na wszystkich urządzeniach)</string>
     <string name="notification_colorize_title">Zabarwiaj powiadomienia</string>
     <string name="show_thumbnail_summary">Używaj miniatury zarówno jako tła ekranu blokady, jak i powiadomień</string>
@@ -598,8 +565,6 @@
     <string name="chapters">Rozdziały</string>
     <string name="description_tab_description">Opis</string>
     <string name="comments_tab_description">Komentarze</string>
-    <string name="show_description_summary">Wyłącz, aby ukryć opis wideo i dodatkowe informacje</string>
-    <string name="show_description_title">Pokazuj opis</string>
     <string name="open_with">Otwórz za pomocą</string>
     <string name="no_app_to_open_intent">Żadna aplikacja na Twoim urządzeniu nie może tego otworzyć</string>
     <string name="related_items_tab_description">Powiązane pozycje</string>
@@ -645,7 +610,6 @@
 \nNewPipe nie będzie w stanie załadować tego kanału w przyszłości.
 \nCzy chcesz anulować subskrypcję tego kanału\?</string>
     <string name="feed_load_error_account_info">Nie udało się załadować kanału dla „%s”.</string>
-    <string name="downloads_storage_use_saf_summary_api_29">Począwszy od Androida 10 obsługiwany jest tylko systemowy selektor folderów (SAF)</string>
     <string name="downloads_storage_use_saf_summary_api_19">Systemowy selektor folderów (SAF) nie jest obsługiwany przez system Android KitKat i niższy</string>
     <string name="downloads_storage_ask_summary_no_saf_notice">Zostaniesz zapytany(-na), gdzie zapisać każdy pobierany plik</string>
     <string name="no_dir_yet">Nie ustawiono jeszcze folderu zapisywania, wybierz domyślny teraz</string>
@@ -658,7 +622,6 @@
     <string name="comments_are_disabled">Komentarze są wyłączone</string>
     <string name="low_quality_smaller">Niska jakość (mniejszy)</string>
     <string name="high_quality_larger">Wysoka jakość (większy)</string>
-    <string name="seekbar_preview_thumbnail_title">Podgląd miniatury na pasku przewijania</string>
     <string name="dont_show">Nie pokazuj</string>
     <string name="detail_heart_img_view_description">Serduszko od twórcy</string>
     <string name="mark_as_watched">Oznacz jako obejrzane</string>
@@ -728,6 +691,5 @@
     <string name="delete_downloaded_files_confirm">Czy usunąć wszystkie pobrane pliki z dysku\?</string>
     <string name="notifications_disabled">Powiadomienia są wyłączone</string>
     <string name="get_notified">Otrzymuj powiadomienia</string>
-    <string name="enumeration_comma">,</string>
     <string name="toggle_all">Przełącz wszystkie</string>
 </resources>

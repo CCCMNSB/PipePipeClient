@@ -17,22 +17,14 @@
     <string name="default_resolution_title">Разрешение по умолчанию</string>
     <string name="play_with_kodi_title">Воспроизвести в Kodi</string>
     <string name="kore_not_found">Приложение Kore не найдено, установить\?</string>
-    <string name="show_play_with_kodi_title">\"Воспроизвести в Kodi\"</string>
-    <string name="show_play_with_kodi_summary">Показать опцию воспроизведения через медиацентр Kodi</string>
     <string name="play_audio">Аудио</string>
-    <string name="default_audio_format_title">Формат аудио по умолчанию</string>
     <string name="download_dialog_title">Скачать</string>
     <string name="unsupported_url">URL не поддерживается</string>
-    <string name="show_next_and_similar_title">Показать похожие видео</string>
-    <string name="content_language_title">Язык контента по умолчанию</string>
-    <string name="settings_category_video_audio_title">Видео и аудио</string>
     <string name="settings_category_appearance_title">Внешний вид</string>
     <string name="detail_thumbnail_view_description">Воспроизвести видео, длительность:</string>
     <string name="detail_uploader_thumbnail_view_description">Миниатюра аватара пользователя</string>
     <string name="detail_dislikes_img_view_description">Не понравилось</string>
     <string name="detail_likes_img_view_description">Понравилось</string>
-    <string name="use_external_video_player_title">Внешний видеоплеер</string>
-    <string name="use_external_audio_player_title">Внешний аудиоплеер</string>
     <string name="background_player_playing_toast">Фоновое воспроизведение</string>
     <string name="theme_title">Тема</string>
     <string name="dark_theme_title">Тёмная</string>
@@ -55,7 +47,6 @@
     <string name="msg_running_detail">Подробнее</string>
     <string name="msg_copied">Скопировано в буфер обмена</string>
     <string name="no_available_dir">Выберите папку для загрузки позже в настройках</string>
-    <string name="show_age_restricted_content_title">Контент с возрастным ограничением</string>
     <string name="general_error">Ошибка</string>
     <string name="your_comment">Ваш комментарий (English):</string>
     <string name="content">Контент</string>
@@ -81,10 +72,7 @@
     <string name="youtube_signature_deobfuscation_error">Не удалось расшифровать подпись URL у видео</string>
     <string name="controls_background_title">В фоне</string>
     <string name="controls_popup_title">В окне</string>
-    <string name="show_higher_resolutions_summary">Только некоторые устройства поддерживают видео в 2K/4K</string>
-    <string name="default_video_format_title">Формат видео по умолчанию</string>
     <string name="black_theme_title">Чёрная</string>
-    <string name="popup_remember_size_pos_title">Помнить параметры окна</string>
     <string name="popup_playing_toast">Воспроизведение во всплывающем окне</string>
     <string name="clear">Очистить</string>
     <string name="all">Всё</string>
@@ -94,20 +82,16 @@
     <string name="open_in_popup_mode">Открыть во всплывающем окне</string>
     <string name="show_search_suggestions_summary">Выберите отображаемые предложения поиска</string>
     <string name="disabled">Отключено</string>
-    <string name="use_external_video_player_summary">Убирает звук в некоторых разрешениях</string>
     <string name="short_million">млн</string>
     <string name="short_billion">млрд</string>
     <string name="short_thousand">тыс.</string>
     <string name="default_popup_resolution_title">Разрешение всплывающего окна</string>
-    <string name="popup_remember_size_pos_summary">Помнить последние размер и позицию всплывающего окна</string>
     <string name="show_search_suggestions_title">Предложения поиска</string>
     <string name="best_resolution">Лучшее разрешение</string>
     <string name="title_activity_recaptcha">Запрос reCAPTCHA</string>
     <string name="recaptcha_request_toast">Запрошен ввод reCAPTCHA</string>
-    <string name="show_higher_resolutions_title">Высокие разрешения</string>
     <string name="title_activity_about">О NewPipe</string>
     <string name="app_license_title">Лицензия NewPipe</string>
-    <string name="tab_licenses">Лицензии</string>
     <string name="title_licenses">Сторонние лицензии</string>
     <string name="tab_about">О приложении</string>
     <string name="read_full_license">Прочитать лицензию</string>
@@ -126,8 +110,6 @@
     <string name="enable_watch_history_title">История просмотров</string>
     <string name="enable_playback_resume_title">Продолжать воспроизведение</string>
     <string name="enable_playback_resume_summary">Восстанавливать последнюю позицию</string>
-    <string name="enable_playback_state_lists_title">Позиции в списках</string>
-    <string name="enable_playback_state_lists_summary">Показать индикаторы позиций просмотра в списках</string>
     <string name="settings_category_clear_data_title">Очистка данных</string>
     <string name="enable_watch_history_summary">Запоминать воспроизведённые потоки</string>
     <string name="resume_on_audio_focus_gain_title">Возобновить при фокусе</string>
@@ -136,14 +118,12 @@
     <string name="notification_channel_description">Уведомления для плеера NewPipe</string>
     <string name="settings_category_downloads_title">Загрузки</string>
     <string name="settings_file_charset_title">Допустимые символы имён файлов</string>
-    <string name="settings_file_replacement_character_summary">Заменяет недопустимые символы</string>&gt;
-    <string name="settings_file_replacement_character_title">Символ для замены</string>
+&gt;
     <string name="charset_letters_and_digits">Буквы и цифры</string>
     <string name="charset_most_special_characters">Большинство спецсимволов</string>
     <string name="title_activity_history">История</string>
     <string name="action_history">История</string>
     <string name="settings_category_player_title">Плеер</string>
-    <string name="settings_category_player_behavior_title">Поведение</string>
     <string name="settings_category_history_title">История и кэш</string>
     <string name="undo">Отмена</string>
     <string name="search_no_results">Нет результатов</string>
@@ -190,8 +170,6 @@
     <string name="play_queue_remove">Удалить</string>
     <string name="subscribed_button_title">Вы подписаны</string>
     <string name="channel_unsubscribed">Подписка отменена</string>
-    <string name="show_hold_to_append_title">\"Зажмите, чтобы добавить\"</string>
-    <string name="show_hold_to_append_summary">Показать подсказку при нажатии \"В окне\" или \"В фоне\" на странице сведений о видео</string>
     <string name="unknown_content">[Неизвестно]</string>
     <string name="player_recoverable_failure">Восстановление после ошибки плеера</string>
     <string name="hold_to_append">Зажмите, чтобы добавить в очередь</string>
@@ -210,7 +188,6 @@
     <string name="audio_streams_empty">Аудиопотоки не найдены</string>
     <string name="donation_title">Пожертвование</string>
     <string name="donation_encouragement">Разработчики NewPipe ценой своего свободного времени делают вашу жизнь чуть удобнее. Отплатите им тем же — наслаждаясь чашечкой кофе, они смогут сделать NewPipe ещё круче.</string>
-    <string name="give_back">Воздать должное</string>
     <string name="website_title">Веб-сайт</string>
     <string name="website_encouragement">Для получения более подробной информации и последних новостей о NewPipe посетите наш веб-сайт.</string>
     <string name="drawer_open">Открыть боковую панель</string>
@@ -328,11 +305,8 @@
     <string name="privacy_policy_title">Конфиденциальность</string>
     <string name="privacy_policy_encouragement">Проект NewPipe очень серьёзно относится к вашей конфиденциальности. Приложение не собирает никаких данных без вашего согласия.
 \nПолитика конфиденциальности подробно объясняет, какие данные обрабатываются и хранятся при отправке отчёта о сбоях.</string>
-    <string name="read_privacy_policy">Прочитать политику</string>
     <string name="start_accept_privacy_policy">В соответствии с Общим регламентом по защите данных ЕС (GDPR), обращаем ваше внимание на политику конфиденциальности NewPipe. Пожалуйста, внимательно ознакомьтесь с ней.
 \nВам необходимо принять её условия, чтобы отправить нам отчёт об ошибке.</string>
-    <string name="accept">Принять</string>
-    <string name="decline">Отклонить</string>
     <string name="limit_data_usage_none_description">Без ограничений</string>
     <string name="limit_mobile_data_usage_title">Предел разрешения в мобильной сети</string>
     <string name="channels">Каналы</string>
@@ -403,8 +377,6 @@
     <string name="pause_downloads_on_mobile">Прервать в мобильной сети</string>
     <string name="close">Закрыть</string>
     <string name="error_timeout">Время соединения истекло</string>
-    <string name="show_comments_title">Показать комментарии</string>
-    <string name="show_comments_summary">Отключите, чтобы скрыть комментарии</string>
     <string name="autoplay_title">Автовоспроизведение</string>
     <string name="no_comments">Нет комментариев</string>
     <string name="error_unable_to_load_comments">Не удалось загрузить комментарии</string>
@@ -473,7 +445,6 @@
         <item quantity="few">%d секунды</item>
         <item quantity="many">%d секунд</item>
     </plurals>
-    <string name="new_seek_duration_toast">Из-за ограничений ExoPlayer точность перемотки составляет %d секунд</string>
     <string name="mute">Отключить звук</string>
     <string name="unmute">Включить звук</string>
     <string name="help">Помощь</string>
@@ -545,7 +516,6 @@
     <string name="remove_watched_popup_title">Удалить просмотренные видео\?</string>
     <string name="show_original_time_ago_summary">Отображать сообщённое сервисом время с момента публикации</string>
     <string name="show_original_time_ago_title">Исходное время публикации</string>
-    <string name="youtube_restricted_mode_enabled_title">\"Безопасный режим\" YouTube</string>
     <string name="video_detail_by">От %s</string>
     <string name="channel_created_by">Создано %s</string>
     <string name="detail_sub_channel_thumbnail_view_description">Миниатюра значка канала</string>
@@ -583,8 +553,6 @@
     <string name="show_memory_leaks">Показать утечки памяти</string>
     <string name="recaptcha_cookies_cleared">Куки reCAPTCHA удалены</string>
     <string name="clear_cookie_title">Удалить куки reCAPTCHA</string>
-    <string name="show_age_restricted_content_summary">Показывать контент, который, возможно, не подходит для детей, так как имеет возрастное ограничение (например, 18+)</string>
-    <string name="youtube_restricted_mode_enabled_summary">YouTube предоставляет \"Безопасный режим\", скрывая потенциально взрослый контент</string>
     <string name="enqueued">Добавлено в очередь</string>
     <string name="enqueue_stream">Добавить в очередь</string>
     <string name="clear_cookie_summary">Удалить сохранённые при решении reCAPTCHA куки</string>
@@ -602,8 +570,6 @@
     <string name="chapters">Главы</string>
     <string name="description_tab_description">Описание</string>
     <string name="comments_tab_description">Комментарии</string>
-    <string name="show_description_summary">Отключите, чтобы скрыть описание видео и дополнительные сведения</string>
-    <string name="show_description_title">Показать описание</string>
     <string name="open_with">Открыть в</string>
     <string name="no_app_to_open_intent">Подходящее приложение не найдено</string>
     <string name="crash_the_app">Вызвать сбой приложения</string>
@@ -650,7 +616,6 @@
     <string name="open_website_license">Открыть веб-сайт</string>
     <string name="service_provides_reason">%s указывает следующую причину:</string>
     <string name="account_terminated">Аккаунт отключён</string>
-    <string name="downloads_storage_use_saf_summary_api_29">Начиная с Android 10 поддерживается только \"Storage Access Framework\"</string>
     <string name="downloads_storage_use_saf_summary_api_19">\"Storage Access Framework\" не поддерживается на Android KitKat и ниже</string>
     <string name="downloads_storage_ask_summary_no_saf_notice">Спрашивать, куда сохранять каждую загрузку</string>
     <string name="no_dir_yet">Папка для загрузки ещё не выбрана, укажите папку для загрузки сейчас</string>
@@ -662,7 +627,6 @@
     <string name="dont_show">Не показывать</string>
     <string name="low_quality_smaller">Низкое качество (меньше)</string>
     <string name="high_quality_larger">Высокое качество (крупнее)</string>
-    <string name="seekbar_preview_thumbnail_title">Миниатюра над полосой прокрутки</string>
     <string name="detail_heart_img_view_description">Автору видео понравилось это</string>
     <string name="mark_as_watched">Пометить как проигранные</string>
     <string name="show_image_indicators_summary">Picasso: указать цветом источник изображений (красный — сеть, синий — диск, зелёный — память)</string>
@@ -724,5 +688,4 @@
     <string name="check_new_streams">Проверить на наличие новых трансляций</string>
     <string name="delete_downloaded_files_confirm">Удалить все загруженные файлы\?</string>
     <string name="settings_category_player_notification_title">Уведомления плеера</string>
-    <string name="enumeration_comma">,</string>
 </resources>
