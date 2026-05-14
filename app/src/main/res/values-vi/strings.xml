@@ -948,7 +948,7 @@ nSự khác biệt giữa hai loại này là cái nào nhanh thường thiếu 
 <string name="speeding_playback_title">Nhấn và giữ để tăng tốc độ phát lại</string>
 <string name="view_on_github">Xem trên GitHub</string>
 <string name="donation_dialog_title">Hỗ trợ Dự án</string>
-<string name="donation_dialog_message">Hỗ trợ chúng tôi trên Ko‑fi và giúp việc xem video luôn mở và không theo dõi.</string>
+<string name="donation_dialog_message">Cảm ơn bạn đã sử dụng PipePipe! Nếu bạn thấy nó hữu ích, hãy xem xét trở thành người ủng hộ trên Ko-Fi. Sự ủng hộ của bạn rất quan trọng đối với tôi và giúp tôi bổ sung thêm nhiều tính năng mới thú vị. Mỗi sự hỗ trợ đều có ý nghĩa! 😇</string>
 <string name="fullscreen_gesture_control_summary">Sử dụng cử chỉ để vào / thoát toàn màn hình</string>
 <string name="fullscreen_gesture_control_title">Điều khiển cử chỉ toàn màn hình</string>
 <string name="require_audio_focus_summary">Đảm bảo chỉ có PipePipe đang phát âm thanh</string>
@@ -1121,5 +1121,4 @@ nSự khác biệt giữa hai loại này là cái nào nhanh thường thiếu 
 <string name="done">Xong</string>
 <string name="expand">Mở rộng</string>
 <string name="collapse">Thu gọn</string>
-<string name="sponsor_promote_later">Để sau</string>
 </resources>

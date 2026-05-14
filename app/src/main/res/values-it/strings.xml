@@ -753,14 +753,14 @@
 <string name="dont_auto_queue_long_description">Metti automaticamente in coda solo video più corti di 6 minuti</string>
 <string name="enable_notification_text">Abilita le notifiche per questa app per assicurarne il normale funzionamento. Ti avviseremo solo quando necessario.</string>
 <string name="enable_notification_title">Abilita notifiche</string>
-<string name="sponsor_promote">Sostienici su Ko-fi</string>
+<string name="sponsor_promote">Diventa un sostenitore</string>
 <string name="random_play_order_title">Ordine casuale</string>
 <string name="random_play_order_summary">Mescola automaticamente le tue playlist locali quando vengono riprodotte in background</string>
 <string name="update_log">### Nuove funzionalità\n\n- L\'interfaccia utente è stata leggermente migliorata per rendere PipePipe più moderno\n- Il menu del filtro di ricerca è stato ridisegnato \n\n### Correzioni di bug\n\n- Impossibile riprodurre video YT se si è effettuato l\'accesso in determinate condizioni (YouTube)\n- I risultati di ricerca hanno nomi dell\'uploaderr errati in determinate condizioni (YouTube) \n- Errore di analisi in determinate condizioni (YouTube)\n- Impossibile estrarre talvolta gli uploader dei canali (BiliBili)\n- Impossibile estrarre talvolta i dettagli del canale a causa del controllo del rischio (BiliBili)\n- Arresto anomalo in determinate condizioni \n\n### Altro\n\n- Migliorata la stabilità</string>
 <string name="speeding_playback_title">Premi a lungo per aumentare la velocità di riproduzione</string>
 <string name="view_on_github">Visualizza su GitHub</string>
-<string name="donation_dialog_title">Ti piace PipePipe?</string>
-<string name="donation_dialog_message">Sostienici su Ko-fi e aiutaci a mantenere la visione dei video aperta e senza tracciamento.</string>
+<string name="donation_dialog_title">Supporta il progetto</string>
+<string name="donation_dialog_message">Grazie per usare PipePipe! Se lo trovi utile, considera di diventare un sostenitore su Ko-Fi. Il tuo supporto è importante per me e mi aiuta ad aggiungere nuove ed entusiasmanti funzionalità. Ogni contributo conta! 😇</string>
 <string name="fullscreen_gesture_control_summary">Usa i gesti per entrare/uscire dalla modalità schermo intero</string>
 <string name="fullscreen_gesture_control_title">Controllo gestuale a schermo intero</string>
 <string name="require_audio_focus_summary">Assicurati che solo PipePipe stia riproducendo audio</string>
@@ -1007,5 +1007,4 @@
 <string name="done">Fatto</string>
 <string name="expand">Espandi</string>
 <string name="collapse">Comprimi</string>
-<string name="sponsor_promote_later">Forse più tardi</string>
 </resources>

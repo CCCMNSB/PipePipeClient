@@ -208,7 +208,7 @@ public class MainActivity extends AppCompatActivity {
             builder2.setPositiveButton(R.string.sponsor_promote, (dialog, which) -> {
                 ShareUtils.openUrlInBrowser(this, getString(R.string.donation_url));
             });
-            builder2.setNegativeButton(R.string.sponsor_promote_later, null);
+            builder2.setNegativeButton(R.string.no, null);
 
             final AlertDialog dialog2 = builder2.create();
 
