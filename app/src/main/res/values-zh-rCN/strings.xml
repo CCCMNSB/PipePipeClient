@@ -983,4 +983,16 @@
 <string name="done">完成</string>
 <string name="expand">展开</string>
 <string name="collapse">折叠</string>
+<string name="grid_layout_title">网格布局</string>
+<string name="grid_layout_summary">在网格中显示支持的列表，而不是单列列表</string>
+<string name="grid_columns_title">网格列数</string>
+<string name="grid_columns_landscape_title">网格列数（横屏）</string>
+<string name="channel_tab_podcasts">播客</string>
+<string name="video_tabs_title">视频标签页</string>
+<string name="video_tabs_summary">配置在视频详情页面上显示的标签页</string>
+<string name="filter_future_items_title">过滤未来的项目</string>
+<string name="filter_future_items_summary">移除计划在未来发布的项目</string>
+<string name="pin_video_to_top_title">将视频固定在顶部</string>
+<string name="pin_video_to_top_summary">在滚动视频详情页面时保持视频固定在顶部</string>
+<string name="settings_category_behavior_title">行为</string>
 </resources>

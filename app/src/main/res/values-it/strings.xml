@@ -913,4 +913,16 @@
 <string name="done">Fatto</string>
 <string name="expand">Espandi</string>
 <string name="collapse">Comprimi</string>
+<string name="grid_layout_title">Layout a griglia</string>
+<string name="grid_layout_summary">Mostra le liste supportate in una griglia invece di una lista a colonna singola</string>
+<string name="grid_columns_title">Colonne della griglia</string>
+<string name="grid_columns_landscape_title">Colonne della griglia (orizzontale)</string>
+<string name="channel_tab_podcasts">Podcast</string>
+<string name="video_tabs_title">Schede video</string>
+<string name="video_tabs_summary">Configura quali schede mostrare nella schermata dei dettagli del video</string>
+<string name="filter_future_items_title">Filtra elementi futuri</string>
+<string name="filter_future_items_summary">Rimuovi gli elementi programmati per una pubblicazione futura</string>
+<string name="pin_video_to_top_title">Fissa video in alto</string>
+<string name="pin_video_to_top_summary">Mantieni il video fissato in alto durante lo scorrimento della pagina dei dettagli del video</string>
+<string name="settings_category_behavior_title">Comportamento</string>
 </resources>

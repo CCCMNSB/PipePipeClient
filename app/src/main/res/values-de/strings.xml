@@ -918,4 +918,17 @@
 <string name="done">Fertig</string>
 <string name="expand">Erweitern</string>
 <string name="collapse">Reduzieren</string>
+<string name="unsupported_url">Nicht unterstützte URL</string>
+<string name="grid_layout_title">Gitter-Layout</string>
+<string name="grid_layout_summary">Unterstützte Listen in einem Gitter statt in einer einspaltigen Liste anzeigen</string>
+<string name="grid_columns_title">Gitterspalten</string>
+<string name="grid_columns_landscape_title">Gitterspalten (Querformat)</string>
+<string name="channel_tab_podcasts">Podcasts</string>
+<string name="video_tabs_title">Video-Tabs</string>
+<string name="video_tabs_summary">Konfigurieren, welche Tabs auf dem Video-Detailbildschirm angezeigt werden</string>
+<string name="filter_future_items_title">Zukünftige Elemente filtern</string>
+<string name="filter_future_items_summary">Elemente entfernen, die für eine zukünftige Veröffentlichung geplant sind</string>
+<string name="pin_video_to_top_title">Video oben anheften</string>
+<string name="pin_video_to_top_summary">Das Video beim Scrollen auf der Video-Detailseite oben angeheftet lassen</string>
+<string name="settings_category_behavior_title">Verhalten</string>
 </resources>

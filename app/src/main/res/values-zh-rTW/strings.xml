@@ -973,4 +973,16 @@
 <string name="done">完成</string>
 <string name="expand">展開</string>
 <string name="collapse">收合</string>
+<string name="grid_layout_title">網格佈局</string>
+<string name="grid_layout_summary">在網格中顯示支援的列表，而非單欄列表</string>
+<string name="grid_columns_title">網格欄數</string>
+<string name="grid_columns_landscape_title">網格欄數 (橫向)</string>
+<string name="channel_tab_podcasts">Podcast</string>
+<string name="video_tabs_title">影片分頁</string>
+<string name="video_tabs_summary">設定要在影片詳情頁面顯示哪些分頁</string>
+<string name="filter_future_items_title">過濾未來的項目</string>
+<string name="filter_future_items_summary">移除排定在未來發佈的項目</string>
+<string name="pin_video_to_top_title">將影片置頂</string>
+<string name="pin_video_to_top_summary">在捲動影片詳情頁面時，將影片保持置頂</string>
+<string name="settings_category_behavior_title">行為</string>
 </resources>

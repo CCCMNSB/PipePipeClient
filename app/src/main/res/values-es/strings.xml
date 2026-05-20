@@ -975,4 +975,16 @@
 <string name="done">Hecho</string>
 <string name="expand">Expandir</string>
 <string name="collapse">Contraer</string>
+<string name="grid_layout_title">Diseño de cuadrícula</string>
+<string name="grid_layout_summary">Mostrar listas compatibles en una cuadrícula en lugar de una lista de una sola columna</string>
+<string name="grid_columns_title">Columnas de la cuadrícula</string>
+<string name="grid_columns_landscape_title">Columnas de la cuadrícula (horizontal)</string>
+<string name="channel_tab_podcasts">Podcasts</string>
+<string name="video_tabs_title">Pestañas de video</string>
+<string name="video_tabs_summary">Configurar qué pestañas mostrar en la pantalla de detalles del video</string>
+<string name="filter_future_items_title">Filtrar elementos futuros</string>
+<string name="filter_future_items_summary">Eliminar elementos programados para un lanzamiento futuro</string>
+<string name="pin_video_to_top_title">Fijar video en la parte superior</string>
+<string name="pin_video_to_top_summary">Mantener el video fijado en la parte superior mientras se desplaza por la página de detalles del video</string>
+<string name="settings_category_behavior_title">Comportamiento</string>
 </resources>

@@ -1028,4 +1028,16 @@ nSự khác biệt giữa hai loại này là cái nào nhanh thường thiếu 
 <string name="done">Xong</string>
 <string name="expand">Mở rộng</string>
 <string name="collapse">Thu gọn</string>
+<string name="grid_layout_title">Bố cục lưới</string>
+<string name="grid_layout_summary">Hiển thị các danh sách được hỗ trợ dưới dạng lưới thay vì danh sách một cột</string>
+<string name="grid_columns_title">Số cột lưới</string>
+<string name="grid_columns_landscape_title">Số cột lưới (ngang)</string>
+<string name="channel_tab_podcasts">Podcast</string>
+<string name="video_tabs_title">Các thẻ video</string>
+<string name="video_tabs_summary">Cấu hình các thẻ sẽ hiển thị trên màn hình chi tiết video</string>
+<string name="filter_future_items_title">Lọc các mục trong tương lai</string>
+<string name="filter_future_items_summary">Loại bỏ các mục được lên lịch phát hành trong tương lai</string>
+<string name="pin_video_to_top_title">Ghim video lên đầu</string>
+<string name="pin_video_to_top_summary">Giữ video được ghim ở đầu khi cuộn trang chi tiết video</string>
+<string name="settings_category_behavior_title">Hành vi</string>
 </resources>

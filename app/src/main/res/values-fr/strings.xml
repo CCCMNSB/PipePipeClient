@@ -936,4 +936,16 @@ Voulez-vous continuer?</string>
 <string name="done">Terminé</string>
 <string name="expand">Développer</string>
 <string name="collapse">Réduire</string>
+<string name="grid_layout_title">Disposition en grille</string>
+<string name="grid_layout_summary">Afficher les listes prises en charge dans une grille au lieu d\'une liste à colonne unique</string>
+<string name="grid_columns_title">Colonnes de la grille</string>
+<string name="grid_columns_landscape_title">Colonnes de la grille (paysage)</string>
+<string name="channel_tab_podcasts">Podcasts</string>
+<string name="video_tabs_title">Onglets vidéo</string>
+<string name="video_tabs_summary">Configurer les onglets à afficher sur l\'écran de détails de la vidéo</string>
+<string name="filter_future_items_title">Filtrer les éléments futurs</string>
+<string name="filter_future_items_summary">Supprimer les éléments programmés pour une sortie future</string>
+<string name="pin_video_to_top_title">Épingler la vidéo en haut</string>
+<string name="pin_video_to_top_summary">Garder la vidéo épinglée en haut lors du défilement de la page de détails de la vidéo</string>
+<string name="settings_category_behavior_title">Comportement</string>
 </resources>
