@@ -948,4 +948,6 @@ Voulez-vous continuer?</string>
 <string name="pin_video_to_top_title">Épingler la vidéo en haut</string>
 <string name="pin_video_to_top_summary">Garder la vidéo épinglée en haut lors du défilement de la page de détails de la vidéo</string>
 <string name="settings_category_behavior_title">Comportement</string>
+<string name="use_experimental_new_ui_title">Utiliser la nouvelle interface utilisateur expérimentale</string>
+<string name="use_experimental_new_ui_summary">Utilisez la nouvelle interface utilisateur basée sur Compose, toujours en cours d\'optimisation. La modification de ce paramètre redémarrera l\'application.</string>
 </resources>

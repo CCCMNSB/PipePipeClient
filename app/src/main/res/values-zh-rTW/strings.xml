@@ -985,4 +985,6 @@
 <string name="pin_video_to_top_title">將影片置頂</string>
 <string name="pin_video_to_top_summary">在捲動影片詳情頁面時，將影片保持置頂</string>
 <string name="settings_category_behavior_title">行為</string>
+<string name="use_experimental_new_ui_title">使用實驗性新介面</string>
+<string name="use_experimental_new_ui_summary">使用新的基於 Compose 的 UI，目前仍在最佳化中。變更此設定將會重新啟動應用程式。</string>
 </resources>

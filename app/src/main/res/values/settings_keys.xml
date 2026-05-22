@@ -1728,4 +1728,5 @@
         <item>@string/description_tab_description</item>
     </string-array>
     <string name="filter_future_items_key">filter_future_items_key</string>
+    <string name="use_experimental_new_ui_key">use_experimental_new_ui</string>
 </resources>

@@ -925,4 +925,6 @@
 <string name="pin_video_to_top_title">Fissa video in alto</string>
 <string name="pin_video_to_top_summary">Mantieni il video fissato in alto durante lo scorrimento della pagina dei dettagli del video</string>
 <string name="settings_category_behavior_title">Comportamento</string>
+<string name="use_experimental_new_ui_title">Usa la nuova UI sperimentale</string>
+<string name="use_experimental_new_ui_summary">Usa la nuova interfaccia utente basata su Compose, ancora in fase di ottimizzazione. Modificare questa impostazione riavvierà l\'app.</string>
 </resources>

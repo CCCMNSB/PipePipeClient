@@ -71,9 +71,15 @@ class Translator:
             ],
             temperature=0,
         )
-        print(response.choices[0].message.content.strip())
-        translated_text = response.choices[0].message.content.strip()
-        # print(translated_text)
+        raw = response.choices[0].message.content.strip()
+        if raw.startswith("```json"):
+            raw = raw[len("```json"):]
+        elif raw.startswith("```"):
+            raw = raw[len("```"):]
+        if raw.endswith("```"):
+            raw = raw[:-len("```")]
+        translated_text = raw.strip()
+        print(translated_text)
         return translated_text
 
     def get_translated_dict(self, content, language):

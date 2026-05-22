@@ -333,6 +333,11 @@ public final class ThemeHelper {
         return preferences.getBoolean(context.getString(R.string.grid_layout_enabled_key), true);
     }
 
+    public static boolean shouldUseExperimentalNewUi(final Context context) {
+        final SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(context);
+        return preferences.getBoolean(context.getString(R.string.use_experimental_new_ui_key), false);
+    }
+
     public static boolean isGrid(ItemViewMode mode)  {
         return mode == ItemViewMode.GRID;
     }

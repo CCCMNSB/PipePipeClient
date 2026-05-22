@@ -139,6 +139,7 @@ public class PlaylistFragment extends BaseListInfoFragment<StreamInfoItem, Playl
     @Override
     protected void initViews(final View rootView, final Bundle savedInstanceState) {
         super.initViews(rootView, savedInstanceState);
+        infoListAdapter.setUseMiniVariant(true);
     }
 
     private PlayQueue getPlayQueueStartingAt(final StreamInfoItem infoItem) {

@@ -243,6 +243,7 @@ public class LocalPlaylistFragment extends BaseLocalListFragment<List<PlaylistSt
     @Override
     protected void initViews(final View rootView, final Bundle savedInstanceState) {
         super.initViews(rootView, savedInstanceState);
+        itemListAdapter.setUseItemHandle(true);
         setTitle(name);
         setupTouchListeners(rootView);
     }

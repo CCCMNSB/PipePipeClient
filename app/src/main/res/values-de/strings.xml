@@ -931,4 +931,6 @@
 <string name="pin_video_to_top_title">Video oben anheften</string>
 <string name="pin_video_to_top_summary">Das Video beim Scrollen auf der Video-Detailseite oben angeheftet lassen</string>
 <string name="settings_category_behavior_title">Verhalten</string>
+<string name="use_experimental_new_ui_title">Experimentelle neue Benutzeroberfläche verwenden</string>
+<string name="use_experimental_new_ui_summary">Verwenden Sie die neue Compose-basierte Benutzeroberfläche, die noch optimiert wird. Eine Änderung wird die App neu starten.</string>
 </resources>

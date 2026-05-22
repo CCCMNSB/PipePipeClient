@@ -995,4 +995,6 @@
 <string name="pin_video_to_top_title">将视频固定在顶部</string>
 <string name="pin_video_to_top_summary">在滚动视频详情页面时保持视频固定在顶部</string>
 <string name="settings_category_behavior_title">行为</string>
+<string name="use_experimental_new_ui_title">使用实验性新 UI</string>
+<string name="use_experimental_new_ui_summary">使用新的基于 Compose 的 UI，仍在优化中。更改此项将重启应用。</string>
 </resources>
