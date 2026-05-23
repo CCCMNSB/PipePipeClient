@@ -987,4 +987,6 @@
 <string name="settings_category_behavior_title">行為</string>
 <string name="use_experimental_new_ui_title">使用實驗性新介面</string>
 <string name="use_experimental_new_ui_summary">使用新的基於 Compose 的 UI，目前仍在最佳化中。變更此設定將會重新啟動應用程式。</string>
+<string name="force_end_on_overtime_title">逾時強制結束</string>
+<string name="force_end_on_overtime_summary">當目前播放位置超過串流時長時強制結束播放，作為無法自然停止之串流的因應措施</string>
 </resources>

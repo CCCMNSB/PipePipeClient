@@ -1042,4 +1042,6 @@ nSự khác biệt giữa hai loại này là cái nào nhanh thường thiếu 
 <string name="settings_category_behavior_title">Hành vi</string>
 <string name="use_experimental_new_ui_title">Sử dụng giao diện người dùng mới thử nghiệm</string>
 <string name="use_experimental_new_ui_summary">Sử dụng giao diện người dùng dựa trên Compose mới, vẫn đang được tối ưu hóa. Việc thay đổi điều này sẽ khởi động lại ứng dụng.</string>
+<string name="force_end_on_overtime_title">Buộc kết thúc khi quá giờ</string>
+<string name="force_end_on_overtime_summary">Buộc kết thúc phát khi vị trí hiện tại vượt quá thời lượng của luồng, như một giải pháp tạm thời cho các luồng không tự động dừng</string>
 </resources>

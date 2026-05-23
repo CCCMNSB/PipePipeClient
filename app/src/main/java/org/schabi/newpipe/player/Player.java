@@ -1853,6 +1853,18 @@ public final class Player implements
         }
         final int currentProgress = Math.max((int) simpleExoPlayer.getCurrentPosition(), 0);
 
+        if (prefs.getBoolean(context.getString(R.string.force_end_on_overtime_key), false)
+                && currentItem != null
+                && currentItem.getStreamType() == StreamType.VIDEO_STREAM
+                && currentState != STATE_COMPLETED
+                && duration > 0
+                && currentProgress > duration + 3000) {
+            changeState(STATE_COMPLETED);
+            saveStreamProgressStateCompleted();
+            isPrepared = false;
+            return;
+        }
+
         onUpdateProgress(
                 currentProgress,
                 (int) simpleExoPlayer.getDuration(),

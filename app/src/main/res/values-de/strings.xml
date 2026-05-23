@@ -933,4 +933,6 @@
 <string name="settings_category_behavior_title">Verhalten</string>
 <string name="use_experimental_new_ui_title">Experimentelle neue Benutzeroberfläche verwenden</string>
 <string name="use_experimental_new_ui_summary">Verwenden Sie die neue Compose-basierte Benutzeroberfläche, die noch optimiert wird. Eine Änderung wird die App neu starten.</string>
+<string name="force_end_on_overtime_title">Beenden bei Zeitüberschreitung erzwingen</string>
+<string name="force_end_on_overtime_summary">Erzwingt das Ende der Wiedergabe, wenn die aktuelle Position die Stream-Dauer überschreitet, als Workaround für Streams, die nicht natürlich stoppen</string>
 </resources>

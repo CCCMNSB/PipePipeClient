@@ -956,4 +956,6 @@
 <string name="settings_category_behavior_title">動作</string>
 <string name="use_experimental_new_ui_title">試験的な新しいUIを使用する</string>
 <string name="use_experimental_new_ui_summary">まだ最適化中の新しいComposeベースのUIを使用します。これを変更するとアプリが再起動します。</string>
+<string name="force_end_on_overtime_title">時間超過時に強制終了</string>
+<string name="force_end_on_overtime_summary">自然に停止しないストリームの回避策として、現在の再生位置がストリームの再生時間を超えた場合に再生を強制終了します</string>
 </resources>

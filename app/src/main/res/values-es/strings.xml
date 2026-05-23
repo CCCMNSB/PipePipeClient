@@ -989,4 +989,6 @@
 <string name="settings_category_behavior_title">Comportamiento</string>
 <string name="use_experimental_new_ui_title">Usar la nueva interfaz de usuario experimental</string>
 <string name="use_experimental_new_ui_summary">Use la nueva interfaz de usuario basada en Compose, que aún se está optimizando. Cambiar esto reiniciará la aplicación.</string>
+<string name="force_end_on_overtime_title">Forzar fin al exceder el tiempo</string>
+<string name="force_end_on_overtime_summary">Forzar el fin de la reproducción cuando la posición actual supere la duración de la transmisión, como solución alternativa para las transmisiones que no se detienen de forma natural</string>
 </resources>
