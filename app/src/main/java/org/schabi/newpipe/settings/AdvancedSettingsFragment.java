@@ -1,5 +1,6 @@
 package org.schabi.newpipe.settings;
 
+import android.app.Activity;
 import android.content.SharedPreferences;
 import android.os.Build;
 import android.os.Bundle;
@@ -11,6 +12,7 @@ import androidx.preference.SwitchPreferenceCompat;
 
 import org.schabi.newpipe.R;
 import org.schabi.newpipe.util.DeviceUtils;
+import org.schabi.newpipe.util.NavigationHelper;
 import org.schabi.newpipe.util.PicassoHelper;
 import org.schabi.newpipe.util.ServiceHelper;
 
@@ -32,6 +34,19 @@ public class AdvancedSettingsFragment extends BasePreferenceFragment implements 
                                 .show();
                     } catch (final IOException e) {
                         Log.e(TAG, "Unable to clear Picasso cache", e);
+                    }
+                    return true;
+                });
+
+        findPreference(getString(R.string.use_experimental_new_ui_key))
+                .setOnPreferenceChangeListener((preference, newValue) -> {
+                    defaultPreferences.edit()
+                            .putBoolean(getString(R.string.use_experimental_new_ui_key),
+                                    (Boolean) newValue)
+                            .commit();
+                    final Activity activity = getActivity();
+                    if (activity != null) {
+                        NavigationHelper.restartApp(activity);
                     }
                     return true;
                 });

@@ -1,6 +1,5 @@
 package org.schabi.newpipe.settings;
 
-import android.app.Activity;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.os.Build;
@@ -13,7 +12,6 @@ import androidx.preference.Preference;
 
 import org.schabi.newpipe.R;
 import org.schabi.newpipe.util.Constants;
-import org.schabi.newpipe.util.NavigationHelper;
 import org.schabi.newpipe.util.ThemeHelper;
 
 public class AppearanceSettingsFragment extends BasePreferenceFragment {
@@ -39,19 +37,6 @@ public class AppearanceSettingsFragment extends BasePreferenceFragment {
             applyThemeChange(startThemeKey, themeKey, newValue);
             return false;
         });
-
-        findPreference(getString(R.string.use_experimental_new_ui_key))
-                .setOnPreferenceChangeListener((preference, newValue) -> {
-                    defaultPreferences.edit()
-                            .putBoolean(getString(R.string.use_experimental_new_ui_key),
-                                    (Boolean) newValue)
-                            .commit();
-                    final Activity activity = getActivity();
-                    if (activity != null) {
-                        NavigationHelper.restartApp(activity);
-                    }
-                    return true;
-                });
 
         final String nightThemeKey = getString(R.string.night_theme_key);
         if (startThemeKey.equals(autoDeviceThemeKey)) {

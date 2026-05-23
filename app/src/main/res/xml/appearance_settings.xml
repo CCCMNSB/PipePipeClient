@@ -40,14 +40,6 @@
         app:iconSpaceReserved="false" />
 
     <SwitchPreferenceCompat
-        android:defaultValue="false"
-        android:key="@string/use_experimental_new_ui_key"
-        android:summary="@string/use_experimental_new_ui_summary"
-        android:title="@string/use_experimental_new_ui_title"
-        app:singleLineTitle="false"
-        app:iconSpaceReserved="false" />
-
-    <SwitchPreferenceCompat
         android:defaultValue="true"
         android:key="@string/grid_layout_enabled_key"
         android:summary="@string/grid_layout_summary"
