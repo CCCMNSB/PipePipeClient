@@ -431,7 +431,7 @@ public interface PlaybackResolver extends Resolver<StreamInfo, MediaSource> {
                                     + stream.getContent(), e);
                 }
             case HLS:
-                return dataSource.getLiveHlsMediaSourceFactory().createMediaSource(
+                return dataSource.getYoutubeHlsMediaSourceFactory().createMediaSource(
                         new MediaItem.Builder()
                                 .setTag(metadata)
                                 .setUri(Uri.parse(stream.getContent()))
