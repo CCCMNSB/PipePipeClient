@@ -991,4 +991,6 @@
 <string name="use_experimental_new_ui_summary">Use la nueva interfaz de usuario basada en Compose, que aún se está optimizando. Cambiar esto reiniciará la aplicación.</string>
 <string name="force_end_on_overtime_title">Forzar fin al exceder el tiempo</string>
 <string name="force_end_on_overtime_summary">Forzar el fin de la reproducción cuando la posición actual supere la duración de la transmisión, como solución alternativa para las transmisiones que no se detienen de forma natural</string>
+<string name="use_old_search_filter_title">Usar filtro de búsqueda antiguo</string>
+<string name="use_old_search_filter_summary">Usar el antiguo filtro de búsqueda basado en menús en lugar de la nueva interfaz de diálogo</string>
 </resources>

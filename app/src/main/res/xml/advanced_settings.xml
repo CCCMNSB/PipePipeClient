@@ -131,6 +131,14 @@
                 android:title="@string/download_thumbnail_title"
                 app:singleLineTitle="false"
                 app:iconSpaceReserved="false" />
+
+        <SwitchPreferenceCompat
+                android:defaultValue="false"
+                android:key="@string/use_old_search_filter_key"
+                android:summary="@string/use_old_search_filter_summary"
+                android:title="@string/use_old_search_filter_title"
+                app:singleLineTitle="false"
+                app:iconSpaceReserved="false" />
     </PreferenceCategory>
 
     <PreferenceCategory

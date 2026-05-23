@@ -952,4 +952,6 @@ Voulez-vous continuer?</string>
 <string name="use_experimental_new_ui_summary">Utilisez la nouvelle interface utilisateur basée sur Compose, toujours en cours d\'optimisation. La modification de ce paramètre redémarrera l\'application.</string>
 <string name="force_end_on_overtime_title">Forcer l\'arrêt en cas de dépassement</string>
 <string name="force_end_on_overtime_summary">Forcer l\'arrêt de la lecture lorsque la position actuelle dépasse la durée du flux, comme solution de contournement pour les flux qui ne s\'arrêtent pas naturellement</string>
+<string name="use_old_search_filter_title">Utiliser l\'ancien filtre de recherche</string>
+<string name="use_old_search_filter_summary">Utiliser l\'ancien filtre de recherche basé sur un menu au lieu de la nouvelle interface de dialogue</string>
 </resources>

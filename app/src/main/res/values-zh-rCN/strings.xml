@@ -999,4 +999,6 @@
 <string name="use_experimental_new_ui_summary">使用新的基于 Compose 的 UI，仍在优化中。更改此项将重启应用。</string>
 <string name="force_end_on_overtime_title">超时强制结束</string>
 <string name="force_end_on_overtime_summary">当当前播放位置超过流时长时强制结束播放，用于解决无法自然停止的流的问题</string>
+<string name="use_old_search_filter_title">使用旧版搜索筛选器</string>
+<string name="use_old_search_filter_summary">使用基于菜单的旧版搜索筛选器，而不是新的对话框界面</string>
 </resources>

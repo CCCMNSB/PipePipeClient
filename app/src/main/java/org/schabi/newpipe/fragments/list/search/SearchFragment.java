@@ -164,6 +164,7 @@ public class SearchFragment extends BaseListFragment<SearchInfo, ListExtractor.I
 
     private SearchFilterUI searchFilterUi;
     private boolean isTv;
+    private boolean useOldSearchFilter;
 
     private boolean suggestionsPanelVisible = false;
 
@@ -223,16 +224,19 @@ public class SearchFragment extends BaseListFragment<SearchInfo, ListExtractor.I
         historyRecordManager = new HistoryRecordManager(context);
 
         isTv = DeviceUtils.isTv(context);
+
+        useOldSearchFilter = isTv || prefs.getBoolean(
+                context.getString(R.string.use_old_search_filter_key), false);
     }
 
     @Override
     public View onCreateView(final LayoutInflater inflater, @Nullable final ViewGroup container,
                              @Nullable final Bundle savedInstanceState) {
-        if (isTv) {
+        if (useOldSearchFilter) {
             searchFilterUi = new SearchFilterUI(this, getContext());
         }
         updateService();
-        if (isTv) {
+        if (useOldSearchFilter) {
             searchFilterUi.restorePreviouslySelectedFilters(
                     userSelectedContentFilterList,
                     userSelectedSortFilterList);
@@ -257,7 +261,7 @@ public class SearchFragment extends BaseListFragment<SearchInfo, ListExtractor.I
     private void updateService() {
         try {
             service = NewPipe.getService(serviceId);
-            if (isTv && searchFilterUi != null) {
+            if (useOldSearchFilter && searchFilterUi != null) {
                 searchFilterUi.updateService(service);
             }
         } catch (final Exception e) {
@@ -402,7 +406,7 @@ public class SearchFragment extends BaseListFragment<SearchInfo, ListExtractor.I
         updateSearchActionLayout(searchFilter, 40, 40);
         updateSearchActionLayout(searchClear, 40, 80);
         searchClear.setVisibility(View.GONE);
-        searchFilter.setVisibility(isTv ? View.GONE : View.VISIBLE);
+        searchFilter.setVisibility(useOldSearchFilter ? View.GONE : View.VISIBLE);
         searchSubmit.setVisibility(View.VISIBLE);
     }
 
@@ -475,14 +479,14 @@ public class SearchFragment extends BaseListFragment<SearchInfo, ListExtractor.I
             updateService();
         }
 
-        if (isTv && searchFilterUi != null && service != null) {
+        if (useOldSearchFilter && searchFilterUi != null && service != null) {
             searchFilterUi.createSearchUI(menu);
         }
     }
 
     @Override
     public boolean onOptionsItemSelected(@NonNull final MenuItem item) {
-        if (isTv && searchFilterUi != null) {
+        if (useOldSearchFilter && searchFilterUi != null) {
             return searchFilterUi.onOptionsItemSelected(item);
         }
         return super.onOptionsItemSelected(item);
@@ -1063,7 +1067,7 @@ public class SearchFragment extends BaseListFragment<SearchInfo, ListExtractor.I
     }
 
     private void showFilterDialog() {
-        if (isTv) {
+        if (useOldSearchFilter) {
             return;
         }
 

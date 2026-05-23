@@ -35,6 +35,10 @@ public class AdvancedSettingsFragment extends BasePreferenceFragment implements 
                     }
                     return true;
                 });
+
+        if (DeviceUtils.isTv(getContext())) {
+            findPreference(getString(R.string.use_old_search_filter_key)).setVisible(false);
+        }
     }
     
     private void initializeAndroidAutoPreference() {

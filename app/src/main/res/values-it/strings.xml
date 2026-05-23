@@ -929,4 +929,6 @@
 <string name="use_experimental_new_ui_summary">Usa la nuova interfaccia utente basata su Compose, ancora in fase di ottimizzazione. Modificare questa impostazione riavvierà l\'app.</string>
 <string name="force_end_on_overtime_title">Forza l\'interruzione a tempo scaduto</string>
 <string name="force_end_on_overtime_summary">Forza l\'interruzione della riproduzione quando la posizione corrente supera la durata dello stream, come soluzione alternativa per gli stream che non si interrompono naturalmente</string>
+<string name="use_old_search_filter_title">Usa il vecchio filtro di ricerca</string>
+<string name="use_old_search_filter_summary">Usa il vecchio filtro di ricerca basato su menu invece della nuova interfaccia utente a finestra di dialogo</string>
 </resources>

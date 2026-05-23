@@ -935,4 +935,6 @@
 <string name="use_experimental_new_ui_summary">Verwenden Sie die neue Compose-basierte Benutzeroberfläche, die noch optimiert wird. Eine Änderung wird die App neu starten.</string>
 <string name="force_end_on_overtime_title">Beenden bei Zeitüberschreitung erzwingen</string>
 <string name="force_end_on_overtime_summary">Erzwingt das Ende der Wiedergabe, wenn die aktuelle Position die Stream-Dauer überschreitet, als Workaround für Streams, die nicht natürlich stoppen</string>
+<string name="use_old_search_filter_title">Alten Suchfilter verwenden</string>
+<string name="use_old_search_filter_summary">Verwenden Sie den alten menübasierten Suchfilter anstelle der neuen Dialog-UI</string>
 </resources>
