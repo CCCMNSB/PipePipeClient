@@ -56,13 +56,16 @@ public final class PipePipeMigrations {
                                                 final SharedPreferences preferences) {
         final String key = context.getString(R.string.show_channel_tabs_key);
         final Set<String> enabledTabs = preferences.getStringSet(key, null);
-        if (enabledTabs == null || !enabledTabs.contains("show_channel_tabs_livestreams")) {
+        if (enabledTabs == null) {
             return;
         }
 
         final Set<String> newSet = new HashSet<>(enabledTabs);
-        newSet.remove("show_channel_tabs_livestreams");
-        newSet.add(context.getString(R.string.show_channel_tabs_livestreams));
+        if (enabledTabs.contains("show_channel_tabs_livestreams")) {
+            newSet.remove("show_channel_tabs_livestreams");
+            newSet.add(context.getString(R.string.show_channel_tabs_livestreams));
+        }
+        newSet.add(context.getString(R.string.show_channel_tabs_podcasts));
         preferences.edit().putStringSet(key, newSet).apply();
     }
 
