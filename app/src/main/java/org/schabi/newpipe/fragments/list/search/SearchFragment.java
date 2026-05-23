@@ -56,6 +56,7 @@ import org.schabi.newpipe.extractor.search.filter.FilterItem;
 import org.schabi.newpipe.fragments.BackPressable;
 import org.schabi.newpipe.fragments.list.BaseListFragment;
 import org.schabi.newpipe.fragments.list.search.filter.SearchFilterLogic;
+import org.schabi.newpipe.fragments.list.search.filter.SearchFilterUI;
 import org.schabi.newpipe.ktx.AnimationType;
 import org.schabi.newpipe.ktx.ExceptionUtils;
 import org.schabi.newpipe.local.history.HistoryRecordManager;
@@ -161,6 +162,9 @@ public class SearchFragment extends BaseListFragment<SearchInfo, ListExtractor.I
     private View searchFilter;
     private View searchSubmit;
 
+    private SearchFilterUI searchFilterUi;
+    private boolean isTv;
+
     private boolean suggestionsPanelVisible = false;
 
     /*////////////////////////////////////////////////////////////////////////*/
@@ -217,12 +221,22 @@ public class SearchFragment extends BaseListFragment<SearchInfo, ListExtractor.I
 
         suggestionListAdapter = new SuggestionListAdapter(activity);
         historyRecordManager = new HistoryRecordManager(context);
+
+        isTv = DeviceUtils.isTv(context);
     }
 
     @Override
     public View onCreateView(final LayoutInflater inflater, @Nullable final ViewGroup container,
                              @Nullable final Bundle savedInstanceState) {
+        if (isTv) {
+            searchFilterUi = new SearchFilterUI(this, getContext());
+        }
         updateService();
+        if (isTv) {
+            searchFilterUi.restorePreviouslySelectedFilters(
+                    userSelectedContentFilterList,
+                    userSelectedSortFilterList);
+        }
         restoreSelectedFilters();
         return inflater.inflate(R.layout.fragment_search, container, false);
     }
@@ -243,6 +257,9 @@ public class SearchFragment extends BaseListFragment<SearchInfo, ListExtractor.I
     private void updateService() {
         try {
             service = NewPipe.getService(serviceId);
+            if (isTv && searchFilterUi != null) {
+                searchFilterUi.updateService(service);
+            }
         } catch (final Exception e) {
             ErrorUtil.showUiErrorSnackbar(this, "Getting service for id " + serviceId, e);
         }
@@ -385,7 +402,7 @@ public class SearchFragment extends BaseListFragment<SearchInfo, ListExtractor.I
         updateSearchActionLayout(searchFilter, 40, 40);
         updateSearchActionLayout(searchClear, 40, 80);
         searchClear.setVisibility(View.GONE);
-        searchFilter.setVisibility(View.VISIBLE);
+        searchFilter.setVisibility(isTv ? View.GONE : View.VISIBLE);
         searchSubmit.setVisibility(View.VISIBLE);
     }
 
@@ -457,10 +474,17 @@ public class SearchFragment extends BaseListFragment<SearchInfo, ListExtractor.I
             Log.w(TAG, "onCreateOptionsMenu() called with null service");
             updateService();
         }
+
+        if (isTv && searchFilterUi != null && service != null) {
+            searchFilterUi.createSearchUI(menu);
+        }
     }
 
     @Override
     public boolean onOptionsItemSelected(@NonNull final MenuItem item) {
+        if (isTv && searchFilterUi != null) {
+            return searchFilterUi.onOptionsItemSelected(item);
+        }
         return super.onOptionsItemSelected(item);
     }
 
@@ -1039,6 +1063,10 @@ public class SearchFragment extends BaseListFragment<SearchInfo, ListExtractor.I
     }
 
     private void showFilterDialog() {
+        if (isTv) {
+            return;
+        }
+
         if (getChildFragmentManager().findFragmentByTag(SearchFilterDialog.TAG) != null) {
             return;
         }
