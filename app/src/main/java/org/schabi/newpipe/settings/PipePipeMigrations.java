@@ -86,7 +86,7 @@ public final class PipePipeMigrations {
         if (preferences.getBoolean(context.getString(R.string.show_description_key), true)) {
             tabs.add("description");
         }
-        if (preferences.getBoolean(context.getString(R.string.sponsor_block_enable_key), false)) {
+        if (preferences.getBoolean(context.getString(R.string.sponsor_block_enable_key), true)) {
             tabs.add("sponsorblock");
         }
 

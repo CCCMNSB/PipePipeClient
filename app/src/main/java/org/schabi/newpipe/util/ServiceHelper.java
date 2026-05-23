@@ -324,7 +324,7 @@ public final class ServiceHelper {
         final SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
 
         final boolean isSponsorBlockEnabled = prefs.getBoolean(context
-                .getString(R.string.sponsor_block_enable_key), false);
+                .getString(R.string.sponsor_block_enable_key), true);
 
         if (!isSponsorBlockEnabled) {
             return null;

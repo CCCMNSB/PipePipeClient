@@ -190,11 +190,11 @@ public final class VideoDetailFragment
             showRelatedItems = videoTabs.contains(VIDEO_TAB_RELATED);
             showDescription = videoTabs.contains(VIDEO_TAB_DESCRIPTION);
             showSponsorBlock = videoTabs.contains(VIDEO_TAB_SPONSORBLOCK)
-                    && sharedPreferences.getBoolean(getString(R.string.sponsor_block_enable_key), false);
+                    && sharedPreferences.getBoolean(getString(R.string.sponsor_block_enable_key), true);
             tabSettingsChanged = true;
         } else if (getString(R.string.sponsor_block_enable_key).equals(key)) {
             showSponsorBlock = getVideoTabs(sharedPreferences).contains(VIDEO_TAB_SPONSORBLOCK)
-                    && sharedPreferences.getBoolean(key, false);
+                    && sharedPreferences.getBoolean(key, true);
             tabSettingsChanged = true;
         } else if (getString(R.string.pin_video_to_top_key).equals(key)) {
             updateStickyPlayerMode();
@@ -330,7 +330,7 @@ public final class VideoDetailFragment
         showRelatedItems = videoTabs.contains(VIDEO_TAB_RELATED);
         showDescription = videoTabs.contains(VIDEO_TAB_DESCRIPTION);
         showSponsorBlock = videoTabs.contains(VIDEO_TAB_SPONSORBLOCK)
-                && prefs.getBoolean(getString(R.string.sponsor_block_enable_key), false);
+                && prefs.getBoolean(getString(R.string.sponsor_block_enable_key), true);
         selectedTabTag = prefs.getString(
                 getString(R.string.stream_info_selected_tab_key), COMMENTS_TAB_TAG);
         prefs.registerOnSharedPreferenceChangeListener(preferenceChangeListener);
@@ -487,11 +487,11 @@ public final class VideoDetailFragment
             showRelatedItems = videoTabs.contains(VIDEO_TAB_RELATED);
             showDescription = videoTabs.contains(VIDEO_TAB_DESCRIPTION);
             showSponsorBlock = videoTabs.contains(VIDEO_TAB_SPONSORBLOCK)
-                    && sharedPreferences.getBoolean(getString(R.string.sponsor_block_enable_key), false);
+                    && sharedPreferences.getBoolean(getString(R.string.sponsor_block_enable_key), true);
             tabSettingsChanged = true;
         } else if (key.equals(getString(R.string.sponsor_block_enable_key))) {
             showSponsorBlock = getVideoTabs(sharedPreferences).contains(VIDEO_TAB_SPONSORBLOCK)
-                    && sharedPreferences.getBoolean(key, false);
+                    && sharedPreferences.getBoolean(key, true);
             tabSettingsChanged = true;
         } else if (key.equals(getString(R.string.pin_video_to_top_key))) {
             updateStickyPlayerMode();
@@ -2180,7 +2180,7 @@ public final class VideoDetailFragment
 
         final SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
         final boolean isSponsorBlockEnabled =
-                prefs.getBoolean(getString(R.string.sponsor_block_enable_key), false);
+                prefs.getBoolean(getString(R.string.sponsor_block_enable_key), true);
 
         if (player != null && isSponsorBlockEnabled) {
             if (currentSponsorBlockMode == null) {

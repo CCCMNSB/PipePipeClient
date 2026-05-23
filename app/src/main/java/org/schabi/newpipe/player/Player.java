@@ -408,7 +408,7 @@ public final class Player implements
         prefs = PreferenceManager.getDefaultSharedPreferences(context);
 
         final boolean isSponsorBlockEnabled = prefs.getBoolean(
-                context.getString(R.string.sponsor_block_enable_key), false);
+                context.getString(R.string.sponsor_block_enable_key), true);
 
         setSponsorBlockMode(isSponsorBlockEnabled
                 ? SponsorBlockMode.ENABLED
@@ -417,7 +417,7 @@ public final class Player implements
         preferenceChangeListener =
                 (sharedPreferences, key) -> {
                     if (context.getString(R.string.sponsor_block_enable_key).equals(key)) {
-                        setSponsorBlockMode(sharedPreferences.getBoolean(key, false)
+                        setSponsorBlockMode(sharedPreferences.getBoolean(key, true)
                                 ? SponsorBlockMode.ENABLED
                                 : SponsorBlockMode.DISABLED);
                     }
