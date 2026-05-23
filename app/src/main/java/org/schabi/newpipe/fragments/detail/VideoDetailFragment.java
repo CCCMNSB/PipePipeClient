@@ -1122,7 +1122,7 @@ public final class VideoDetailFragment
                 Log.e(TAG, "initTabs() error adding description tab", e);
             }
         }
-        if (shouldShowSponsorBlock() && currentInfo != null && currentInfo.getStreamType() != StreamType.LIVE_STREAM) {
+        if (shouldShowSponsorBlock()) {
             // temp empty fragment. will be updated in handleResult
             pageAdapter.addFragment(EmptyFragment.newInstance(false), SPONSOR_BLOCK_TAB_TAG);
             tabIcons.add(R.drawable.ic_sponsor_block_enable);
@@ -1209,8 +1209,11 @@ public final class VideoDetailFragment
         }
 
         if (shouldShowSponsorBlock()) {
-            if (info.getServiceId() == ServiceList.BiliBili.getServiceId() && !isFirstP(info.getId())) {
-                // exclude for BiliBili multi-part videos since it needs to deal with cid
+            final boolean isLiveStream = info.getStreamType() == StreamType.LIVE_STREAM;
+            if (isLiveStream
+                    || (info.getServiceId() == ServiceList.BiliBili.getServiceId()
+                            && !isFirstP(info.getId()))) {
+                // exclude for live streams or BiliBili multi-part videos
                 int index = pageAdapter.getItemPositionByTitle(SPONSOR_BLOCK_TAB_TAG);
                 if(index != -1){
                     pageAdapter.removeItem(index);
