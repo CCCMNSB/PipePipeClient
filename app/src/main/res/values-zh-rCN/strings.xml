@@ -1001,4 +1001,6 @@
 <string name="force_end_on_overtime_summary">当当前播放位置超过流时长时强制结束播放，用于解决无法自然停止的流的问题</string>
 <string name="use_old_search_filter_title">使用旧版搜索筛选器</string>
 <string name="use_old_search_filter_summary">使用基于菜单的旧版搜索筛选器，而不是新的对话框界面</string>
+<string name="main_tabs_position_summary">将主标签页选择器移到底部</string>
+<string name="main_tabs_position_title">主标签页位置</string>
 </resources>

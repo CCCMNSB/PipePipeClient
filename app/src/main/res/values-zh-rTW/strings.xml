@@ -991,4 +991,6 @@
 <string name="force_end_on_overtime_summary">當目前播放位置超過串流時長時強制結束播放，作為無法自然停止之串流的因應措施</string>
 <string name="use_old_search_filter_title">使用舊版搜尋篩選器</string>
 <string name="use_old_search_filter_summary">使用舊版選單式搜尋篩選器，而不是新的對話方塊介面</string>
+<string name="main_tabs_position_summary">將主分頁選擇器移動至底部</string>
+<string name="main_tabs_position_title">主分頁位置</string>
 </resources>

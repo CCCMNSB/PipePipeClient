@@ -1037,4 +1037,6 @@
 <string name="force_end_on_overtime_summary">Force end playback when current position exceeds stream duration, as a workaround for streams that do not stop naturally</string>
 <string name="use_old_search_filter_title">Use old search filter</string>
 <string name="use_old_search_filter_summary">Use the old menu-based search filter instead of the new dialog UI</string>
+<string name="main_tabs_position_summary">Move main tab selector to the bottom</string>
+<string name="main_tabs_position_title">Main tabs position</string>
 </resources>
