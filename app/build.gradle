@@ -78,6 +78,7 @@ android {
         // suppress false warning ("Resource IDs will be non-final in Android Gradle Plugin version
         // 5.0, avoid using them in switch case statements"), which affects only library projects
         disable 'NonConstantResourceId'
+        disable 'MutableCollectionMutableState'
     }
 
     compileOptions {
