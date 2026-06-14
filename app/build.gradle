@@ -106,6 +106,12 @@ android {
         includeInBundle = false
     }
 
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
+        }
+    }
+
     namespace 'org.schabi.newpipe'
 }
 
