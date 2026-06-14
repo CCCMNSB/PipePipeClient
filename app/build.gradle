@@ -13,7 +13,6 @@ android {
 
     defaultConfig {
         applicationId "InfinityLoop1309.NewPipeEnhanced"
-        // media3 1.9+ requires API 23 (media3-session). Bumped from 21 -> drops Android 5.0/5.1.
         minSdk 23
         //noinspection ExpiredTargetSdkVersion
         targetSdk 37
