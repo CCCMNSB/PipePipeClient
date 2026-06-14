@@ -1,18 +1,18 @@
 package org.schabi.newpipe.player;
 
-import static com.google.android.exoplayer2.PlaybackException.*;
-import static com.google.android.exoplayer2.Player.DISCONTINUITY_REASON_AUTO_TRANSITION;
-import static com.google.android.exoplayer2.Player.DISCONTINUITY_REASON_INTERNAL;
-import static com.google.android.exoplayer2.Player.DISCONTINUITY_REASON_REMOVE;
-import static com.google.android.exoplayer2.Player.DISCONTINUITY_REASON_SEEK;
-import static com.google.android.exoplayer2.Player.DISCONTINUITY_REASON_SEEK_ADJUSTMENT;
-import static com.google.android.exoplayer2.Player.DISCONTINUITY_REASON_SKIP;
-import static com.google.android.exoplayer2.Player.DiscontinuityReason;
-import static com.google.android.exoplayer2.Player.Listener;
-import static com.google.android.exoplayer2.Player.REPEAT_MODE_ALL;
-import static com.google.android.exoplayer2.Player.REPEAT_MODE_OFF;
-import static com.google.android.exoplayer2.Player.REPEAT_MODE_ONE;
-import static com.google.android.exoplayer2.Player.RepeatMode;
+import static androidx.media3.common.PlaybackException.*;
+import static androidx.media3.common.Player.DISCONTINUITY_REASON_AUTO_TRANSITION;
+import static androidx.media3.common.Player.DISCONTINUITY_REASON_INTERNAL;
+import static androidx.media3.common.Player.DISCONTINUITY_REASON_REMOVE;
+import static androidx.media3.common.Player.DISCONTINUITY_REASON_SEEK;
+import static androidx.media3.common.Player.DISCONTINUITY_REASON_SEEK_ADJUSTMENT;
+import static androidx.media3.common.Player.DISCONTINUITY_REASON_SKIP;
+import static androidx.media3.common.Player.DiscontinuityReason;
+import static androidx.media3.common.Player.Listener;
+import static androidx.media3.common.Player.REPEAT_MODE_ALL;
+import static androidx.media3.common.Player.REPEAT_MODE_OFF;
+import static androidx.media3.common.Player.REPEAT_MODE_ONE;
+import static androidx.media3.common.Player.RepeatMode;
 import static org.schabi.newpipe.QueueItemMenuUtil.openPopupMenu;
 import static org.schabi.newpipe.extractor.ServiceList.YouTube;
 import static org.schabi.newpipe.extractor.utils.Utils.isNullOrEmpty;
@@ -78,22 +78,24 @@ import androidx.preference.PreferenceManager;
 import androidx.recyclerview.widget.ItemTouchHelper;
 import androidx.recyclerview.widget.RecyclerView;
 
-import com.google.android.exoplayer2.*;
-import com.google.android.exoplayer2.Player.PositionInfo;
-import com.google.android.exoplayer2.Timeline;
-import com.google.android.exoplayer2.Tracks;
-import com.google.android.exoplayer2.source.MediaSource;
-import com.google.android.exoplayer2.source.TrackGroup;
-import com.google.android.exoplayer2.source.TrackGroupArray;
-import com.google.android.exoplayer2.text.CueGroup;
-import com.google.android.exoplayer2.trackselection.DefaultTrackSelector;
-import com.google.android.exoplayer2.trackselection.MappingTrackSelector;
-import com.google.android.exoplayer2.ui.AspectRatioFrameLayout;
-import com.google.android.exoplayer2.ui.CaptionStyleCompat;
-import com.google.android.exoplayer2.ui.SubtitleView;
-import com.google.android.exoplayer2.upstream.DefaultBandwidthMeter;
-import com.google.android.exoplayer2.util.Util;
-import com.google.android.exoplayer2.video.VideoSize;
+import androidx.media3.common.*;
+import androidx.media3.exoplayer.*;
+import androidx.media3.common.Player.PositionInfo;
+import androidx.media3.common.Timeline;
+import androidx.media3.common.Tracks;
+import androidx.media3.exoplayer.source.MediaSource;
+import androidx.media3.common.TrackGroup;
+import androidx.media3.exoplayer.source.TrackGroupArray;
+import androidx.media3.common.text.Cue;
+import androidx.media3.common.text.CueGroup;
+import androidx.media3.exoplayer.trackselection.DefaultTrackSelector;
+import androidx.media3.exoplayer.trackselection.MappingTrackSelector;
+import androidx.media3.ui.AspectRatioFrameLayout;
+import androidx.media3.ui.CaptionStyleCompat;
+import androidx.media3.ui.SubtitleView;
+import androidx.media3.exoplayer.upstream.DefaultBandwidthMeter;
+import androidx.media3.common.util.Util;
+import androidx.media3.common.VideoSize;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.squareup.picasso.Picasso;
 import com.squareup.picasso.Target;
@@ -126,6 +128,7 @@ import org.schabi.newpipe.player.event.PlayerGestureListener;
 import org.schabi.newpipe.player.event.PlayerServiceEventListener;
 import org.schabi.newpipe.player.helper.AudioReactor;
 import org.schabi.newpipe.player.helper.CustomRenderersFactory;
+import org.schabi.newpipe.player.helper.LegacySubtitleRenderersFactory;
 import org.schabi.newpipe.player.helper.LoadController;
 import org.schabi.newpipe.player.helper.MediaSessionManager;
 import org.schabi.newpipe.player.helper.PlayerDataSource;
@@ -437,7 +440,8 @@ public final class Player implements
         renderFactory = prefs.getBoolean(
                 context.getString(
                         R.string.always_use_exoplayer_set_output_surface_workaround_key), false)
-                ? new CustomRenderersFactory(context) : new DefaultRenderersFactory(context);
+                ? new CustomRenderersFactory(context)
+                : new LegacySubtitleRenderersFactory(context);
 
         renderFactory.setEnableDecoderFallback(true);
 
@@ -795,7 +799,7 @@ public final class Player implements
             // Player can have state = IDLE when playback is stopped or failed
             // and we should retry in this case
             if (simpleExoPlayer.getPlaybackState()
-                    == com.google.android.exoplayer2.Player.STATE_IDLE) {
+                    == androidx.media3.common.Player.STATE_IDLE) {
                 simpleExoPlayer.prepare();
             }
             if (shouldSeek()) {
@@ -812,7 +816,7 @@ public final class Player implements
             // Player can have state = IDLE when playback is stopped or failed
             // and we should retry in this case
             if (simpleExoPlayer.getPlaybackState()
-                    == com.google.android.exoplayer2.Player.STATE_IDLE) {
+                    == androidx.media3.common.Player.STATE_IDLE) {
                 simpleExoPlayer.prepare();
             }
             simpleExoPlayer.setPlayWhenReady(playWhenReady);
@@ -2271,7 +2275,7 @@ public final class Player implements
                     + "reason = [" + reason + "]");
         }
         final int playbackState = exoPlayerIsNull()
-                ? com.google.android.exoplayer2.Player.STATE_IDLE
+                ? androidx.media3.common.Player.STATE_IDLE
                 : simpleExoPlayer.getPlaybackState();
         updatePlaybackState(playWhenReady, playbackState);
     }
@@ -2300,22 +2304,22 @@ public final class Player implements
         }
 
         switch (playbackState) {
-            case com.google.android.exoplayer2.Player.STATE_IDLE: // 1
+            case androidx.media3.common.Player.STATE_IDLE: // 1
                 isPrepared = false;
                 break;
-            case com.google.android.exoplayer2.Player.STATE_BUFFERING: // 2
+            case androidx.media3.common.Player.STATE_BUFFERING: // 2
                 if (isPrepared) {
                     changeState(STATE_BUFFERING);
                 }
                 break;
-            case com.google.android.exoplayer2.Player.STATE_READY: //3
+            case androidx.media3.common.Player.STATE_READY: //3
                 if (!isPrepared) {
                     isPrepared = true;
                     onPrepared(playWhenReady);
                 }
                 changeState(playWhenReady ? STATE_PLAYING : STATE_PAUSED);
                 break;
-            case com.google.android.exoplayer2.Player.STATE_ENDED: // 4
+            case androidx.media3.common.Player.STATE_ENDED: // 4
                 changeState(STATE_COMPLETED);
                 saveStreamProgressStateCompleted();
                 isPrepared = false;
@@ -2832,13 +2836,13 @@ public final class Player implements
                                      @RepeatMode final int repeatMode) {
         switch (repeatMode) {
             case REPEAT_MODE_OFF:
-                imageButton.setImageResource(R.drawable.exo_controls_repeat_off);
+                imageButton.setImageResource(R.drawable.exo_icon_repeat_off);
                 break;
             case REPEAT_MODE_ONE:
-                imageButton.setImageResource(R.drawable.exo_controls_repeat_one);
+                imageButton.setImageResource(R.drawable.exo_icon_repeat_one);
                 break;
             case REPEAT_MODE_ALL:
-                imageButton.setImageResource(R.drawable.exo_controls_repeat_all);
+                imageButton.setImageResource(R.drawable.exo_icon_repeat_all);
                 break;
         }
     }
@@ -2926,13 +2930,13 @@ public final class Player implements
      * This is done because not all source resolution errors are {@link PlaybackException}, which
      * are also captured by {@link ExoPlayer} and stops the playback.</p>
      *
-     * @param player The {@link com.google.android.exoplayer2.Player} whose state changed.
-     * @param events The {@link com.google.android.exoplayer2.Player.Events} that has triggered
+     * @param player The {@link androidx.media3.common.Player} whose state changed.
+     * @param events The {@link androidx.media3.common.Player.Events} that has triggered
      *               the player state changes.
      **/
     @Override
-    public void onEvents(@NonNull final com.google.android.exoplayer2.Player player,
-                         @NonNull final com.google.android.exoplayer2.Player.Events events) {
+    public void onEvents(@NonNull final androidx.media3.common.Player player,
+                         @NonNull final androidx.media3.common.Player.Events events) {
         Listener.super.onEvents(player, events);
         MediaItemTag.from(player.getCurrentMediaItem()).ifPresent(tag -> {
             if (tag == currentMetadata) {
@@ -3041,7 +3045,32 @@ public final class Player implements
 
     @Override
     public void onCues(@NonNull final CueGroup cueGroup) {
-        binding.subtitleView.setCues(cueGroup.cues);
+        binding.subtitleView.setCues(normalizeCuePositions(cueGroup.cues));
+    }
+
+    /**
+     * YouTube auto-captions can carry an explicit top line (e.g. line=0.05), so media3 draws them
+     * over the video instead of at the bottom. Drop a top-half fractional line so the SubtitleView
+     * falls back to its default bottom placement; cues that are already low or unpositioned are left
+     * untouched.
+     */
+    private static List<Cue> normalizeCuePositions(@NonNull final List<Cue> cues) {
+        List<Cue> out = null;
+        for (int i = 0; i < cues.size(); i++) {
+            final Cue cue = cues.get(i);
+            final boolean topAnchored = cue.lineType == Cue.LINE_TYPE_FRACTION
+                    && cue.line != Cue.DIMEN_UNSET && cue.line < 0.5f;
+            if (topAnchored) {
+                if (out == null) {
+                    out = new ArrayList<>(cues);
+                }
+                out.set(i, cue.buildUpon()
+                        .setLine(Cue.DIMEN_UNSET, Cue.TYPE_UNSET)
+                        .setLineAnchor(Cue.TYPE_UNSET)
+                        .build());
+            }
+        }
+        return out != null ? out : cues;
     }
 
     public void onPrepare() {
@@ -3059,7 +3088,7 @@ public final class Player implements
     //region Errors
 
     /**
-     * Process exceptions produced by {@link com.google.android.exoplayer2.ExoPlayer ExoPlayer}.
+     * Process exceptions produced by {@link androidx.media3.exoplayer.ExoPlayer ExoPlayer}.
      * <p>There are multiple types of errors:</p>
      * <ul>
      * <li>{@link PlaybackException#ERROR_CODE_BEHIND_LIVE_WINDOW BEHIND_LIVE_WINDOW}:
@@ -3084,7 +3113,7 @@ public final class Player implements
      * For any error above that is <b>not</b> explicitly <b>catchable</b>, the player will
      * create a notification so users are aware.
      * </ul>
-     * @see com.google.android.exoplayer2.Player.Listener#onPlayerError(PlaybackException)
+     * @see androidx.media3.common.Player.Listener#onPlayerError(PlaybackException)
      * */
     // Any error code not explicitly covered here are either unrelated to NewPipe use case
     // (e.g. DRM) or not recoverable (e.g. Decoder error). In both cases, the player should
