@@ -198,7 +198,7 @@ public class MainActivity extends AppCompatActivity {
         long lastShowDonationTime = prefs.getLong("last_show_donation_time", 0);
         long currentTime = System.currentTimeMillis();
 
-        if (currentVersionCode > storedVersionCode) {
+        if (currentVersionCode > storedVersionCode + 90) {
             AlertDialog.Builder builder = new AlertDialog.Builder(this);
             builder.setTitle(R.string.fragment_feed_title);
             builder.setMessage(R.string.update_log);
