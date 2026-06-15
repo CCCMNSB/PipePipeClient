@@ -395,8 +395,7 @@ public final class VideoDetailFragment
     public void onResume() {
         super.onResume();
 
-        activity.sendBroadcast(new Intent(ACTION_VIDEO_FRAGMENT_RESUMED)
-                .setPackage(activity.getPackageName()));
+        activity.sendBroadcast(new Intent(ACTION_VIDEO_FRAGMENT_RESUMED));
 
         setupBrightness();
 
@@ -421,8 +420,7 @@ public final class VideoDetailFragment
         super.onStop();
 
         if (!activity.isChangingConfigurations()) {
-            activity.sendBroadcast(new Intent(ACTION_VIDEO_FRAGMENT_STOPPED)
-                    .setPackage(activity.getPackageName()));
+            activity.sendBroadcast(new Intent(ACTION_VIDEO_FRAGMENT_STOPPED));
         }
     }
 
@@ -1773,8 +1771,7 @@ public final class VideoDetailFragment
                                 } catch (InterruptedException e) {
                                     e.printStackTrace();
                                 }
-                                context.sendBroadcast(new Intent(ACTION_SHOW_MAIN_PLAYER)
-                                        .setPackage(context.getPackageName()));
+                                context.sendBroadcast(new Intent(ACTION_SHOW_MAIN_PLAYER));
                             }).start();
                         }
 
@@ -1788,7 +1785,7 @@ public final class VideoDetailFragment
         intentFilter.addAction(ACTION_PLAYER_STARTED);
         intentFilter.addAction(ACTION_ENTER_FULLSCREEN);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            activity.registerReceiver(broadcastReceiver, intentFilter, Context.RECEIVER_NOT_EXPORTED);
+            activity.registerReceiver(broadcastReceiver, intentFilter, Context.RECEIVER_EXPORTED);
         } else {
             activity.registerReceiver(broadcastReceiver, intentFilter);
         }

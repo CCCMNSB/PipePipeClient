@@ -215,7 +215,7 @@ class FeedLoadService : Service() {
             }
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            registerReceiver(broadcastReceiver, IntentFilter(ACTION_CANCEL), Context.RECEIVER_NOT_EXPORTED)
+            registerReceiver(broadcastReceiver, IntentFilter(ACTION_CANCEL), Context.RECEIVER_EXPORTED)
         } else {
             registerReceiver(broadcastReceiver, IntentFilter(ACTION_CANCEL))
         }

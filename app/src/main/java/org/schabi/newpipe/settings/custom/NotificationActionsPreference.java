@@ -61,8 +61,7 @@ public class NotificationActionsPreference extends Preference {
     public void onDetached() {
         super.onDetached();
         saveChanges();
-        getContext().sendBroadcast(new Intent(PlayerService.ACTION_RECREATE_NOTIFICATION)
-                .setPackage(getContext().getPackageName()));
+        getContext().sendBroadcast(new Intent(PlayerService.ACTION_RECREATE_NOTIFICATION));
     }
 
 
