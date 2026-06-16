@@ -279,6 +279,13 @@ public class PlayerDataSource {
                 .setContinueLoadingCheckIntervalBytes(continueLoadingCheckIntervalBytes);
     }
 
+    public DashMediaSource.Factory getBiliDashMediaSourceFactory(){
+        cacheDataSourceFactoryBuilder.setUpstreamDataSourceFactory(biliCachelessDataSourceFactory);
+        return new DashMediaSource.Factory(
+                getDefaultDashChunkSourceFactory(cacheDataSourceFactoryBuilder.build()),
+                cacheDataSourceFactoryBuilder.build());
+    }
+
     public void disconnectWebSocketClients() {
         try {
             nicoWebSocketClient.disconnect();

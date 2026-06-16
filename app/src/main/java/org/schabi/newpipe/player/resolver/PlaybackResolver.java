@@ -501,11 +501,90 @@ public interface PlaybackResolver extends Resolver<StreamInfo, MediaSource> {
             final String cacheKey,
             final MediaItemTag metadata) throws IOException{
         final String url = stream.getContent();
+        final String manifest = createBiliBiliDashManifest(stream, streamInfo);
+        if (manifest != null) {
+            return dataSource.getBiliDashMediaSourceFactory().createMediaSource(
+                    createDashManifest(manifest, stream),
+                    new MediaItem.Builder()
+                            .setTag(metadata)
+                            .setUri(Uri.parse(url))
+                            .setCustomCacheKey(cacheKey)
+                            .build());
+        }
         return dataSource.getBiliMediaSourceFactory(streamInfo.getUrl()).createMediaSource(
                 new MediaItem.Builder()
                         .setTag(metadata)
                         .setUri(Uri.parse(url))
                         .setCustomCacheKey(cacheKey)
                         .build());
+    }
+
+    @Nullable
+    private static <T extends Stream> String createBiliBiliDashManifest(
+            final T stream,
+            final StreamInfo streamInfo) {
+        final boolean isAudio = stream instanceof AudioStream;
+        final boolean isVideo = stream instanceof VideoStream;
+        if (!isAudio && !isVideo) {
+            return null;
+        }
+        final int initStart;
+        final int initEnd;
+        final int indexStart;
+        final int indexEnd;
+        final String mimeType;
+        final String codecs;
+        final int bandwidth;
+        final String extraAttributes;
+        if (isAudio) {
+            final AudioStream audioStream = (AudioStream) stream;
+            initStart = audioStream.getInitStart();
+            initEnd = audioStream.getInitEnd();
+            indexStart = audioStream.getIndexStart();
+            indexEnd = audioStream.getIndexEnd();
+            mimeType = "audio/mp4";
+            codecs = audioStream.getCodec();
+            bandwidth = audioStream.getBitrate() > 0
+                    ? audioStream.getBitrate() : audioStream.getAverageBitrate();
+            extraAttributes = "";
+        } else {
+            final VideoStream videoStream = (VideoStream) stream;
+            initStart = videoStream.getInitStart();
+            initEnd = videoStream.getInitEnd();
+            indexStart = videoStream.getIndexStart();
+            indexEnd = videoStream.getIndexEnd();
+            mimeType = "video/mp4";
+            codecs = videoStream.getCodec();
+            bandwidth = videoStream.getBitrate();
+            extraAttributes = (videoStream.getWidth() > 0 ? " width=\"" + videoStream.getWidth() + "\"" : "")
+                    + (videoStream.getHeight() > 0 ? " height=\"" + videoStream.getHeight() + "\"" : "")
+                    + (videoStream.getFps() > 0 ? " frameRate=\"" + videoStream.getFps() + "\"" : "");
+        }
+        if (initEnd <= initStart || indexEnd <= indexStart || bandwidth <= 0
+                || codecs == null || codecs.isEmpty()) {
+            return null;
+        }
+        final String contentType = isAudio ? "audio" : "video";
+        final long duration = Math.max(1, streamInfo.getDuration());
+        return "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
+                + "<MPD xmlns=\"urn:mpeg:dash:schema:mpd:2011\" type=\"static\" profiles=\"urn:mpeg:dash:profile:isoff-on-demand:2011\" minBufferTime=\"PT1.5S\" mediaPresentationDuration=\"PT" + duration + "S\">"
+                + "<Period duration=\"PT" + duration + "S\">"
+                + "<AdaptationSet contentType=\"" + contentType + "\" mimeType=\"" + mimeType + "\" subsegmentAlignment=\"true\">"
+                + "<Representation id=\"" + escapeXml(stream.getId()) + "\" bandwidth=\"" + bandwidth + "\" codecs=\"" + escapeXml(codecs) + "\"" + extraAttributes + ">"
+                + "<BaseURL>" + escapeXml(stream.getContent()) + "</BaseURL>"
+                + "<SegmentBase indexRange=\"" + indexStart + "-" + indexEnd + "\">"
+                + "<Initialization range=\"" + initStart + "-" + initEnd + "\"/>"
+                + "</SegmentBase>"
+                + "</Representation>"
+                + "</AdaptationSet>"
+                + "</Period>"
+                + "</MPD>";
+    }
+
+    private static String escapeXml(final String value) {
+        return value.replace("&", "&amp;")
+                .replace("\"", "&quot;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;");
     }
 }
