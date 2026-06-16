@@ -261,8 +261,8 @@ public final class Player implements
     private PlayerMediaSession playerMediaSession;
     @Nullable private SurfaceHolderCallback surfaceHolderCallback;
 
-    @NonNull private final DefaultTrackSelector trackSelector;
-    @NonNull private final LoadController loadController;
+    @NonNull private DefaultTrackSelector trackSelector;
+    @NonNull private LoadController loadController;
     @NonNull private final DefaultRenderersFactory renderFactory;
 
     @NonNull private final VideoPlaybackResolver videoResolver;
@@ -432,7 +432,7 @@ public final class Player implements
 
         setupBroadcastReceiver();
 
-        trackSelector = new DefaultTrackSelector(context, PlayerHelper.getQualitySelector());
+        trackSelector = createTrackSelector();
         dataSource = new PlayerDataSource(context, DownloaderImpl.USER_AGENT,
                 new DefaultBandwidthMeter.Builder(context).build());
         loadController = new LoadController();
@@ -530,6 +530,9 @@ public final class Player implements
             Log.d(TAG, "initPlayer() called with: playOnReady = [" + playOnReady + "]");
         }
 
+        trackSelector = createTrackSelector();
+        loadController = new LoadController();
+
         simpleExoPlayer = new ExoPlayer.Builder(context, renderFactory)
                 .setTrackSelector(trackSelector)
                 .setLoadControl(loadController)
@@ -563,6 +566,10 @@ public final class Player implements
         } else {
             Log.d(TAG, "[" + Util.DEVICE_DEBUG_INFO + "] does not support media tunneling");
         }
+    }
+
+    private DefaultTrackSelector createTrackSelector() {
+        return new DefaultTrackSelector(context, PlayerHelper.getQualitySelector());
     }
 
     private void initListeners() {
