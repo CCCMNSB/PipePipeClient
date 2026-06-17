@@ -15,7 +15,7 @@ android {
         applicationId "InfinityLoop1309.NewPipeEnhanced"
         minSdk 23
         //noinspection ExpiredTargetSdkVersion
-        targetSdk 37
+        targetSdk 36
         versionCode 1100
         versionName "5.2.0-beta2"
         multiDexEnabled true
