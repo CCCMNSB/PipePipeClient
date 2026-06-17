@@ -939,4 +939,9 @@
 <string name="use_old_search_filter_summary">Verwenden Sie den alten menübasierten Suchfilter anstelle der neuen Dialog-UI</string>
 <string name="main_tabs_position_summary">Haupt-Tab-Auswahl nach unten verschieben</string>
 <string name="main_tabs_position_title">Position der Haupt-Tabs</string>
+<string name="disable_exoplayer_media_codec_async_queueing_title">Asynchrones MediaCodec-Queueing deaktivieren</string>
+<string name="disable_exoplayer_media_codec_async_queueing_summary">Workaround für Wiedergabefehler, die durch asynchrones MediaCodec-Queueing auf einigen Geräten verursacht werden. Die Aktivierung kann die Kompatibilität verbessern, aber die Wiedergabeleistung verringern.</string>
+<string name="media_codec_workaround_hint_title">MediaCodec-Wiedergabe fehlgeschlagen</string>
+<string name="media_codec_async_workaround_hint">Dieser Fehler wird möglicherweise durch asynchrones MediaCodec-Queueing verursacht. Versuchen Sie, \"Asynchrones MediaCodec-Queueing deaktivieren\" in den ExoPlayer-Einstellungen zu aktivieren, und starten Sie die Wiedergabe anschließend neu.</string>
+<string name="media_codec_surface_workaround_hint">Dieser Fehler trat beim Ändern der Videoausgabeoberfläche auf. Versuchen Sie, \"Immer den Workaround für die Videoausgabe-Oberflächeneinstellung von ExoPlayer verwenden\" in den ExoPlayer-Einstellungen zu aktivieren, und starten Sie die Wiedergabe anschließend neu.</string>
 </resources>

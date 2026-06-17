@@ -443,6 +443,10 @@ public final class Player implements
                 ? new CustomRenderersFactory(context)
                 : new LegacySubtitleRenderersFactory(context);
 
+        if (prefs.getBoolean(context.getString(
+                R.string.disable_exoplayer_media_codec_async_queueing_key), false)) {
+            renderFactory.forceDisableMediaCodecAsynchronousQueueing();
+        }
         renderFactory.setEnableDecoderFallback(true);
 
         videoResolver = new VideoPlaybackResolver(context, dataSource, getQualityResolver());
@@ -3198,11 +3202,44 @@ public final class Player implements
         }
 
         if (!isCatchableException) {
+            showMediaCodecWorkaroundHint(error);
             createErrorNotification(error);
         }
 
         if (fragmentListener != null) {
             fragmentListener.onPlayerError(error, isCatchableException);
+        }
+    }
+
+    private void showMediaCodecWorkaroundHint(@NonNull final PlaybackException error) {
+        if (error.errorCode != ERROR_CODE_DECODING_FAILED
+                && error.errorCode != ERROR_CODE_FAILED_RUNTIME_CHECK) {
+            return;
+        }
+        try {
+            final String stackTrace = Log.getStackTraceString(error);
+            final boolean hasSetOutputSurface = stackTrace.contains("setOutputSurface");
+            final boolean hasAsyncCodecAdapter =
+                    stackTrace.contains("AsynchronousMediaCodecAdapter")
+                            || stackTrace.contains("AsynchronousMediaCodecBufferEnqueuer");
+            final int message;
+            if (hasSetOutputSurface && !prefs.getBoolean(context.getString(
+                    R.string.always_use_exoplayer_set_output_surface_workaround_key), false)) {
+                message = R.string.media_codec_surface_workaround_hint;
+            } else if (hasAsyncCodecAdapter && !prefs.getBoolean(context.getString(
+                    R.string.disable_exoplayer_media_codec_async_queueing_key), false)) {
+                message = R.string.media_codec_async_workaround_hint;
+            } else {
+                return;
+            }
+
+            new AlertDialog.Builder(getParentActivity())
+                    .setTitle(R.string.media_codec_workaround_hint_title)
+                    .setMessage(message)
+                    .setPositiveButton(R.string.ok, null)
+                    .show();
+        } catch (Exception e) {
+            e.printStackTrace();
         }
     }
 

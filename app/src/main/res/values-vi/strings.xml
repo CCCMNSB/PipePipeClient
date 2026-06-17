@@ -1048,4 +1048,9 @@ nSự khác biệt giữa hai loại này là cái nào nhanh thường thiếu 
 <string name="use_old_search_filter_summary">Sử dụng bộ lọc tìm kiếm dựa trên menu cũ thay vì giao diện hộp thoại mới</string>
 <string name="main_tabs_position_summary">Di chuyển bộ chọn tab chính xuống dưới cùng</string>
 <string name="main_tabs_position_title">Vị trí tab chính</string>
+<string name="disable_exoplayer_media_codec_async_queueing_title">Tắt tính năng xếp hàng không đồng bộ MediaCodec</string>
+<string name="disable_exoplayer_media_codec_async_queueing_summary">Giải pháp thay thế cho các lỗi phát lại do tính năng xếp hàng không đồng bộ MediaCodec gây ra trên một số thiết bị. Bật tùy chọn này có thể cải thiện khả năng tương thích nhưng có thể làm giảm hiệu suất phát lại.</string>
+<string name="media_codec_workaround_hint_title">Phát lại MediaCodec thất bại</string>
+<string name="media_codec_async_workaround_hint">Lỗi này có thể do việc xếp hàng đợi không đồng bộ của MediaCodec. Hãy thử bật \"Tắt xếp hàng đợi không đồng bộ MediaCodec\" trong cài đặt ExoPlayer, sau đó khởi động lại quá trình phát.</string>
+<string name="media_codec_surface_workaround_hint">Lỗi này xảy ra trong khi thay đổi bề mặt đầu ra video. Hãy thử bật \"Luôn sử dụng giải pháp thay thế cài đặt bề mặt đầu ra video của ExoPlayer\" trong cài đặt ExoPlayer, sau đó khởi động lại quá trình phát.</string>
 </resources>

@@ -956,4 +956,9 @@ Voulez-vous continuer?</string>
 <string name="use_old_search_filter_summary">Utiliser l\'ancien filtre de recherche basé sur un menu au lieu de la nouvelle interface de dialogue</string>
 <string name="main_tabs_position_summary">Déplacer le sélecteur d\'onglets principaux vers le bas</string>
 <string name="main_tabs_position_title">Position des onglets principaux</string>
+<string name="disable_exoplayer_media_codec_async_queueing_title">Désactiver la mise en file d\'attente asynchrone de MediaCodec</string>
+<string name="disable_exoplayer_media_codec_async_queueing_summary">Solution de contournement pour les erreurs de lecture causées par la mise en file d\'attente asynchrone de MediaCodec sur certains appareils. Activer cette option peut améliorer la compatibilité, mais peut réduire les performances de lecture.</string>
+<string name="media_codec_workaround_hint_title">La lecture MediaCodec a échoué</string>
+<string name="media_codec_async_workaround_hint">Cet échec peut être causé par la file d\'attente asynchrone de MediaCodec. Essayez d\'activer « Désactiver la file d\'attente asynchrone MediaCodec » dans les paramètres d\'ExoPlayer, puis redémarrez la lecture.</string>
+<string name="media_codec_surface_workaround_hint">Cet échec s\'est produit lors du changement de la surface de sortie vidéo. Essayez d\'activer « Toujours utiliser le contournement du paramètre de surface de sortie vidéo d\'ExoPlayer » dans les paramètres d\'ExoPlayer, puis redémarrez la lecture.</string>
 </resources>

@@ -995,4 +995,9 @@
 <string name="use_old_search_filter_summary">Usar el antiguo filtro de búsqueda basado en menús en lugar de la nueva interfaz de diálogo</string>
 <string name="main_tabs_position_summary">Mover el selector de pestañas principales a la parte inferior</string>
 <string name="main_tabs_position_title">Posición de las pestañas principales</string>
+<string name="disable_exoplayer_media_codec_async_queueing_title">Desactivar la cola asíncrona de MediaCodec</string>
+<string name="disable_exoplayer_media_codec_async_queueing_summary">Solución alternativa para errores de reproducción causados por la cola asíncrona de MediaCodec en algunos dispositivos. Activar esta opción puede mejorar la compatibilidad, pero podría reducir el rendimiento de la reproducción.</string>
+<string name="media_codec_workaround_hint_title">Falló la reproducción de MediaCodec</string>
+<string name="media_codec_async_workaround_hint">Este fallo puede ser causado por la puesta en cola asíncrona de MediaCodec. Intente habilitar \"Deshabilitar la puesta en cola asíncrona de MediaCodec\" en la configuración de ExoPlayer, luego reinicie la reproducción.</string>
+<string name="media_codec_surface_workaround_hint">Este fallo ocurrió al cambiar la superficie de salida de video. Intente habilitar \"Usar siempre la solución alternativa de configuración de superficie de salida de video de ExoPlayer\" en la configuración de ExoPlayer, luego reinicie la reproducción.</string>
 </resources>

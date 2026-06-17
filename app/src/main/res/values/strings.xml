@@ -1052,4 +1052,9 @@
 <string name="duration">Duration</string>
 <string name="license">License</string>
 <string name="published">Published</string>
+<string name="disable_exoplayer_media_codec_async_queueing_title">Disable MediaCodec asynchronous queueing</string>
+<string name="disable_exoplayer_media_codec_async_queueing_summary">Workaround for playback errors caused by MediaCodec asynchronous queueing on some devices. Enabling this may improve compatibility, but can reduce playback performance.</string>
+<string name="media_codec_workaround_hint_title">MediaCodec playback failed</string>
+<string name="media_codec_async_workaround_hint">This failure may be caused by MediaCodec asynchronous queueing. Try enabling \"Disable MediaCodec asynchronous queueing\" in ExoPlayer settings, then restart playback.</string>
+<string name="media_codec_surface_workaround_hint">This failure happened while changing the video output surface. Try enabling \"Always use ExoPlayer\'s video output surface setting workaround\" in ExoPlayer settings, then restart playback.</string>
 </resources>

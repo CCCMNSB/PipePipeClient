@@ -1016,4 +1016,9 @@
 <string name="duration">时长</string>
 <string name="license">许可</string>
 <string name="published">发布日期</string>
+<string name="disable_exoplayer_media_codec_async_queueing_title">禁用 MediaCodec 异步队列</string>
+<string name="disable_exoplayer_media_codec_async_queueing_summary">解决部分设备上由 MediaCodec 异步队列引起的播放错误的变通方案。启用此选项可能会提升兼容性，但会降低播放性能。</string>
+<string name="media_codec_workaround_hint_title">MediaCodec 播放失败</string>
+<string name="media_codec_async_workaround_hint">此故障可能是由 MediaCodec 异步队列引起的。请尝试在 ExoPlayer 设置中启用 \"禁用 MediaCodec 异步队列\"，然后重新启动播放。</string>
+<string name="media_codec_surface_workaround_hint">此故障发生在更改视频输出 Surface 时。请尝试在 ExoPlayer 设置中启用 \"始终使用 ExoPlayer 的视频输出 Surface 设置变通方案\"，然后重新启动播放。</string>
 </resources>
