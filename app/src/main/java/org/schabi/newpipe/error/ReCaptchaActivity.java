@@ -8,7 +8,6 @@ import android.os.Bundle;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
-import android.view.ViewGroup;
 import android.webkit.CookieManager;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
@@ -26,7 +25,6 @@ import org.schabi.newpipe.DownloaderImpl;
 import org.schabi.newpipe.MainActivity;
 import org.schabi.newpipe.R;
 import org.schabi.newpipe.util.ThemeHelper;
-import org.schabi.newpipe.util.WindowInsetsHelper;
 
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
@@ -78,11 +76,6 @@ public class ReCaptchaActivity extends AppCompatActivity {
         recaptchaBinding = ActivityRecaptchaBinding.inflate(getLayoutInflater());
         setContentView(recaptchaBinding.getRoot());
         setSupportActionBar(recaptchaBinding.toolbar);
-
-        WindowInsetsHelper.applyStatusBarInsets(this, recaptchaBinding.toolbar,
-                recaptchaBinding.reCaptchaWebView);
-        // Edge-to-edge (targetSdk 35+): keep the captcha web view content above the nav bar.
-        WindowInsetsHelper.applyNavigationBarInsets(recaptchaBinding.reCaptchaWebView);
 
         final String url = sanitizeRecaptchaUrl(getIntent().getStringExtra(RECAPTCHA_URL_EXTRA));
         // set return to Cancel by default

@@ -9,7 +9,6 @@ import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
-import android.view.ViewGroup;
 import android.widget.EditText;
 
 import androidx.annotation.IdRes;
@@ -35,7 +34,6 @@ import org.schabi.newpipe.settings.preferencesearch.PreferenceSearchResultHighli
 import org.schabi.newpipe.settings.preferencesearch.PreferenceSearchResultListener;
 import org.schabi.newpipe.settings.preferencesearch.PreferenceSearcher;
 import org.schabi.newpipe.util.DeviceUtils;
-import org.schabi.newpipe.util.WindowInsetsHelper;
 import org.schabi.newpipe.util.KeyboardUtil;
 import org.schabi.newpipe.util.ReleaseVersionUtil;
 import org.schabi.newpipe.util.ThemeHelper;
@@ -102,13 +100,6 @@ public class SettingsActivity extends AppCompatActivity implements
         initSearch(settingsLayoutBinding, restored);
 
         setSupportActionBar(settingsLayoutBinding.settingsToolbarLayout.toolbar);
-
-        WindowInsetsHelper.applyStatusBarInsets(this,
-                settingsLayoutBinding.settingsToolbarLayout.toolbar,
-                settingsLayoutBinding.settingsFragmentHolder);
-        // Edge-to-edge (targetSdk 35+): keep the last preference entry on long, scrollable
-        // settings pages above the system navigation bar.
-        WindowInsetsHelper.applyNavigationBarInsets(settingsLayoutBinding.settingsFragmentHolder);
 
         if (restored) {
             // Restore state
