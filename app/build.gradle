@@ -8,6 +8,11 @@ plugins {
     id "org.sonarqube"
 }
 
+def keyPath = System.getenv("KEY_PATH")
+def keyStorePassword = System.getenv("KEY_STORE_PASSWORD")
+def signingKeyAlias = System.getenv("KEY_ALIAS")
+def signingKeyPassword = System.getenv("KEY_PASSWORD")
+
 android {
     compileSdk 37
 
@@ -38,6 +43,17 @@ android {
         }
     }
 
+    signingConfigs {
+        if (keyPath && keyStorePassword && signingKeyAlias && signingKeyPassword) {
+            release {
+                storeFile file(keyPath)
+                storePassword keyStorePassword
+                keyAlias signingKeyAlias
+                keyPassword signingKeyPassword
+            }
+        }
+    }
+
     buildTypes {
         debug {
             debuggable true
@@ -56,6 +72,9 @@ android {
         }
 
         release {
+            if (signingConfigs.findByName("release")) {
+                signingConfig signingConfigs.release
+            }
             if (System.properties.containsKey('packageSuffix')) {
                 applicationIdSuffix System.getProperty('packageSuffix')
                 resValue "string", "app_name", "PipePipe " + System.getProperty('packageSuffix')
