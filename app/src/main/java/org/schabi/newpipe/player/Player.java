@@ -4918,7 +4918,6 @@ public final class Player implements
     //////////////////////////////////////////////////////////////////////////*/
     //region Gestures
 
-    @SuppressWarnings("checkstyle:ParameterNumber")
     private void onLayoutChange(final View view, final int l, final int t, final int r, final int b,
                                 final int ol, final int ot, final int or, final int ob) {
         if (l != ol || t != ot || r != or || b != ob) {

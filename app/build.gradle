@@ -4,7 +4,6 @@ plugins {
     id "org.jetbrains.kotlin.plugin.compose"
     id "org.jetbrains.kotlin.plugin.parcelize"
     id "org.jetbrains.kotlin.kapt"
-    id "checkstyle"
     id "org.sonarqube"
 }
 
@@ -154,8 +153,6 @@ androidComponents.onVariants(androidComponents.selector().all()) { variant ->
 }
 
 ext {
-    checkstyleVersion = '10.0'
-
     androidxLifecycleVersion = '2.3.1'
     androidxRoomVersion = '2.4.2'
     androidxWorkVersion = '2.10.2'
@@ -171,33 +168,7 @@ ext {
 }
 
 configurations {
-    checkstyle
     ktlint
-}
-
-checkstyle {
-    getConfigDirectory().set(rootProject.file("checkstyle"))
-    ignoreFailures false
-    showViolations true
-    toolVersion = checkstyleVersion
-}
-
-task runCheckstyle(type: Checkstyle) {
-    source 'src'
-    include '**/*.java'
-    exclude '**/gen/**'
-    exclude '**/R.java'
-    exclude '**/BuildConfig.java'
-    exclude 'main/java/us/shandian/giga/**'
-
-    classpath = configurations.checkstyle
-
-    showViolations true
-
-    reports {
-        xml.getRequired().set(true)
-        html.getRequired().set(true)
-    }
 }
 
 def outputDir = "${project.buildDir}/reports/ktlint/"
@@ -244,8 +215,6 @@ dependencies {
         exclude group: 'org.json', module: 'json'
     }
 
-/** Checkstyle **/
-    checkstyle "com.puppycrawl.tools:checkstyle:${checkstyleVersion}"
     ktlint 'com.pinterest:ktlint:0.44.0'
 
 /** Kotlin **/
