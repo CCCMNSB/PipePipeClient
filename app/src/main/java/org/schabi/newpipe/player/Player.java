@@ -3188,13 +3188,14 @@ public final class Player implements
                 reloadPlayQueueManager();
                 break;
             case ERROR_CODE_DECODER_INIT_FAILED:
-                AlertDialog.Builder builder = new AlertDialog.Builder(getParentActivity())
-                        .setTitle(R.string.decoder_init_failure)
-                        .setMessage(R.string.unable_to_decode_summary)
-                        .setPositiveButton(R.string.ok, (dialog, which) -> {
-                            // Handle "Yes" click
-                        });
-                builder.show();
+                final AppCompatActivity activity = getParentActivity();
+                if (activity != null) {
+                    new AlertDialog.Builder(activity)
+                            .setTitle(R.string.decoder_init_failure)
+                            .setMessage(R.string.unable_to_decode_summary)
+                            .setPositiveButton(R.string.ok, null)
+                            .show();
+                }
 
                 onPlaybackShutdown();
                 break;
