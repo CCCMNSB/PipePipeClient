@@ -1061,4 +1061,5 @@
 <string name="media_codec_workaround_hint_title">MediaCodec playback failed</string>
 <string name="media_codec_async_workaround_hint">This failure may be caused by MediaCodec asynchronous queueing. Try enabling \"Disable MediaCodec asynchronous queueing\" in ExoPlayer settings, then restart playback.</string>
 <string name="media_codec_surface_workaround_hint">This failure happened while changing the video output surface. Try enabling \"Always use ExoPlayer\'s video output surface setting workaround\" in ExoPlayer settings, then restart playback.</string>
+<string name="search_inside_channel">Search inside %s</string>
 </resources>

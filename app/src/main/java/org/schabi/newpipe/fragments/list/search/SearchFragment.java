@@ -50,8 +50,12 @@ import org.schabi.newpipe.extractor.NewPipe;
 import org.schabi.newpipe.extractor.Page;
 import org.schabi.newpipe.extractor.ServiceList;
 import org.schabi.newpipe.extractor.StreamingService;
+import org.schabi.newpipe.extractor.channel.ChannelTabInfo;
+import org.schabi.newpipe.extractor.linkhandler.ChannelTabs;
+import org.schabi.newpipe.extractor.linkhandler.ListLinkHandler;
 import org.schabi.newpipe.extractor.search.SearchExtractor;
 import org.schabi.newpipe.extractor.search.SearchInfo;
+import org.schabi.newpipe.extractor.search.filter.Filter;
 import org.schabi.newpipe.extractor.search.filter.FilterItem;
 import org.schabi.newpipe.fragments.BackPressable;
 import org.schabi.newpipe.fragments.list.BaseListFragment;
@@ -68,6 +72,7 @@ import org.schabi.newpipe.util.KeyboardUtil;
 import org.schabi.newpipe.util.NavigationHelper;
 import org.schabi.newpipe.util.ServiceHelper;
 
+import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -127,6 +132,14 @@ public class SearchFragment extends BaseListFragment<SearchInfo, ListExtractor.I
     boolean isCorrectedSearch;
 
     MetaInfo[] metaInfo;
+
+    boolean channelSearchMode;
+
+    String channelUrl;
+
+    String channelName;
+
+    ListLinkHandler channelSearchHandler;
 
     boolean wasSearchFocused = false;
 
@@ -190,6 +203,16 @@ public class SearchFragment extends BaseListFragment<SearchInfo, ListExtractor.I
         return searchFragment;
     }
 
+    public static SearchFragment getChannelInstance(final int serviceId,
+                                                    final String channelUrl,
+                                                    final String channelName) {
+        final SearchFragment searchFragment = getInstance(serviceId, "");
+        searchFragment.channelSearchMode = true;
+        searchFragment.channelUrl = channelUrl;
+        searchFragment.channelName = channelName;
+        return searchFragment;
+    }
+
 
     /**
      * Set wasLoading to true so when the fragment onResume is called, the initial search is done.
@@ -222,11 +245,11 @@ public class SearchFragment extends BaseListFragment<SearchInfo, ListExtractor.I
     @Override
     public View onCreateView(final LayoutInflater inflater, @Nullable final ViewGroup container,
                              @Nullable final Bundle savedInstanceState) {
-        if (useOldSearchFilter) {
+        if (useOldSearchFilter && !channelSearchMode) {
             searchFilterUi = new SearchFilterUI(this, getContext());
         }
         updateService();
-        if (useOldSearchFilter) {
+        if (useOldSearchFilter && !channelSearchMode) {
             searchFilterUi.restorePreviouslySelectedFilters(
                     userSelectedContentFilterList,
                     userSelectedSortFilterList);
@@ -394,9 +417,11 @@ public class SearchFragment extends BaseListFragment<SearchInfo, ListExtractor.I
 
         updateSearchActionLayout(searchSubmit, 40, 0);
         updateSearchActionLayout(searchFilter, 40, 40);
-        updateSearchActionLayout(searchClear, 40, 80);
+        updateSearchActionLayout(searchClear, 40,
+                useOldSearchFilter || channelSearchMode ? 40 : 80);
         searchClear.setVisibility(View.GONE);
-        searchFilter.setVisibility(useOldSearchFilter ? View.GONE : View.VISIBLE);
+        searchFilter.setVisibility(useOldSearchFilter || channelSearchMode
+                ? View.GONE : View.VISIBLE);
         searchSubmit.setVisibility(View.VISIBLE);
     }
 
@@ -444,6 +469,10 @@ public class SearchFragment extends BaseListFragment<SearchInfo, ListExtractor.I
         bundle.putString("searchSuggestion", searchSuggestion);
         bundle.putBoolean("isCorrectedSearch", isCorrectedSearch);
         bundle.putSerializable("metaInfo", metaInfo);
+        bundle.putBoolean("channelSearchMode", channelSearchMode);
+        bundle.putString("channelUrl", channelUrl);
+        bundle.putString("channelName", channelName);
+        bundle.putSerializable("channelSearchHandler", channelSearchHandler);
         bundle.putBoolean("wasSearchFocused", wasSearchFocused);
         bundle.putIntegerArrayList("userSelectedContentFilterList", userSelectedContentFilterList);
         bundle.putIntegerArrayList("userSelectedSortFilterList", userSelectedSortFilterList);
@@ -458,6 +487,11 @@ public class SearchFragment extends BaseListFragment<SearchInfo, ListExtractor.I
         searchSuggestion = savedInstanceState.getString("searchSuggestion");
         isCorrectedSearch = savedInstanceState.getBoolean("isCorrectedSearch", false);
         metaInfo = (MetaInfo[]) savedInstanceState.getSerializable("metaInfo");
+        channelSearchMode = savedInstanceState.getBoolean("channelSearchMode", false);
+        channelUrl = savedInstanceState.getString("channelUrl");
+        channelName = savedInstanceState.getString("channelName");
+        channelSearchHandler = (ListLinkHandler) savedInstanceState
+                .getSerializable("channelSearchHandler");
         wasSearchFocused = savedInstanceState.getBoolean("wasSearchFocused", false);
         userSelectedContentFilterList = savedInstanceState.getIntegerArrayList("userSelectedContentFilterList");
         userSelectedSortFilterList = savedInstanceState.getIntegerArrayList("userSelectedSortFilterList");
@@ -492,14 +526,15 @@ public class SearchFragment extends BaseListFragment<SearchInfo, ListExtractor.I
             updateService();
         }
 
-        if (useOldSearchFilter && searchFilterUi != null && service != null) {
+        if (useOldSearchFilter && !channelSearchMode && searchFilterUi != null
+                && service != null) {
             searchFilterUi.createSearchUI(menu);
         }
     }
 
     @Override
     public boolean onOptionsItemSelected(@NonNull final MenuItem item) {
-        if (useOldSearchFilter && searchFilterUi != null) {
+        if (useOldSearchFilter && !channelSearchMode && searchFilterUi != null) {
             return searchFilterUi.onOptionsItemSelected(item);
         }
         return super.onOptionsItemSelected(item);
@@ -517,6 +552,9 @@ public class SearchFragment extends BaseListFragment<SearchInfo, ListExtractor.I
                     + lastSearchedString);
         }
         searchEditText.setText(searchString);
+        if (channelSearchMode) {
+            searchEditText.setHint(getString(R.string.search_inside_channel, channelName));
+        }
 
         if (TextUtils.isEmpty(searchString) || TextUtils.isEmpty(searchEditText.getText())) {
             searchToolbarContainer.setTranslationX(100);
@@ -539,6 +577,9 @@ public class SearchFragment extends BaseListFragment<SearchInfo, ListExtractor.I
     private void updateToolbarActionViews() {
         final boolean hasQuery = !TextUtils.isEmpty(searchEditText.getText());
         searchClear.setVisibility(hasQuery ? View.VISIBLE : View.GONE);
+        if (channelSearchMode) {
+            searchFilter.setVisibility(View.GONE);
+        }
         updateSearchEditTextMargin();
     }
 
@@ -596,10 +637,14 @@ public class SearchFragment extends BaseListFragment<SearchInfo, ListExtractor.I
         });
 
         TooltipCompat.setTooltipText(searchClear, getString(R.string.clear));
-        TooltipCompat.setTooltipText(searchFilter, getString(R.string.filter));
+        if (!channelSearchMode) {
+            TooltipCompat.setTooltipText(searchFilter, getString(R.string.filter));
+        }
         TooltipCompat.setTooltipText(searchSubmit, getString(R.string.search));
 
-        searchFilter.setOnClickListener(v -> showFilterDialog());
+        if (!channelSearchMode) {
+            searchFilter.setOnClickListener(v -> showFilterDialog());
+        }
         searchSubmit.setOnClickListener(v -> search());
 
         searchEditText.setOnClickListener(v -> {
@@ -825,7 +870,8 @@ public class SearchFragment extends BaseListFragment<SearchInfo, ListExtractor.I
                 .switchMap(query -> {
                     // Only show remote suggestions if they are enabled in settings and
                     // the query length is at least THRESHOLD_NETWORK_SUGGESTION
-                    final boolean shallShowRemoteSuggestionsNow = showRemoteSuggestions
+                    final boolean shallShowRemoteSuggestionsNow = !channelSearchMode
+                            && showRemoteSuggestions
                             && query.length() >= THRESHOLD_NETWORK_SUGGESTION;
 
                     if (showLocalSuggestions && shallShowRemoteSuggestionsNow) {
@@ -887,21 +933,23 @@ public class SearchFragment extends BaseListFragment<SearchInfo, ListExtractor.I
             return;
         }
 
-        try {
-            final StreamingService streamingService = NewPipe.getServiceByUrl(theSearchString);
-            showLoading();
-            disposables.add(Observable
-                    .fromCallable(() -> NavigationHelper.getIntentByLink(activity,
-                            streamingService, theSearchString))
-                    .subscribeOn(Schedulers.io())
-                    .observeOn(AndroidSchedulers.mainThread())
-                    .subscribe(intent -> {
-                        getFM().popBackStackImmediate();
-                        activity.startActivity(intent);
-                    }, throwable -> showTextError(getString(R.string.unsupported_url))));
-            return;
-        } catch (final Exception ignored) {
-            // Exception occurred, it's not a url
+        if (!channelSearchMode) {
+            try {
+                final StreamingService streamingService = NewPipe.getServiceByUrl(theSearchString);
+                showLoading();
+                disposables.add(Observable
+                        .fromCallable(() -> NavigationHelper.getIntentByLink(activity,
+                                streamingService, theSearchString))
+                        .subscribeOn(Schedulers.io())
+                        .observeOn(AndroidSchedulers.mainThread())
+                        .subscribe(intent -> {
+                            getFM().popBackStackImmediate();
+                            activity.startActivity(intent);
+                        }, throwable -> showTextError(getString(R.string.unsupported_url))));
+                return;
+            } catch (final Exception ignored) {
+                // Exception occurred, it's not a url
+            }
         }
 
         lastSearchedString = this.searchString;
@@ -933,6 +981,20 @@ public class SearchFragment extends BaseListFragment<SearchInfo, ListExtractor.I
         }catch (Exception e){
             e.printStackTrace();
         }
+        if (channelSearchMode) {
+            try {
+                channelSearchHandler = getChannelSearchHandler();
+            } catch (final Exception e) {
+                onItemError(e);
+                return;
+            }
+            searchDisposable = ExtractorHelper.getChannelTab(serviceId, channelSearchHandler, true)
+                    .subscribeOn(Schedulers.io())
+                    .observeOn(AndroidSchedulers.mainThread())
+                    .doOnEvent((channelTabInfo, throwable) -> isLoading.set(false))
+                    .subscribe(this::handleChannelSearchResult, this::onItemError);
+            return;
+        }
         searchDisposable = ExtractorHelper.searchFor(serviceId,
                 searchString,
                 selectedContentFilter,
@@ -952,6 +1014,17 @@ public class SearchFragment extends BaseListFragment<SearchInfo, ListExtractor.I
         showListFooter(true);
         if (searchDisposable != null) {
             searchDisposable.dispose();
+        }
+        if (channelSearchMode) {
+            searchDisposable = ExtractorHelper.getMoreChannelTabItems(
+                    serviceId,
+                    channelSearchHandler,
+                    nextPage)
+                    .subscribeOn(Schedulers.io())
+                    .observeOn(AndroidSchedulers.mainThread())
+                    .doOnEvent((nextItemsResult, throwable) -> isLoading.set(false))
+                    .subscribe(this::handleNextItems, this::onItemError);
+            return;
         }
         searchDisposable = ExtractorHelper.getMoreSearchItems(
                 serviceId,
@@ -983,6 +1056,21 @@ public class SearchFragment extends BaseListFragment<SearchInfo, ListExtractor.I
         } else {
             showError(new ErrorInfo(exception, UserAction.SEARCHED, searchString, serviceId));
         }
+    }
+
+    private ListLinkHandler getChannelSearchHandler() throws Exception {
+        final StreamingService streamingService = NewPipe.getService(serviceId);
+        final String channelId = streamingService.getChannelLHFactory()
+                .fromUrl(channelUrl)
+                .getId();
+        final List<FilterItem> contentFilters = Collections.singletonList(
+                new FilterItem(Filter.ITEM_IDENTIFIER_UNKNOWN, ChannelTabs.SEARCH));
+        final ListLinkHandler searchHandler = streamingService.getChannelTabLHFactory()
+                .fromQuery(channelId, contentFilters, null);
+        final String searchUrl = searchHandler.getUrl()
+                + "?query=" + URLEncoder.encode(searchString, "UTF-8").replace("+", "%20");
+        return new ListLinkHandler(searchUrl, searchUrl, searchHandler.getId(),
+                searchHandler.getContentFilters(), searchHandler.getSortFilter());
     }
 
     /*//////////////////////////////////////////////////////////////////////////
@@ -1174,6 +1262,26 @@ public class SearchFragment extends BaseListFragment<SearchInfo, ListExtractor.I
     /*//////////////////////////////////////////////////////////////////////////
     // Search Results
     //////////////////////////////////////////////////////////////////////////*/
+
+    private void handleChannelSearchResult(@NonNull final ChannelTabInfo result) {
+        if (!result.getErrors().isEmpty()) {
+            showSnackBarError(new ErrorInfo(result.getErrors(), UserAction.SEARCHED,
+                    searchString, serviceId));
+        }
+
+        nextPage = result.getNextPage();
+        hideLoading();
+
+        if (infoListAdapter.getItemsList().isEmpty()) {
+            if (!result.getRelatedItems().isEmpty()) {
+                infoListAdapter.addInfoItemList(result.getRelatedItems());
+                showListFooter(hasMoreItems());
+            } else {
+                infoListAdapter.clearStreamItemList();
+                showEmptyState();
+            }
+        }
+    }
 
     @Override
     public void handleResult(@NonNull final SearchInfo result) {

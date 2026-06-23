@@ -27,6 +27,7 @@ import org.schabi.newpipe.error.UserAction;
 import org.schabi.newpipe.extractor.channel.ChannelInfo;
 import org.schabi.newpipe.extractor.exceptions.ContentNotSupportedException;
 import org.schabi.newpipe.extractor.linkhandler.ListLinkHandler;
+import org.schabi.newpipe.extractor.ServiceList;
 import org.schabi.newpipe.fragments.BaseStateFragment;
 import org.schabi.newpipe.fragments.detail.TabAdapter;
 import org.schabi.newpipe.local.feed.notifications.NotificationHelper;
@@ -65,6 +66,7 @@ public class ChannelFragment extends BaseStateFragment<ChannelInfo>
 
     private MenuItem menuRssButton;
     private MenuItem menuNotifyButton;
+    private MenuItem menuSearchButton;
 
     /*//////////////////////////////////////////////////////////////////////////
     // Views
@@ -177,7 +179,9 @@ public class ChannelFragment extends BaseStateFragment<ChannelInfo>
         }
         menuRssButton = menu.findItem(R.id.menu_item_rss);
         menuNotifyButton = menu.findItem(R.id.menu_item_notify);
+        menuSearchButton = menu.findItem(R.id.menu_item_search);
         updateRssButton();
+        updateSearchButton();
         monitorSubscription();
     }
 
@@ -193,6 +197,11 @@ public class ChannelFragment extends BaseStateFragment<ChannelInfo>
             if (currentInfo != null) {
                 ShareUtils.openUrlInBrowser(
                         requireContext(), currentInfo.getFeedUrl(), false);
+            }
+        } else if (item.getItemId() == R.id.menu_item_search) {
+            if (currentInfo != null) {
+                NavigationHelper.openChannelSearchFragment(getFM(),
+                        currentInfo.getServiceId(), currentInfo.getOriginalUrl(), name);
             }
         } else if (item.getItemId() == R.id.menu_item_openInBrowser) {
             if (currentInfo != null) {
@@ -212,6 +221,13 @@ public class ChannelFragment extends BaseStateFragment<ChannelInfo>
     private void updateRssButton() {
         if (currentInfo != null && menuRssButton != null) {
             menuRssButton.setVisible(!TextUtils.isEmpty(currentInfo.getFeedUrl()));
+        }
+    }
+
+    private void updateSearchButton() {
+        if (menuSearchButton != null) {
+            menuSearchButton.setVisible(currentInfo != null
+                    && currentInfo.getServiceId() == ServiceList.YouTube.getServiceId());
         }
     }
 
@@ -399,6 +415,7 @@ public class ChannelFragment extends BaseStateFragment<ChannelInfo>
 
         updateTabs();
         updateRssButton();
+        updateSearchButton();
         monitorSubscription();
     }
 }
