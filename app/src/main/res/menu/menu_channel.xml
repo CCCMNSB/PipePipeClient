@@ -12,14 +12,6 @@
         tools:visible="true" />
 
     <item
-        android:id="@+id/menu_item_rss"
-        android:icon="@drawable/ic_rss_feed"
-        android:title="@string/rss_button_title"
-        android:visible="false"
-        app:showAsAction="ifRoom"
-        tools:visible="true" />
-
-    <item
         android:id="@+id/menu_item_share"
         android:icon="@drawable/ic_share"
         android:title="@string/share"

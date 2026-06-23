@@ -64,7 +64,6 @@ public class ChannelFragment extends BaseStateFragment<ChannelInfo>
     private SubscriptionManager subscriptionManager;
     private int lastTab;
 
-    private MenuItem menuRssButton;
     private MenuItem menuNotifyButton;
     private MenuItem menuSearchButton;
 
@@ -177,10 +176,8 @@ public class ChannelFragment extends BaseStateFragment<ChannelInfo>
             Log.d(TAG, "onCreateOptionsMenu() called with: "
                     + "menu = [" + menu + "], inflater = [" + inflater + "]");
         }
-        menuRssButton = menu.findItem(R.id.menu_item_rss);
         menuNotifyButton = menu.findItem(R.id.menu_item_notify);
         menuSearchButton = menu.findItem(R.id.menu_item_search);
-        updateRssButton();
         updateSearchButton();
         monitorSubscription();
     }
@@ -193,11 +190,6 @@ public class ChannelFragment extends BaseStateFragment<ChannelInfo>
             setNotify(value);
         } else if (item.getItemId() == R.id.action_settings) {
             NavigationHelper.openSettings(requireContext());
-        } else if (item.getItemId() == R.id.menu_item_rss) {
-            if (currentInfo != null) {
-                ShareUtils.openUrlInBrowser(
-                        requireContext(), currentInfo.getFeedUrl(), false);
-            }
         } else if (item.getItemId() == R.id.menu_item_search) {
             if (currentInfo != null) {
                 NavigationHelper.openChannelSearchFragment(getFM(),
@@ -216,12 +208,6 @@ public class ChannelFragment extends BaseStateFragment<ChannelInfo>
             return super.onOptionsItemSelected(item);
         }
         return true;
-    }
-
-    private void updateRssButton() {
-        if (currentInfo != null && menuRssButton != null) {
-            menuRssButton.setVisible(!TextUtils.isEmpty(currentInfo.getFeedUrl()));
-        }
     }
 
     private void updateSearchButton() {
@@ -414,7 +400,6 @@ public class ChannelFragment extends BaseStateFragment<ChannelInfo>
         setInitialData(result.getServiceId(), result.getOriginalUrl(), result.getName());
 
         updateTabs();
-        updateRssButton();
         updateSearchButton();
         monitorSubscription();
     }
