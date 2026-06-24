@@ -941,4 +941,26 @@
 <string name="media_codec_workaround_hint_title">MediaCodec-Wiedergabe fehlgeschlagen</string>
 <string name="media_codec_async_workaround_hint">Dieser Fehler wird möglicherweise durch asynchrones MediaCodec-Queueing verursacht. Versuchen Sie, \"Asynchrones MediaCodec-Queueing deaktivieren\" in den ExoPlayer-Einstellungen zu aktivieren, und starten Sie die Wiedergabe anschließend neu.</string>
 <string name="media_codec_surface_workaround_hint">Dieser Fehler trat beim Ändern der Videoausgabeoberfläche auf. Versuchen Sie, \"Immer den Workaround für die Videoausgabe-Oberflächeneinstellung von ExoPlayer verwenden\" in den ExoPlayer-Einstellungen zu aktivieren, und starten Sie die Wiedergabe anschließend neu.</string>
+<string name="aspect_ratio_custom">Benutzerdefiniert…</string>
+<string name="aspect_ratio_custom_title">Benutzerdefiniertes Seitenverhältnis</string>
+<string name="aspect_ratio_custom_hint">z. B. 16:9 oder 1.78</string>
+<string name="aspect_ratio_invalid">Ungültiges Seitenverhältnis</string>
+<string name="past_hour">Letzte Stunde</string>
+<string name="past_day">Letzter Tag</string>
+<string name="past_week">Letzte Woche</string>
+<string name="past_month">Letzter Monat</string>
+<string name="past_year">Letztes Jahr</string>
+<string name="short_video">Kurz</string>
+<string name="medium_length">Mittel</string>
+<string name="long_video">Lang</string>
+<string name="extra_long">Extra lang</string>
+<string name="upload_date">Upload-Datum</string>
+<string name="duration">Dauer</string>
+<string name="license">Lizenz</string>
+<string name="published">Veröffentlicht</string>
+<string name="search_inside_channel">In %s suchen</string>
+<string name="show_auto_translated_subtitles_title">Automatisch übersetzte Untertitel anzeigen</string>
+<string name="show_auto_translated_subtitles_summary">Zeigt automatisch von YouTube übersetzte Untertitel an. Erfordert eine YouTube-Anmeldung.</string>
+<string name="show_auto_translated_subtitles_login_required_summary">Deaktiviert, da für automatisch übersetzte Untertitel eine YouTube-Anmeldung erforderlich ist.</string>
+<string name="auto_translated_subtitles_language_title">Untertitel automatisch übersetzen in</string>
 </resources>

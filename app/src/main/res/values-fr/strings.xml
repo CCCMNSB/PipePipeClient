@@ -958,4 +958,26 @@ Voulez-vous continuer?</string>
 <string name="media_codec_workaround_hint_title">La lecture MediaCodec a échoué</string>
 <string name="media_codec_async_workaround_hint">Cet échec peut être causé par la file d\'attente asynchrone de MediaCodec. Essayez d\'activer « Désactiver la file d\'attente asynchrone MediaCodec » dans les paramètres d\'ExoPlayer, puis redémarrez la lecture.</string>
 <string name="media_codec_surface_workaround_hint">Cet échec s\'est produit lors du changement de la surface de sortie vidéo. Essayez d\'activer « Toujours utiliser le contournement du paramètre de surface de sortie vidéo d\'ExoPlayer » dans les paramètres d\'ExoPlayer, puis redémarrez la lecture.</string>
+<string name="aspect_ratio_custom">Personnalisé…</string>
+<string name="aspect_ratio_custom_title">Format d\'image personnalisé</string>
+<string name="aspect_ratio_custom_hint">par ex. 16:9 ou 1.78</string>
+<string name="aspect_ratio_invalid">Format d\'image non valide</string>
+<string name="past_hour">Dernière heure</string>
+<string name="past_day">Dernier jour</string>
+<string name="past_week">Dernière semaine</string>
+<string name="past_month">Dernier mois</string>
+<string name="past_year">Dernière année</string>
+<string name="short_video">Court</string>
+<string name="medium_length">Moyen</string>
+<string name="long_video">Long</string>
+<string name="extra_long">Très long</string>
+<string name="upload_date">Date de mise en ligne</string>
+<string name="duration">Durée</string>
+<string name="license">Licence</string>
+<string name="published">Publié</string>
+<string name="search_inside_channel">Rechercher dans %s</string>
+<string name="show_auto_translated_subtitles_title">Afficher les sous-titres traduits automatiquement</string>
+<string name="show_auto_translated_subtitles_summary">Afficher les sous-titres YouTube traduits automatiquement. Nécessite une connexion YouTube.</string>
+<string name="show_auto_translated_subtitles_login_required_summary">Désactivé car la connexion YouTube est requise pour les sous-titres traduits automatiquement.</string>
+<string name="auto_translated_subtitles_language_title">Traduire automatiquement les sous-titres en</string>
 </resources>

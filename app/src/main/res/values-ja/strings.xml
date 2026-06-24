@@ -964,4 +964,26 @@
 <string name="media_codec_workaround_hint_title">MediaCodecの再生に失敗しました</string>
 <string name="media_codec_async_workaround_hint">このエラーはMediaCodecの非同期キューイングが原因である可能性があります。ExoPlayerの設定で「MediaCodecの非同期キューイングを無効にする」を有効にしてから、再生を再開してください。</string>
 <string name="media_codec_surface_workaround_hint">このエラーはビデオ出力サーフェスの変更中に発生しました。ExoPlayerの設定で「常にExoPlayerのビデオ出力サーフェス設定の回避策を使用する」を有効にしてから、再生を再開してください。</string>
+<string name="aspect_ratio_custom">カスタム…</string>
+<string name="aspect_ratio_custom_title">カスタムアスペクト比</string>
+<string name="aspect_ratio_custom_hint">例: 16:9 または 1.78</string>
+<string name="aspect_ratio_invalid">無効なアスペクト比</string>
+<string name="past_hour">1時間以内</string>
+<string name="past_day">1日以内</string>
+<string name="past_week">1週間以内</string>
+<string name="past_month">1か月以内</string>
+<string name="past_year">1年以内</string>
+<string name="short_video">短い</string>
+<string name="medium_length">中</string>
+<string name="long_video">長い</string>
+<string name="extra_long">非常に長い</string>
+<string name="upload_date">アップロード日</string>
+<string name="duration">再生時間</string>
+<string name="license">ライセンス</string>
+<string name="published">公開日</string>
+<string name="search_inside_channel">%s 内を検索</string>
+<string name="show_auto_translated_subtitles_title">自動翻訳字幕を表示</string>
+<string name="show_auto_translated_subtitles_summary">YouTubeの自動翻訳字幕を表示します。YouTubeへのログインが必要です。</string>
+<string name="show_auto_translated_subtitles_login_required_summary">自動翻訳字幕にはYouTubeへのログインが必要なため、無効化されています。</string>
+<string name="auto_translated_subtitles_language_title">字幕の自動翻訳先</string>
 </resources>

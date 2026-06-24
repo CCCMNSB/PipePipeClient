@@ -1008,4 +1008,13 @@
 <string name="media_codec_workaround_hint_title">MediaCodec 播放失敗</string>
 <string name="media_codec_async_workaround_hint">此失敗可能是由 MediaCodec 非同步佇列所引起。請嘗試在 ExoPlayer 設定中啟用「停用 MediaCodec 非同步佇列」，然後重新開始播放。</string>
 <string name="media_codec_surface_workaround_hint">此失敗發生於變更影片輸出介面時。請嘗試在 ExoPlayer 設定中啟用「一律使用 ExoPlayer 的影片輸出介面設定因應措施」，然後重新開始播放。</string>
+<string name="aspect_ratio_custom">自訂…</string>
+<string name="aspect_ratio_custom_title">自訂長寬比</string>
+<string name="aspect_ratio_custom_hint">例如：16:9 或 1.78</string>
+<string name="aspect_ratio_invalid">無效的長寬比</string>
+<string name="search_inside_channel">在 %s 中搜尋</string>
+<string name="show_auto_translated_subtitles_title">顯示自動翻譯字幕</string>
+<string name="show_auto_translated_subtitles_summary">顯示 YouTube 自動翻譯字幕。需要登入 YouTube。</string>
+<string name="show_auto_translated_subtitles_login_required_summary">已停用，因為自動翻譯字幕需要登入 YouTube。</string>
+<string name="auto_translated_subtitles_language_title">將字幕自動翻譯為</string>
 </resources>
