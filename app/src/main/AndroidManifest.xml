@@ -42,6 +42,10 @@
         <intent>
             <action android:name="android.media.browse.MediaBrowserService" />
         </intent>
+        <intent>
+            <action android:name="android.intent.action.SENDTO" />
+            <data android:scheme="mailto" />
+        </intent>
     </queries>
 
     <application
