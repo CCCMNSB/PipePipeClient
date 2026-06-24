@@ -37,6 +37,7 @@ import androidx.preference.PreferenceManager;
 import androidx.recyclerview.widget.ItemTouchHelper;
 import androidx.recyclerview.widget.RecyclerView;
 
+import org.schabi.newpipe.App;
 import org.schabi.newpipe.R;
 import org.schabi.newpipe.databinding.FragmentSearchBinding;
 import org.schabi.newpipe.error.ErrorInfo;
@@ -93,6 +94,11 @@ import io.reactivex.rxjava3.subjects.PublishSubject;
 public class SearchFragment extends BaseListFragment<SearchInfo, ListExtractor.InfoItemsPage<?>>
         implements BackPressable, SearchFilterLogic.Callback, SearchFilterDialog.Callback {
     private static final String YOUTUBE_MUSIC_FILTER_PREFIX = "music_";
+    private static final String SEARCH_FILTER_LAST_SERVICE_KEY = "search_filter_last_service";
+    private static final String SEARCH_FILTER_LAST_UI_SERVICE_KEY_PREFIX =
+            "search_filter_last_ui_service_";
+    private static final String SEARCH_FILTER_CONTENT_KEY_PREFIX = "search_filter_content_";
+    private static final String SEARCH_FILTER_SORT_KEY_PREFIX = "search_filter_sort_";
 
     /*//////////////////////////////////////////////////////////////////////////
     // Search
@@ -189,18 +195,57 @@ public class SearchFragment extends BaseListFragment<SearchInfo, ListExtractor.I
 
         try {
             StreamingService service = NewPipe.getService(serviceId);
+            searchFragment.service = service;
             defaultContentFilter.add(service.getSearchQHFactory().getFilterItem(0)); // 默认 "all"
         } catch (Exception e) {
             Log.e("Search", "Failed to initialize default filters", e);
         }
 
         searchFragment.setQuery(serviceId, searchString, defaultContentFilter, defaultSortFilter);
+        searchFragment.restorePersistedSearchFilters(PreferenceManager
+                .getDefaultSharedPreferences(App.getApp()));
+        searchFragment.restoreSelectedFilters();
 
         if (!TextUtils.isEmpty(searchString)) {
             searchFragment.setSearchOnResume();
         }
 
         return searchFragment;
+    }
+
+    public static int getPersistedSearchServiceId(final Context context,
+                                                  final int fallbackServiceId) {
+        final SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
+        final int serviceId = prefs.getInt(SEARCH_FILTER_LAST_SERVICE_KEY, fallbackServiceId);
+        try {
+            NewPipe.getService(serviceId);
+            return serviceId;
+        } catch (final Exception ignored) {
+            return fallbackServiceId;
+        }
+    }
+
+    public static void setPersistedSearchServiceId(final Context context, final int serviceId) {
+        try {
+            NewPipe.getService(serviceId);
+            PreferenceManager.getDefaultSharedPreferences(context).edit()
+                    .putInt(SEARCH_FILTER_LAST_SERVICE_KEY, serviceId)
+                    .apply();
+        } catch (final Exception ignored) {
+        }
+    }
+
+    public static int getPersistedSearchContentFilterId(final Context context,
+                                                        final int filterServiceId,
+                                                        final int fallbackFilterId) {
+        final SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
+        return prefs.getInt(getSearchFilterContentKey(filterServiceId), fallbackFilterId);
+    }
+
+    public static ArrayList<Integer> getPersistedSearchSortFilterIds(final Context context,
+                                                                     final int filterServiceId) {
+        final SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
+        return deserializeFilterIds(prefs.getString(getSearchFilterSortKey(filterServiceId), ""));
     }
 
     public static SearchFragment getChannelInstance(final int serviceId,
@@ -249,6 +294,7 @@ public class SearchFragment extends BaseListFragment<SearchInfo, ListExtractor.I
             searchFilterUi = new SearchFilterUI(this, getContext());
         }
         updateService();
+        restorePersistedSearchFilters();
         if (useOldSearchFilter && !channelSearchMode) {
             searchFilterUi.restorePreviouslySelectedFilters(
                     userSelectedContentFilterList,
@@ -1084,6 +1130,10 @@ public class SearchFragment extends BaseListFragment<SearchInfo, ListExtractor.I
 
         selectedContentFilter = (ArrayList<FilterItem>) theSelectedContentFilter;
         selectedSortFilter = (ArrayList<FilterItem>) theSelectedSortFilter;
+        if (!isInit) {
+            savePersistedSearchFilters(getCurrentSearchFilterUiServiceId(),
+                    getFilterIds(selectedContentFilter), getFilterIds(selectedSortFilter));
+        }
     }
 
     @Override
@@ -1103,6 +1153,8 @@ public class SearchFragment extends BaseListFragment<SearchInfo, ListExtractor.I
         userSelectedContentFilterList = new ArrayList<>();
         userSelectedContentFilterList.add(contentFilterId);
         userSelectedSortFilterList = sortFilterIds;
+        savePersistedSearchFilters(selectedServiceId,
+                userSelectedContentFilterList, userSelectedSortFilterList);
         restoreSelectedFilters();
 
         if (serviceChanged || !TextUtils.isEmpty(currentQuery)) {
@@ -1165,6 +1217,110 @@ public class SearchFragment extends BaseListFragment<SearchInfo, ListExtractor.I
 
         selectedContentFilter = restoredContentFilters;
         selectedSortFilter = restoredSortFilters;
+    }
+
+    private void restorePersistedSearchFilters() {
+        if (channelSearchMode || activity == null) {
+            return;
+        }
+
+        restorePersistedSearchFilters(PreferenceManager.getDefaultSharedPreferences(activity));
+    }
+
+    private void restorePersistedSearchFilters(final SharedPreferences prefs) {
+        if (userSelectedContentFilterList != null || userSelectedSortFilterList != null) {
+            return;
+        }
+
+        final int filterServiceId = getPersistedSearchFilterUiServiceId(prefs);
+        final String contentKey = getSearchFilterContentKey(filterServiceId);
+        if (!prefs.contains(contentKey)) {
+            return;
+        }
+
+        userSelectedContentFilterList = new ArrayList<>();
+        userSelectedContentFilterList.add(prefs.getInt(contentKey, 0));
+        userSelectedSortFilterList = deserializeFilterIds(
+                prefs.getString(getSearchFilterSortKey(filterServiceId), ""));
+    }
+
+    private int getPersistedSearchFilterUiServiceId(final SharedPreferences prefs) {
+        int filterServiceId = prefs.getInt(
+                SEARCH_FILTER_LAST_UI_SERVICE_KEY_PREFIX + serviceId, serviceId);
+        if (serviceId != ServiceList.YouTube.getServiceId()
+                && filterServiceId == SearchFilterDialog.YOUTUBE_MUSIC_SERVICE_ID) {
+            filterServiceId = serviceId;
+        }
+        return filterServiceId;
+    }
+
+    private void savePersistedSearchFilters(final int filterServiceId,
+                                            final ArrayList<Integer> contentFilterIds,
+                                            final ArrayList<Integer> sortFilterIds) {
+        if (channelSearchMode || activity == null || contentFilterIds == null
+                || contentFilterIds.isEmpty()) {
+            return;
+        }
+
+        final int resolvedServiceId = filterServiceId == SearchFilterDialog.YOUTUBE_MUSIC_SERVICE_ID
+                ? ServiceList.YouTube.getServiceId()
+                : filterServiceId;
+        final SharedPreferences.Editor editor = PreferenceManager.getDefaultSharedPreferences(
+                activity).edit();
+        editor.putInt(SEARCH_FILTER_LAST_SERVICE_KEY, resolvedServiceId);
+        editor.putInt(SEARCH_FILTER_LAST_UI_SERVICE_KEY_PREFIX + resolvedServiceId,
+                filterServiceId);
+        editor.putInt(getSearchFilterContentKey(filterServiceId), contentFilterIds.get(0));
+        editor.putString(getSearchFilterSortKey(filterServiceId), serializeFilterIds(sortFilterIds));
+        editor.apply();
+    }
+
+    private int getCurrentSearchFilterUiServiceId() {
+        return shouldUseYoutubeMusicUiService()
+                ? SearchFilterDialog.YOUTUBE_MUSIC_SERVICE_ID
+                : serviceId;
+    }
+
+    private static String getSearchFilterContentKey(final int filterServiceId) {
+        return SEARCH_FILTER_CONTENT_KEY_PREFIX + filterServiceId;
+    }
+
+    private static String getSearchFilterSortKey(final int filterServiceId) {
+        return SEARCH_FILTER_SORT_KEY_PREFIX + filterServiceId;
+    }
+
+    private ArrayList<Integer> getFilterIds(final List<FilterItem> filterItems) {
+        final ArrayList<Integer> filterIds = new ArrayList<>();
+        if (filterItems != null) {
+            for (final FilterItem filterItem : filterItems) {
+                filterIds.add(filterItem.getIdentifier());
+            }
+        }
+        return filterIds;
+    }
+
+    private String serializeFilterIds(final List<Integer> filterIds) {
+        if (filterIds == null || filterIds.isEmpty()) {
+            return "";
+        }
+        return filterIds.stream()
+                .map(String::valueOf)
+                .collect(Collectors.joining(","));
+    }
+
+    private static ArrayList<Integer> deserializeFilterIds(final String serializedFilterIds) {
+        final ArrayList<Integer> filterIds = new ArrayList<>();
+        if (TextUtils.isEmpty(serializedFilterIds)) {
+            return filterIds;
+        }
+
+        for (final String filterId : serializedFilterIds.split(",")) {
+            try {
+                filterIds.add(Integer.parseInt(filterId));
+            } catch (final NumberFormatException ignored) {
+            }
+        }
+        return filterIds;
     }
 
     private void showFilterDialog() {
