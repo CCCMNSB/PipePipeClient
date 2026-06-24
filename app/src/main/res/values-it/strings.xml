@@ -74,9 +74,6 @@
 <string name="seek_duration_title">Durata ricerca veloce</string>
 <string name="progressive_load_interval_title">Dimensione intervallo di caricamento riproduzione</string>
 <string name="progressive_load_interval_summary">Modifica la dimensione dell\'intervallo di caricamento (attualmente %s). Un valore più basso può accelerare il caricamento iniziale del video. Le modifiche richiedono un riavvio del lettore</string>
-<string name="clear_queue_confirmation_title">Chiedere conferma prima di cancellare una coda</string>
-<string name="clear_queue_confirmation_summary">Passando da un lettore a un altro è possibile che la tua coda venga sostituita</string>
-<string name="clear_queue_confirmation_description">La coda del lettore attivo sarà sostituita</string>
 <string name="download_thumbnail_title">Carica miniature</string>
 <string name="download_thumbnail_summary">Disattiva per evitare di caricare le miniature, risparmiando dati e utilizzo di memoria. Le modifiche cancellano sia la cache delle immagini in memoria che su disco</string>
 <string name="show_meta_info_title">Mostra informazioni meta</string>

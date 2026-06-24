@@ -74,9 +74,6 @@
 <string name="seek_duration_title">Durée d\'avance rapide/retour rapide</string>
 <string name="progressive_load_interval_title">Taille de l\'intervalle de chargement de la lecture</string>
 <string name="progressive_load_interval_summary">Modifier la taille de l\'intervalle de chargement (actuellement %s). Une valeur inférieure peut accélérer le chargement initial de la vidéo. Les modifications nécessitent un redémarrage du lecteur</string>
-<string name="clear_queue_confirmation_title">Demander confirmation avant de vider une file d\'attente</string>
-<string name="clear_queue_confirmation_summary">Passer d\'un lecteur à un autre peut remplacer votre file d\'attente</string>
-<string name="clear_queue_confirmation_description">La file d\'attente du lecteur actif sera remplacée</string>
 <string name="download_thumbnail_title">Charger les miniatures</string>
 <string name="download_thumbnail_summary">Désactiver pour éviter le chargement de miniatures, en économisant des données et de l\'utilisation mémoire. Les modifications effacent le cache d\'image en mémoire et sur disque</string>
 <string name="show_meta_info_title">Afficher les informations méta</string>

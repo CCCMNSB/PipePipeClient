@@ -74,9 +74,6 @@
 <string name="seek_duration_title">Thời lượng tua nhanh tới/lui</string>
 <string name="progressive_load_interval_title">Kích thước khoảng thời gian tải phát lại</string>
 <string name="progressive_load_interval_summary">Thay đổi kích thước khoảng thời gian tải (hiện tại là %s). Giá trị thấp hơn có thể tăng tốc độ tải băng hình ban đầu. Các thay đổi yêu cầu trình phát khởi động lại</string>
-<string name="clear_queue_confirmation_title">Yêu cầu xác nhận trước khi xóa hàng chờ</string>
-<string name="clear_queue_confirmation_summary">Chuyển từ trình phát này sang trình phát khác có thể thay thế hàng chờ của bạn</string>
-<string name="clear_queue_confirmation_description">Hàng chờ trình phát đang hoạt động sẽ được thay thế</string>
 <string name="download_thumbnail_title">Tải hình thu nhỏ</string>
 <string name="download_thumbnail_summary">Tắt để tránh tải hình thu nhỏ, tiết kiệm dữ liệu và sử dụng bộ nhớ. Các thay đổi sẽ xóa cả bộ nhớ đệm hình ảnh trong bộ nhớ và trên đĩa</string>
 <string name="show_meta_info_title">Hiển thị siêu dữ liệu</string>

@@ -74,9 +74,6 @@
 <string name="seek_duration_title">Duración de avance/retroceso rápido</string>
 <string name="progressive_load_interval_title">Tamaño del intervalo de carga de reproducción</string>
 <string name="progressive_load_interval_summary">Cambiar el tamaño del intervalo de carga (actualmente %s). Un valor menor puede acelerar la carga inicial del vídeo. Los cambios requieren un reinicio del reproductor</string>
-<string name="clear_queue_confirmation_title">Pedir confirmación antes de vaciar una cola</string>
-<string name="clear_queue_confirmation_summary">Cambiar de un reproductor a otro puede reemplazar tu cola</string>
-<string name="clear_queue_confirmation_description">La cola activa del reproductor será reemplazada</string>
 <string name="download_thumbnail_title">Cargar miniaturas</string>
 <string name="download_thumbnail_summary">Desactivar para evitar cargar miniaturas, ahorrando uso de datos y memoria. Los cambios borran la memoria caché de imágenes tanto en la memoria como en el disco</string>
 <string name="show_meta_info_title">Mostrar información meta</string>

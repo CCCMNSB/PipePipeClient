@@ -72,9 +72,6 @@
 <string name="seek_duration_title">快进/快退定位单位时间</string>
 <string name="progressive_load_interval_title">播放加载间隔大小</string>
 <string name="progressive_load_interval_summary">更改加载间隔大小（当前为 %s）。较低的值可能会加快初始视频加载速度。更改需要重启播放器</string>
-<string name="clear_queue_confirmation_title">清空队列前要求确认</string>
-<string name="clear_queue_confirmation_summary">从一个播放器切换到另一个播放器可能会替换您的队列</string>
-<string name="clear_queue_confirmation_description">当前播放器队列将被替换</string>
 <string name="download_thumbnail_title">加载缩略图</string>
 <string name="download_thumbnail_summary">关闭以防止加载缩略图、保存数据和内存占用。更改会清除内存中和磁盘上的图像缓存</string>
 <string name="show_meta_info_title">显示元数据</string>

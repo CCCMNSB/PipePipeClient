@@ -74,9 +74,6 @@
 <string name="seek_duration_title">Dauer des schnellen Vor-/-Zurückspulens</string>
 <string name="progressive_load_interval_title">Intervallgröße des Ladevorgangs</string>
 <string name="progressive_load_interval_summary">Ändern Sie die Größe des Ladeintervalls (derzeit %s). Ein niedrigerer Wert kann das initiale Laden des Videos beschleunigen. Änderungen erfordern einen Neustart des Players</string>
-<string name="clear_queue_confirmation_title">Bestätigung zum Löschen einer Warteschlange anfordern</string>
-<string name="clear_queue_confirmation_summary">Das Wechseln von einem Player zum nächsten könnte Ihre Warteschlange ersetzen</string>
-<string name="clear_queue_confirmation_description">Die aktive Player-Warteschlange wird ersetzt</string>
 <string name="download_thumbnail_title">Miniaturbilder laden</string>
 <string name="download_thumbnail_summary">Deaktivieren, um das Laden von Miniaturbildern zu verhindern, und somit Daten- und Speichernutzung zu sparen. Änderungen leeren sowohl den im Speicher als auch auf der Festplatte gespeicherten Bildcache</string>
 <string name="show_meta_info_title">Meta-Informationen anzeigen</string>
