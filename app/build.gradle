@@ -21,7 +21,7 @@ android {
         //noinspection OldTargetApi,ExpiredTargetSdkVersion
         targetSdk 36
         versionCode 1100
-        versionName "5.2.0-beta4"
+        versionName "5.2.0-beta5"
         multiDexEnabled true
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
