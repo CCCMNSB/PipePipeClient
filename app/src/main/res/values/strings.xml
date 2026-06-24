@@ -1062,4 +1062,8 @@
 <string name="media_codec_async_workaround_hint">This failure may be caused by MediaCodec asynchronous queueing. Try enabling \"Disable MediaCodec asynchronous queueing\" in ExoPlayer settings, then restart playback.</string>
 <string name="media_codec_surface_workaround_hint">This failure happened while changing the video output surface. Try enabling \"Always use ExoPlayer\'s video output surface setting workaround\" in ExoPlayer settings, then restart playback.</string>
 <string name="search_inside_channel">Search inside %s</string>
+<string name="show_auto_translated_subtitles_title">Show auto-translated subtitles</string>
+<string name="show_auto_translated_subtitles_summary">Show YouTube auto-translated subtitles. Requires YouTube login.</string>
+<string name="show_auto_translated_subtitles_login_required_summary">Disabled because YouTube login is required for auto-translated subtitles.</string>
+<string name="auto_translated_subtitles_language_title">Auto-translate subtitles to</string>
 </resources>
