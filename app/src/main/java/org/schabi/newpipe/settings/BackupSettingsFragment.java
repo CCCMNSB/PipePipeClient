@@ -50,6 +50,9 @@ public class BackupSettingsFragment extends BasePreferenceFragment {
             registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), this::requestImportPathResult);
     private final ActivityResultLauncher<Intent> requestExportPathLauncher =
             registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), this::requestExportPathResult);
+    private final ActivityResultLauncher<Intent> requestNewPipeExportPathLauncher =
+            registerForActivityResult(new ActivityResultContracts.StartActivityForResult(),
+                    this::requestNewPipeExportPathResult);
 
     @Override
     public void onCreatePreferences(final Bundle savedInstanceState, final String rootKey) {
@@ -81,6 +84,21 @@ public class BackupSettingsFragment extends BasePreferenceFragment {
                     requestExportPathLauncher,
                     StoredFileHelper.getNewPicker(requireContext(),
                             "PipePipeData-" + exportDateFormat.format(new Date()) + ".zip",
+                            ZIP_MIME_TYPE, getImportExportDataUri()),
+                    TAG,
+                    getContext()
+            );
+
+            return true;
+        });
+
+        final Preference exportDataToNewPipePreference =
+                requirePreference(R.string.export_data_to_newpipe_key);
+        exportDataToNewPipePreference.setOnPreferenceClickListener((final Preference p) -> {
+            NoFileManagerSafeGuard.launchSafe(
+                    requestNewPipeExportPathLauncher,
+                    StoredFileHelper.getNewPicker(requireContext(),
+                            "NewPipeData-" + exportDateFormat.format(new Date()) + ".zip",
                             ZIP_MIME_TYPE, getImportExportDataUri()),
                     TAG,
                     getContext()
@@ -129,6 +147,18 @@ public class BackupSettingsFragment extends BasePreferenceFragment {
         }
     }
 
+    private void requestNewPipeExportPathResult(final ActivityResult result) {
+        assureCorrectAppLanguage(getContext());
+        if (result.getResultCode() == Activity.RESULT_OK && result.getData() != null) {
+            final Uri lastExportDataUri = result.getData().getData();
+
+            final StoredFileHelper file
+                    = new StoredFileHelper(getContext(), lastExportDataUri, ZIP_MIME_TYPE);
+
+            exportDatabaseToNewPipe(file, lastExportDataUri);
+        }
+    }
+
     private void exportDatabase(final StoredFileHelper file, final Uri exportDataUri) {
         try {
             //checkpoint before export
@@ -142,6 +172,21 @@ public class BackupSettingsFragment extends BasePreferenceFragment {
             Toast.makeText(getContext(), R.string.export_complete_toast, Toast.LENGTH_SHORT).show();
         } catch (final Exception e) {
             ErrorUtil.showUiErrorSnackbar(this, "Exporting database", e);
+        }
+    }
+
+    private void exportDatabaseToNewPipe(final StoredFileHelper file, final Uri exportDataUri) {
+        try {
+            NewPipeDatabase.checkpoint();
+
+            final SharedPreferences preferences = PreferenceManager
+                    .getDefaultSharedPreferences(requireContext());
+            manager.exportDatabaseToNewPipe(preferences, file);
+
+            saveLastImportExportDataUri(exportDataUri);
+            Toast.makeText(getContext(), R.string.export_complete_toast, Toast.LENGTH_SHORT).show();
+        } catch (final Exception e) {
+            ErrorUtil.showUiErrorSnackbar(this, "Exporting database to NewPipe", e);
         }
     }
 

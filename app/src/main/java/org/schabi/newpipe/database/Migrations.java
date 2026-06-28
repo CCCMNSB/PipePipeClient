@@ -407,9 +407,10 @@ public final class Migrations {
                     + "`display_index` INTEGER NOT NULL DEFAULT 0,"
                     + "`stream_count` INTEGER)");
             database.execSQL("INSERT INTO `remote_playlists_tmp` (`uid`, `service_id`, "
-                    + "`name`, `url`, `thumbnail_url`, `uploader`, `stream_count`)"
+                    + "`name`, `url`, `thumbnail_url`, `uploader`, `display_index`, "
+                    + "`stream_count`)"
                     + "SELECT `uid`, `service_id`, `name`, `url`, `thumbnail_url`, `uploader`, "
-                    + "`stream_count` FROM `remote_playlists`");
+                    + "`display_index`, `stream_count` FROM `remote_playlists`");
 
             database.execSQL("DROP TABLE `remote_playlists`");
             database.execSQL("ALTER TABLE `remote_playlists_tmp` RENAME TO `remote_playlists`");
@@ -417,6 +418,12 @@ public final class Migrations {
                     + "ON `remote_playlists` (`name`)");
             database.execSQL("CREATE UNIQUE INDEX `index_remote_playlists_service_id_url` "
                     + "ON `remote_playlists` (`service_id`, `url`)");
+            if (tableExists(database, "pipepipe_backup_metadata")) {
+                database.execSQL("UPDATE playlists SET thumbnail_url = "
+                        + "(SELECT value FROM pipepipe_backup_metadata "
+                        + "WHERE entity = 'playlist_thumbnail' "
+                        + "AND uid = playlists.uid)");
+            }
         }
     };
 
@@ -424,9 +431,23 @@ public final class Migrations {
         @Override
         public void migrate(@NonNull final SupportSQLiteDatabase database) {
             database.execSQL("ALTER TABLE streams ADD COLUMN is_paid INTEGER NOT NULL DEFAULT 0");
+            if (tableExists(database, "pipepipe_backup_metadata")) {
+                database.execSQL("UPDATE streams SET is_paid = 1 WHERE uid IN "
+                        + "(SELECT uid FROM pipepipe_backup_metadata "
+                        + "WHERE entity = 'stream_is_paid')");
+                database.execSQL("DROP TABLE pipepipe_backup_metadata");
+            }
         }
     };
 
+    private static boolean tableExists(@NonNull final SupportSQLiteDatabase database,
+                                       @NonNull final String tableName) {
+        try (android.database.Cursor cursor = database.query(
+                "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?",
+                new Object[]{tableName})) {
+            return cursor.moveToFirst();
+        }
+    }
 
     private Migrations() {
     }

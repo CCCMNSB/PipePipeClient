@@ -1029,4 +1029,7 @@
 <string name="auto_translated_subtitles_language_title">将字幕自动翻译为</string>
 <string name="force_sabr_title">强制 SABR</string>
 <string name="force_sabr_summary">通过 SABR 流水线而不是 DASH/HLS 路由所有 YouTube 视频。实验性功能：可能会导致某些设备或视频播放失败</string>
+<string name="export_data_to_newpipe_title">导出到 NewPipe</string>
+<string name="export_data_to_newpipe_summary">以兼容 NewPipe 的格式导出备份</string>
+<string name="settings_category_other_platforms_title">其他平台</string>
 </resources>

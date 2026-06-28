@@ -1769,4 +1769,5 @@
         <item>id</item>
         <item>ar</item>
     </string-array>
+    <string name="export_data_to_newpipe_key">export_data_to_newpipe</string>
 </resources>

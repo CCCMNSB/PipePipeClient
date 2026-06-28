@@ -1065,4 +1065,7 @@
 <string name="show_auto_translated_subtitles_summary">Show YouTube auto-translated subtitles. Requires YouTube login.</string>
 <string name="show_auto_translated_subtitles_login_required_summary">Disabled because YouTube login is required for auto-translated subtitles.</string>
 <string name="auto_translated_subtitles_language_title">Auto-translate subtitles to</string>
+<string name="export_data_to_newpipe_title">Export to NewPipe</string>
+<string name="export_data_to_newpipe_summary">Export backup in a NewPipe-compatible format</string>
+<string name="settings_category_other_platforms_title">Other platforms</string>
 </resources>

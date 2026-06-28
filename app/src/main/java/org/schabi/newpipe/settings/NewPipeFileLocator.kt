@@ -17,5 +17,7 @@ class NewPipeFileLocator(private val homeDir: File) {
 
     val dbWal by lazy { File(homeDir, "/databases/newpipe.db-wal") }
 
-    val settings by lazy { File(homeDir, "/databases/newpipe.settings") }
+    val newPipeDb by lazy { File(homeDir, "/databases/newpipe-export.db") }
+
+    val settings by lazy { File(homeDir, "/databases/preferences.json") }
 }
