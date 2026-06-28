@@ -862,14 +862,12 @@ PipePipe предлагает две стратегии загрузки лен�
     <string name="remove_duplicates_popup_warning">Дубликаты видео в плейлисте будут удалены.
 
 Вы уверены? Это действие нельзя отменить!</string>
-    <string name="channel_tab_videos">Видео</string>
     <string name="channel_tab_tracks">Треки</string>
     <string name="channel_tab_livestreams">Стримы</string>
     <string name="channel_tab_shorts">Shorts</string>
     <string name="channel_tab_playlists">Подборки</string>
     <string name="channel_tab_channels">Каналы</string>
     <string name="channel_tab_albums">Альбомы</string>
-    <string name="channel_tab_info">О канале</string>
     <string name="show_channel_tabs">Вкладки канала</string>
     <string name="show_channel_tabs_summary">Какие вкладки будут отображаться на страницах каналов</string>
     <string name="image_quality_none">Не загружать изображения</string>
