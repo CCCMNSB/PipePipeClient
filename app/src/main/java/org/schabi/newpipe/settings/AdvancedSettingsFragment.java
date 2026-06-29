@@ -54,6 +54,19 @@ public class AdvancedSettingsFragment extends BasePreferenceFragment implements 
                     return true;
                 });
 
+        findPreference(getString(R.string.use_dns_over_https_fallback_key))
+                .setOnPreferenceChangeListener((preference, newValue) -> {
+                    defaultPreferences.edit()
+                            .putBoolean(getString(R.string.use_dns_over_https_fallback_key),
+                                    (Boolean) newValue)
+                            .commit();
+                    final Activity activity = getActivity();
+                    if (activity != null) {
+                        NavigationHelper.restartApp(activity);
+                    }
+                    return true;
+                });
+
         if (DeviceUtils.isTv(getContext())) {
             findPreference(getString(R.string.use_old_search_filter_key)).setVisible(false);
         }

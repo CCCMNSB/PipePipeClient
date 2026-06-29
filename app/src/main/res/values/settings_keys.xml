@@ -1770,4 +1770,5 @@
         <item>ar</item>
     </string-array>
     <string name="export_data_to_newpipe_key">export_data_to_newpipe</string>
+    <string name="use_dns_over_https_fallback_key">use_dns_over_https_fallback</string>
 </resources>

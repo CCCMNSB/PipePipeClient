@@ -1068,4 +1068,6 @@
 <string name="export_data_to_newpipe_title">Export to NewPipe</string>
 <string name="export_data_to_newpipe_summary">Export backup in a NewPipe-compatible format</string>
 <string name="settings_category_other_platforms_title">Other platforms</string>
+<string name="use_dns_over_https_fallback_title">Use DNS over HTTPS fallback</string>
+<string name="use_dns_over_https_fallback_summary">Retry failed system DNS lookups using Cloudflare DNS over HTTPS. Changing this will restart the app.</string>
 </resources>
