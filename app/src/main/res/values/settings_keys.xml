@@ -1775,11 +1775,11 @@
     <string-array name="youtube_player_client_entries">
         <item>MWEB</item>
         <item>WEB Safari</item>
-        <item>WEB</item>
+<!--        <item>WEB</item>-->
     </string-array>
     <string-array name="youtube_player_client_values">
         <item>mweb</item>
         <item>web_safari</item>
-        <item>web</item>
+<!--        <item>web</item>-->
     </string-array>
 </resources>
