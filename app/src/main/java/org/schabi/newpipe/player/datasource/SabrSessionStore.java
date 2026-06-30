@@ -15,7 +15,9 @@ import org.schabi.newpipe.extractor.services.youtube.sabr.YoutubeSabrInfo;
 import org.schabi.newpipe.extractor.services.youtube.sabr.YoutubeSabrSession;
 
 import java.io.IOException;
+import java.util.Collections;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -76,7 +78,12 @@ public final class SabrSessionStore {
         // and eviction run on: it never goes stale (a stalled reader sits on its last segment, so the
         // pump sees edge ~= readerHead and keeps feeding instead of pacing off a frozen play head).
         private final Map<Integer, Long> readerPositions = new ConcurrentHashMap<>();
+        // Tracks currently selected by ExoPlayer. Background/audio-only playback disables the video
+        // renderer, so requiring a video reader position there pins the SABR cache at the beginning.
+        private final Set<Integer> activeReaderItags =
+                Collections.newSetFromMap(new ConcurrentHashMap<Integer, Boolean>());
         private volatile SabrStreamPump pump;
+        private volatile Thread warmThread;
 
         Holder(@NonNull final String videoId,
                @NonNull final YoutubeSabrInfo info,
@@ -103,29 +110,47 @@ public final class SabrSessionStore {
             readerPositions.put(itag, ms);
         }
 
-        /** Furthest-read track: the pump keeps the buffered edge a cushion ahead of THIS. */
+        void setActiveTracks(final boolean videoActive, final boolean audioActive) {
+            setTrackActive(videoFormat.getItag(), videoActive);
+            setTrackActive(audioFormat.getItag(), audioActive);
+        }
+
+        private void setTrackActive(final int itag, final boolean active) {
+            if (active) {
+                activeReaderItags.add(itag);
+            } else {
+                activeReaderItags.remove(itag);
+                readerPositions.remove(itag);
+            }
+        }
+
+        /** Furthest-read selected track: the pump keeps the buffered edge a cushion ahead of THIS. */
         public long getReaderHeadMs() {
             long head = 0;
-            final Long a = readerPositions.get(audioFormat.getItag());
-            final Long v = readerPositions.get(videoFormat.getItag());
-            if (a != null) {
-                head = Math.max(head, a);
-            }
-            if (v != null) {
-                head = Math.max(head, v);
+            for (final int itag : activeReaderItags) {
+                final Long position = readerPositions.get(itag);
+                if (position != null) {
+                    head = Math.max(head, position);
+                }
             }
             return head;
         }
 
-        /** Slowest-read track: nothing before this is needed any more, so eviction starts here. Zero
-         * until BOTH tracks have read something (else we'd evict the other track's unread segments). */
+        /** Slowest-read selected track: nothing before this is needed any more, so eviction starts here.
+         * Zero until every selected track has read something (else we'd evict unread segments). */
         public long getReaderTailMs() {
-            final Long a = readerPositions.get(audioFormat.getItag());
-            final Long v = readerPositions.get(videoFormat.getItag());
-            if (a == null || v == null) {
+            if (activeReaderItags.isEmpty()) {
                 return 0;
             }
-            return Math.min(a, v);
+            long tail = Long.MAX_VALUE;
+            for (final int itag : activeReaderItags) {
+                final Long position = readerPositions.get(itag);
+                if (position == null) {
+                    return 0;
+                }
+                tail = Math.min(tail, position);
+            }
+            return tail == Long.MAX_VALUE ? 0 : tail;
         }
 
         /** Lazily create the single background pump that feeds both data sources for this video. */
@@ -134,6 +159,28 @@ public final class SabrSessionStore {
                 pump = new SabrStreamPump(session, this, localization);
             }
             return pump;
+        }
+
+        void setWarmThread(@NonNull final Thread warmThread) {
+            this.warmThread = warmThread;
+        }
+
+        void clearWarmThread(final Thread thread) {
+            if (warmThread == thread) {
+                warmThread = null;
+            }
+        }
+
+        void stop() {
+            setActiveTracks(false, false);
+            final Thread warm = warmThread;
+            if (warm != null && warm != Thread.currentThread()) {
+                warm.interrupt();
+            }
+            final SabrStreamPump streamPump = pump;
+            if (streamPump != null) {
+                streamPump.stop();
+            }
         }
 
         boolean isBeyondEnd(@NonNull final SabrSegmentRequest request) {
@@ -235,30 +282,38 @@ public final class SabrSessionStore {
                 }
             }
             // Pre-warm the PO token off-thread so the ~45s WebView mint overlaps the initial probe
-            // and buffering instead of stalling the pump on its first protected response.
+            // and buffering instead of stalling the pump on its first protected response. Keep the
+            // init preload off this creation path too: it is best-effort and can wait on the same
+            // protected request, so doing it synchronously lets playback teardown cancel source
+            // resolution before a MediaSource is returned.
+            final boolean preloadInit = preferredAudioTrackId != null || provider.hasCachedToken(videoId);
             final Thread warm = new Thread(() -> {
                 try {
+                    if (Thread.currentThread().isInterrupted() || !isCurrentHolder(videoId, holder)) {
+                        return;
+                    }
                     provider.getPoToken(info, session.getStreamState());
+                    if (Thread.currentThread().isInterrupted() || !isCurrentHolder(videoId, holder)) {
+                        return;
+                    }
+                    // Pre-load init metadata when a seek will follow (audio switch, or cold-restore:
+                    // a cached token means we played this recently). Else the seek maps with the
+                    // default 5000ms segment duration -> audio UnexpectedDiscontinuityException.
+                    if (preloadInit) {
+                        session.fetchSegment(SabrSegmentRequest.initialization(audioFormat),
+                                localization);
+                        session.fetchSegment(SabrSegmentRequest.initialization(videoFormat),
+                                localization);
+                    }
                 } catch (final Exception ignored) {
-                    // Best-effort; the pump mints on demand if this fails.
+                    // Best-effort; the pump mints/fetches on demand if this fails.
+                } finally {
+                    holder.clearWarmThread(Thread.currentThread());
                 }
             }, "SabrTokenPrewarm");
             warm.setDaemon(true);
+            holder.setWarmThread(warm);
             warm.start();
-            // Pre-load init metadata when a seek will follow (audio switch, or cold-restore: a
-            // cached token means we played this recently). Else the seek maps with the default
-            // 5000ms segment duration -> audio UnexpectedDiscontinuityException. The token gate keeps
-            // the first play (starts at 0) off the ~45s mint.
-            if (preferredAudioTrackId != null || provider.hasCachedToken(videoId)) {
-                try {
-                    session.fetchSegment(SabrSegmentRequest.initialization(audioFormat),
-                            localization);
-                    session.fetchSegment(SabrSegmentRequest.initialization(videoFormat),
-                            localization);
-                } catch (final Exception ignored) {
-                    // Best-effort; on failure the seek falls back to the previous behaviour.
-                }
-            }
             return holder;
         }
     }
@@ -358,9 +413,18 @@ public final class SabrSessionStore {
 
     /** Evict a cached session, stopping its pump so the thread + buffers are released. */
     public static void evict(@NonNull final String videoId) {
-        final Holder holder = SESSIONS.remove(videoId);
-        if (holder != null && holder.pump != null) {
-            holder.pump.stop();
+        final Holder holder;
+        synchronized (SabrSessionStore.class) {
+            holder = SESSIONS.remove(videoId);
+            ORDER.remove(videoId);
         }
+        if (holder != null) {
+            holder.stop();
+        }
+    }
+
+    private static boolean isCurrentHolder(@NonNull final String videoId,
+                                           @NonNull final Holder holder) {
+        return SESSIONS.get(videoId) == holder;
     }
 }
