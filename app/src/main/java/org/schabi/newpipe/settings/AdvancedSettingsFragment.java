@@ -110,6 +110,8 @@ public class AdvancedSettingsFragment extends BasePreferenceFragment implements 
             ServiceHelper.initServices(this.getContext());
         } else if (key.equals(getString(R.string.force_sabr_key))) {
             NewPipe.setForceSabr(sharedPreferences.getBoolean(key, false));
+        } else if (key.equals(getString(R.string.youtube_player_client_key))) {
+            NewPipe.setYoutubePlayerClient(sharedPreferences.getString(key, "mweb"));
         }
     }
 
