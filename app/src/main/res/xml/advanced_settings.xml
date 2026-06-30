@@ -74,7 +74,7 @@
                 app:iconSpaceReserved="false" />
 
         <ListPreference
-                android:defaultValue="mweb"
+                android:defaultValue="web_safari"
                 android:entries="@array/youtube_player_client_entries"
                 android:entryValues="@array/youtube_player_client_values"
                 android:key="@string/youtube_player_client_key"
