@@ -113,7 +113,8 @@ public class App extends MultiDexApplication {
         NewPipe.init(getDownloader(),
             Localization.getPreferredLocalization(this),
             Localization.getPreferredContentCountry(this));
-        YoutubeApiDecoder.setLocalDecoder(new WebViewJavaScriptDecoder(this));
+        final WebViewJavaScriptDecoder decoder = new WebViewJavaScriptDecoder(this);
+        YoutubeApiDecoder.setLocalDecoder(decoder);
 
         Localization.initPrettyTime(Localization.resolvePrettyTime(getApplicationContext()));
 

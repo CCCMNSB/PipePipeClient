@@ -27,6 +27,8 @@ import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -35,17 +37,53 @@ public final class WebViewJavaScriptDecoder implements YoutubeJavaScriptDecoder 
     private static final String TAG = "WebViewJsDecoder";
     private static final String PLAYER_URL =
             "https://www.youtube.com/s/player/%s/player_ias.vflset/en_US/base.js";
+    private static final String IFRAME_URL = "https://www.youtube.com/iframe_api";
     private static final String REMOTE_URL = "https://api.pipepipe.dev/decoder/decode";
     private static final long TIMEOUT_MS = 30_000L;
+    private static final Pattern PLAYER_PATTERN = Pattern.compile(
+            "player\\\\/([a-z0-9]{8})\\\\/");
+    private static final Pattern SIGNATURE_TIMESTAMP_PATTERN = Pattern.compile(
+            "signatureTimestamp\\s*[:=]\\s*(\\d+)");
 
     private final Context context;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private WebView webView;
     private boolean ready;
     private String loadedPlayerId;
+    private String preparedPlayerId;
+    private String preparedPlayerCode;
 
     public WebViewJavaScriptDecoder(final Context context) {
         this.context = context.getApplicationContext();
+    }
+
+    @Nonnull
+    @Override
+    public synchronized PlayerData getPlayerData(@Nonnull final String videoId)
+            throws ParsingException {
+        final long start = SystemClock.elapsedRealtime();
+        try {
+            final Matcher playerMatcher = PLAYER_PATTERN.matcher(
+                    DownloaderImpl.getInstance().get(IFRAME_URL).responseBody());
+            if (!playerMatcher.find()) {
+                throw new ParsingException("Could not find YouTube player ID");
+            }
+            final String playerId = playerMatcher.group(1);
+            final String playerCode = fetchPlayer(playerId);
+            final Matcher timestampMatcher = SIGNATURE_TIMESTAMP_PATTERN.matcher(playerCode);
+            if (!timestampMatcher.find()) {
+                throw new ParsingException("Could not find signature timestamp");
+            }
+            preparedPlayerId = playerId;
+            preparedPlayerCode = playerCode;
+            Log.i(TAG, "metadata=" + (SystemClock.elapsedRealtime() - start) + "ms"
+                    + " player=" + playerId + " chars=" + playerCode.length());
+            return new PlayerData(playerId, Integer.parseInt(timestampMatcher.group(1)));
+        } catch (final ParsingException e) {
+            throw e;
+        } catch (final Exception e) {
+            throw new ParsingException("Could not load local player metadata", e);
+        }
     }
 
     @Nonnull
@@ -69,7 +107,14 @@ public final class WebViewJavaScriptDecoder implements YoutubeJavaScriptDecoder 
             request.put("requests", requests);
             final long localStart = SystemClock.elapsedRealtime();
             if (!playerId.equals(loadedPlayerId)) {
-                uploadPlayer(playerId, fetchPlayer(playerId));
+                final String playerCode = playerId.equals(preparedPlayerId)
+                        && preparedPlayerCode != null
+                        ? preparedPlayerCode : fetchPlayer(playerId);
+                uploadPlayer(playerId, playerCode);
+            }
+            if (playerId.equals(preparedPlayerId)) {
+                preparedPlayerId = null;
+                preparedPlayerCode = null;
             }
             final JSONObject localJson = evaluate(request);
             final long localMs = SystemClock.elapsedRealtime() - localStart;
