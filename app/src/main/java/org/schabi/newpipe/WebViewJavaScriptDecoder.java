@@ -22,9 +22,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStream;
-import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -42,7 +40,6 @@ public final class WebViewJavaScriptDecoder implements YoutubeJavaScriptDecoder 
     private static final String PLAYER_URL =
             "https://www.youtube.com/s/player/%s/player_ias.vflset/en_US/base.js";
     private static final String IFRAME_URL = "https://www.youtube.com/iframe_api";
-    private static final String REMOTE_URL = "https://api.pipepipe.dev/decoder/decode";
     private static final long TIMEOUT_MS = 30_000L;
     private static final long PLAYER_CACHE_TTL_MS = 24L * 60L * 60L * 1000L;
     private static final String PLAYER_CACHE_PREFIX = "youtube-player-";
@@ -135,7 +132,6 @@ public final class WebViewJavaScriptDecoder implements YoutubeJavaScriptDecoder 
             @Nonnull final String playerId,
             @Nullable final List<String> signatures,
             @Nullable final List<String> throttlingParameters) throws ParsingException {
-        final long totalStart = SystemClock.elapsedRealtime();
         ensureReady();
         final JSONObject request = new JSONObject();
         final JSONArray requests = new JSONArray();
@@ -169,38 +165,11 @@ public final class WebViewJavaScriptDecoder implements YoutubeJavaScriptDecoder 
                     + " v8=" + localJson.optLong("elapsedMs") + "ms"
                     + " local=" + localMs + "ms");
 
-            if (BuildConfig.DEBUG) {
-                compareRemote(playerId, signatures, throttlingParameters, totalStart, local);
-            }
             return local;
         } catch (final ParsingException e) {
             throw e;
         } catch (final Exception e) {
             throw new ParsingException("Local V8 decoding failed", e);
-        }
-    }
-
-    private void compareRemote(final String playerId,
-                               @Nullable final List<String> signatures,
-                               @Nullable final List<String> throttlingParameters,
-                               final long totalStart,
-                               final YoutubeApiDecoder.BatchDecodeResult local) {
-        try {
-            final long remoteStart = SystemClock.elapsedRealtime();
-            final YoutubeApiDecoder.BatchDecodeResult remote = decodeRemote(
-                    playerId, signatures, throttlingParameters);
-            final long remoteMs = SystemClock.elapsedRealtime() - remoteStart;
-            final boolean equal = local.getSignatures().equals(remote.getSignatures())
-                    && local.getNParameters().equals(remote.getNParameters());
-            Log.i(TAG, "remote=" + remoteMs + "ms"
-                    + " total=" + (SystemClock.elapsedRealtime() - totalStart) + "ms"
-                    + " equal=" + equal);
-            if (!equal) {
-                Log.e(TAG, "local=" + resultString(local)
-                        + " remote=" + resultString(remote));
-            }
-        } catch (final Exception e) {
-            Log.w(TAG, "remote comparison failed", e);
         }
     }
 
@@ -377,37 +346,6 @@ public final class WebViewJavaScriptDecoder implements YoutubeJavaScriptDecoder 
         }
     }
 
-    private YoutubeApiDecoder.BatchDecodeResult decodeRemote(
-            final String playerId,
-            @Nullable final List<String> signatures,
-            @Nullable final List<String> throttlingParameters) throws Exception {
-        final StringBuilder url = new StringBuilder(REMOTE_URL).append("?player=")
-                .append(playerId);
-        appendValues(url, "n", throttlingParameters);
-        appendValues(url, "sig", signatures);
-        final Map<String, List<String>> headers = new HashMap<>();
-        headers.put("User-Agent", Collections.singletonList("PipePipe/4.9.0"));
-        final JSONObject json = new JSONObject(
-                DownloaderImpl.getInstance().get(url.toString(), headers).responseBody());
-        return parseResult(new JSONObject().put("result", json),
-                throttlingParameters != null && !throttlingParameters.isEmpty(),
-                signatures != null && !signatures.isEmpty());
-    }
-
-    private static void appendValues(final StringBuilder url, final String name,
-                                     @Nullable final List<String> values) throws Exception {
-        if (values == null || values.isEmpty()) {
-            return;
-        }
-        url.append('&').append(name).append('=');
-        for (int i = 0; i < values.size(); i++) {
-            if (i > 0) {
-                url.append(',');
-            }
-            url.append(URLEncoder.encode(values.get(i), StandardCharsets.UTF_8.name()));
-        }
-    }
-
     private static YoutubeApiDecoder.BatchDecodeResult parseResult(final JSONObject wrapper,
                                                                     final boolean hasN,
                                                                     final boolean hasSig)
@@ -439,10 +377,6 @@ public final class WebViewJavaScriptDecoder implements YoutubeJavaScriptDecoder 
     private static JSONObject makeRequest(final String type, final List<String> values)
             throws Exception {
         return new JSONObject().put("type", type).put("challenges", new JSONArray(values));
-    }
-
-    private static String resultString(final YoutubeApiDecoder.BatchDecodeResult result) {
-        return "sig=" + result.getSignatures() + " n=" + result.getNParameters();
     }
 
     private String loadAsset(final String path) {
