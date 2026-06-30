@@ -2,6 +2,7 @@ package org.schabi.newpipe;
 
 import android.annotation.SuppressLint;
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
@@ -17,6 +18,9 @@ import org.schabi.newpipe.extractor.services.youtube.YoutubeApiDecoder;
 import org.schabi.newpipe.extractor.services.youtube.YoutubeJavaScriptDecoder;
 
 import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -40,6 +44,9 @@ public final class WebViewJavaScriptDecoder implements YoutubeJavaScriptDecoder 
     private static final String IFRAME_URL = "https://www.youtube.com/iframe_api";
     private static final String REMOTE_URL = "https://api.pipepipe.dev/decoder/decode";
     private static final long TIMEOUT_MS = 30_000L;
+    private static final long PLAYER_CACHE_TTL_MS = 24L * 60L * 60L * 1000L;
+    private static final String PLAYER_CACHE_PREFIX = "youtube-player-";
+    private static final String PLAYER_CACHE_PREFS = "youtube-player-cache";
     private static final Pattern PLAYER_PATTERN = Pattern.compile(
             "player\\\\/([a-z0-9]{8})\\\\/");
     private static final Pattern SIGNATURE_TIMESTAMP_PATTERN = Pattern.compile(
@@ -47,6 +54,7 @@ public final class WebViewJavaScriptDecoder implements YoutubeJavaScriptDecoder 
 
     private final Context context;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private final SharedPreferences preferences;
     private WebView webView;
     private boolean ready;
     private String loadedPlayerId;
@@ -55,6 +63,8 @@ public final class WebViewJavaScriptDecoder implements YoutubeJavaScriptDecoder 
 
     public WebViewJavaScriptDecoder(final Context context) {
         this.context = context.getApplicationContext();
+        preferences = this.context.getSharedPreferences(
+                PLAYER_CACHE_PREFS, Context.MODE_PRIVATE);
     }
 
     @Nonnull
@@ -63,27 +73,60 @@ public final class WebViewJavaScriptDecoder implements YoutubeJavaScriptDecoder 
             throws ParsingException {
         final long start = SystemClock.elapsedRealtime();
         try {
+            final String cachedPlayerId = preferences.getString("playerId", null);
+            final int cachedTimestamp = preferences.getInt("signatureTimestamp", 0);
+            final long expiresAt = preferences.getLong("expiresAt", 0);
+            if (cachedPlayerId != null && cachedTimestamp != 0
+                    && System.currentTimeMillis() < expiresAt) {
+                final File cachedFile = playerFile(cachedPlayerId);
+                if (cachedFile.isFile()) {
+                    final String playerCode = readFile(cachedFile);
+                    preparedPlayerId = cachedPlayerId;
+                    preparedPlayerCode = playerCode;
+                    logMetadata(start, "disk", cachedPlayerId, playerCode.length());
+                    return new PlayerData(cachedPlayerId, cachedTimestamp);
+                }
+            }
             final Matcher playerMatcher = PLAYER_PATTERN.matcher(
                     DownloaderImpl.getInstance().get(IFRAME_URL).responseBody());
             if (!playerMatcher.find()) {
                 throw new ParsingException("Could not find YouTube player ID");
             }
             final String playerId = playerMatcher.group(1);
-            final String playerCode = fetchPlayer(playerId);
+            final File playerFile = playerFile(playerId);
+            final boolean diskCached = playerFile.isFile();
+            final String playerCode = diskCached
+                    ? readFile(playerFile) : fetchAndCachePlayer(playerId, playerFile);
             final Matcher timestampMatcher = SIGNATURE_TIMESTAMP_PATTERN.matcher(playerCode);
             if (!timestampMatcher.find()) {
                 throw new ParsingException("Could not find signature timestamp");
             }
             preparedPlayerId = playerId;
             preparedPlayerCode = playerCode;
-            Log.i(TAG, "metadata=" + (SystemClock.elapsedRealtime() - start) + "ms"
-                    + " player=" + playerId + " chars=" + playerCode.length());
-            return new PlayerData(playerId, Integer.parseInt(timestampMatcher.group(1)));
+            final int signatureTimestamp = Integer.parseInt(timestampMatcher.group(1));
+            preferences.edit()
+                    .putString("playerId", playerId)
+                    .putInt("signatureTimestamp", signatureTimestamp)
+                    .putLong("expiresAt", System.currentTimeMillis() + PLAYER_CACHE_TTL_MS)
+                    .apply();
+            logMetadata(start, diskCached ? "disk-refresh" : "network",
+                    playerId, playerCode.length());
+            return new PlayerData(playerId, signatureTimestamp);
         } catch (final ParsingException e) {
             throw e;
         } catch (final Exception e) {
             throw new ParsingException("Could not load local player metadata", e);
         }
+    }
+
+    private File playerFile(final String playerId) {
+        return new File(context.getFilesDir(), PLAYER_CACHE_PREFIX + playerId + ".js");
+    }
+
+    private static void logMetadata(final long start, final String source,
+                                    final String playerId, final int length) {
+        Log.i(TAG, "metadata=" + (SystemClock.elapsedRealtime() - start) + "ms"
+                + " source=" + source + " player=" + playerId + " chars=" + length);
     }
 
     @Nonnull
@@ -291,6 +334,46 @@ public final class WebViewJavaScriptDecoder implements YoutubeJavaScriptDecoder 
                     .responseBody();
         } catch (final Exception e) {
             throw new ParsingException("Could not fetch YouTube player", e);
+        }
+    }
+
+    private String fetchAndCachePlayer(final String playerId, final File playerFile)
+            throws ParsingException {
+        final String playerCode = fetchPlayer(playerId);
+        final File temporaryFile = new File(playerFile.getPath() + ".tmp");
+        try (FileOutputStream output = new FileOutputStream(temporaryFile)) {
+            output.write(playerCode.getBytes(StandardCharsets.UTF_8));
+        } catch (final Exception e) {
+            temporaryFile.delete();
+            throw new ParsingException("Could not cache YouTube player", e);
+        }
+        if (!temporaryFile.renameTo(playerFile)) {
+            temporaryFile.delete();
+            throw new ParsingException("Could not replace cached YouTube player");
+        }
+        final File[] files = context.getFilesDir().listFiles();
+        if (files != null) {
+            for (final File file : files) {
+                if (file.getName().startsWith(PLAYER_CACHE_PREFIX)
+                        && !file.equals(playerFile)) {
+                    file.delete();
+                }
+            }
+        }
+        return playerCode;
+    }
+
+    private static String readFile(final File file) throws ParsingException {
+        try (FileInputStream input = new FileInputStream(file);
+             ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            final byte[] buffer = new byte[8192];
+            int read;
+            while ((read = input.read(buffer)) != -1) {
+                output.write(buffer, 0, read);
+            }
+            return output.toString(StandardCharsets.UTF_8.name());
+        } catch (final Exception e) {
+            throw new ParsingException("Could not read cached YouTube player", e);
         }
     }
 
