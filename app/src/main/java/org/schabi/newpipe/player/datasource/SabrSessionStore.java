@@ -84,6 +84,7 @@ public final class SabrSessionStore {
         private final AtomicInteger sourceReferences = new AtomicInteger();
         private volatile SabrStreamPump pump;
         private volatile Thread warmThread;
+        private volatile boolean invalidated;
 
         Holder(@NonNull final String videoId,
                @NonNull final YoutubeSabrInfo info,
@@ -180,6 +181,10 @@ public final class SabrSessionStore {
             return pump;
         }
 
+        boolean isInvalidated() {
+            return invalidated;
+        }
+
         void setWarmThread(@NonNull final Thread warmThread) {
             this.warmThread = warmThread;
         }
@@ -191,6 +196,7 @@ public final class SabrSessionStore {
         }
 
         void stop() {
+            invalidated = true;
             setActiveTracks(false, false);
             final Thread warm = warmThread;
             if (warm != null && warm != Thread.currentThread()) {

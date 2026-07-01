@@ -3161,6 +3161,9 @@ public final class Player implements
 
         saveStreamProgressState();
         boolean isCatchableException = false;
+        final boolean sabrSessionInvalidated = error.getCause() != null
+                && error.getCause().getMessage() != null
+                && error.getCause().getMessage().startsWith("SABR session invalidated");
 
         switch (error.errorCode) {
             case ERROR_CODE_BEHIND_LIVE_WINDOW:
@@ -3206,6 +3209,9 @@ public final class Player implements
             case ERROR_CODE_IO_NETWORK_CONNECTION_FAILED:
             case ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT:
             case ERROR_CODE_UNSPECIFIED:
+                if (sabrSessionInvalidated) {
+                    isCatchableException = true;
+                }
                 setRecovery();
                 // SABR: recover at the saved position, not 0 (see shouldSeek).
                 seekOnNextSabrReload = true;
