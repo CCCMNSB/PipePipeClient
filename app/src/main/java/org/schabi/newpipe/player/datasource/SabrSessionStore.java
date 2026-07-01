@@ -218,6 +218,13 @@ public final class SabrSessionStore {
         }
     }
 
+    public static void updatePlaybackRate(@NonNull final String videoId, final float playbackRate) {
+        final Holder holder = SESSIONS.get(videoId);
+        if (holder != null) {
+            holder.session.getStreamState().setPlaybackRate(playbackRate);
+        }
+    }
+
     // <=0 = audio-only / no preference -> any cached session is fine. Otherwise the session matches
     // when the requested itag RESOLVES to the same format the session already holds. We resolve both
     // sides through pickVideoFormat so an itag the probe doesn't carry (which both map to the same

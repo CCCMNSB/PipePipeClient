@@ -1821,8 +1821,10 @@ public final class Player implements
         }
 
         // Feed the real play head to any live SABR session (no-op otherwise).
-        getCurrentStreamInfo().ifPresent(info ->
-                SabrSessionStore.updatePlayerTime(info.getId(), currentProgress));
+        getCurrentStreamInfo().ifPresent(info -> {
+            SabrSessionStore.updatePlayerTime(info.getId(), currentProgress);
+            SabrSessionStore.updatePlaybackRate(info.getId(), getPlaybackSpeed());
+        });
 
         if (duration != binding.playbackSeekBar.getMax()) {
             setVideoDurationToControls(duration);
