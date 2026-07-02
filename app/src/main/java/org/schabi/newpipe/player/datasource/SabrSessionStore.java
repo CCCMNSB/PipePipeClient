@@ -8,6 +8,7 @@ import androidx.annotation.Nullable;
 import org.schabi.newpipe.extractor.exceptions.ExtractionException;
 import org.schabi.newpipe.extractor.localization.ContentCountry;
 import org.schabi.newpipe.extractor.localization.Localization;
+import org.schabi.newpipe.extractor.services.youtube.sabr.SabrProtocolException;
 import org.schabi.newpipe.extractor.services.youtube.sabr.SabrSegmentRequest;
 import org.schabi.newpipe.extractor.services.youtube.sabr.YoutubeSabrClientProfile;
 import org.schabi.newpipe.extractor.services.youtube.sabr.YoutubeSabrFormat;
@@ -83,6 +84,7 @@ public final class SabrSessionStore {
         private volatile SabrStreamPump pump;
         private volatile Thread warmThread;
         private volatile boolean invalidated;
+        private volatile IOException terminalFailure;
 
         Holder(@NonNull final String videoId,
                @NonNull final YoutubeSabrInfo info,
@@ -190,6 +192,16 @@ public final class SabrSessionStore {
 
         boolean isInvalidated() {
             return invalidated;
+        }
+
+        void setTerminalFailure(@NonNull final IOException failure) {
+            terminalFailure = failure;
+        }
+
+        void throwIfFailed() throws IOException {
+            if (terminalFailure != null) {
+                throw terminalFailure;
+            }
         }
 
         void setWarmThread(@NonNull final Thread warmThread) {
@@ -348,6 +360,8 @@ public final class SabrSessionStore {
                         session.fetchSegment(SabrSegmentRequest.initialization(videoFormat),
                                 localization);
                     }
+                } catch (final SabrProtocolException e) {
+                    holder.setTerminalFailure(new IOException(e));
                 } catch (final Exception ignored) {
                     // Best-effort; the pump mints/fetches on demand if this fails.
                 } finally {
