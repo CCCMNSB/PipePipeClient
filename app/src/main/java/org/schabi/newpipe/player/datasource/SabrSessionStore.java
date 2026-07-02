@@ -112,6 +112,15 @@ public final class SabrSessionStore {
         void setActiveTracks(final boolean videoActive, final boolean audioActive) {
             setTrackActive(videoFormat.getItag(), videoActive);
             setTrackActive(audioFormat.getItag(), audioActive);
+            if (videoActive || audioActive) {
+                session.getStreamState().setActiveTrackTypes(videoActive, audioActive);
+            } else {
+                trimSessions(null);
+            }
+        }
+
+        private boolean hasActiveTracks() {
+            return !activeReaderItags.isEmpty();
         }
 
         byte[] getInitializationData(final int itag) {
@@ -312,15 +321,9 @@ public final class SabrSessionStore {
                     new YoutubeSabrSession(info, audioFormat, videoFormat, provider);
             final Holder holder = new Holder(videoId, info, session, audioFormat, videoFormat);
             SESSIONS.put(videoId, holder);
-            // LRU bound: evict the oldest sessions (their pumps are stopped, caches freed).
             ORDER.remove(videoId);
             ORDER.addLast(videoId);
-            while (ORDER.size() > MAX_SESSIONS) {
-                final String old = ORDER.pollFirst();
-                if (old != null && !old.equals(videoId)) {
-                    evict(old);
-                }
-            }
+            trimSessions(videoId);
             // Pre-warm the PO token off-thread so the ~45s WebView mint overlaps the initial probe
             // and buffering instead of stalling the pump on its first protected response. Keep the
             // init preload off this creation path too: it is best-effort and can wait on the same
@@ -454,6 +457,34 @@ public final class SabrSessionStore {
     /** Evict a cached session, stopping its pump so the thread + buffers are released. */
     public static void evict(@NonNull final String videoId) {
         evict(videoId, null);
+    }
+
+    private static void trimSessions(@Nullable final String protectedVideoId) {
+        while (true) {
+            final Holder holder;
+            synchronized (SabrSessionStore.class) {
+                if (ORDER.size() <= MAX_SESSIONS) {
+                    return;
+                }
+                String candidate = null;
+                for (final String videoId : ORDER) {
+                    final Holder current = SESSIONS.get(videoId);
+                    if (!videoId.equals(protectedVideoId)
+                            && current != null && !current.hasActiveTracks()) {
+                        candidate = videoId;
+                        break;
+                    }
+                }
+                if (candidate == null) {
+                    return;
+                }
+                holder = SESSIONS.remove(candidate);
+                ORDER.remove(candidate);
+            }
+            if (holder != null) {
+                holder.stop();
+            }
+        }
     }
 
     private static void evict(@NonNull final String videoId,
