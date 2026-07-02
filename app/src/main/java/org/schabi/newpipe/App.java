@@ -179,15 +179,6 @@ public class App extends MultiDexApplication {
     }
 
     private void configureRxJavaErrorHandler() {
-        RxJavaPlugins.setScheduleHandler(task -> () -> {
-            try {
-                task.run();
-            } catch (final RuntimeException | Error throwable) {
-                final Thread thread = Thread.currentThread();
-                thread.getUncaughtExceptionHandler().uncaughtException(thread, throwable);
-                throw throwable;
-            }
-        });
         // https://github.com/ReactiveX/RxJava/wiki/What's-different-in-2.0#error-handling
         RxJavaPlugins.setErrorHandler(new Consumer<Throwable>() {
             @Override

@@ -71,7 +71,6 @@ public class MediaSourceManager {
      * @see #maybeLoadItem(PlayQueueItem)
      */
     private static final int MAXIMUM_LOADER_SIZE = WINDOW_SIZE * 2 + 1;
-    private static final long SOURCE_LOAD_TIMEOUT_MILLIS = 180_000L;
     @NonNull
     private final Context context;
     @NonNull
@@ -196,8 +195,6 @@ public class MediaSourceManager {
 
         playQueueReactor.cancel();
         loaderReactor.dispose();
-        removeMediaSourceHandler.removeCallbacksAndMessages(null);
-        loadingItems.clear();
     }
 
     /*//////////////////////////////////////////////////////////////////////////
@@ -421,13 +418,6 @@ public class MediaSourceManager {
             }
 
             loadingItems.add(item);
-            removeMediaSourceHandler.postDelayed(() -> {
-                if (loadingItems.contains(item)) {
-                    onMediaSourceReceived(item, FailedMediaSource.of(item,
-                            new MediaSourceResolutionException(
-                                    "Media source resolution timed out: " + item.getUrl())));
-                }
-            }, SOURCE_LOAD_TIMEOUT_MILLIS);
             final Disposable loader = getLoadedMediaSource(item)
                     .observeOn(AndroidSchedulers.mainThread())
                     /* No exception handling since getLoadedMediaSource guarantees nonnull return */
@@ -476,9 +466,7 @@ public class MediaSourceManager {
                     + "] with url=[" + item.getUrl() + "]");
         }
 
-        if (!loadingItems.remove(item)) {
-            return;
-        }
+        loadingItems.remove(item);
 
         final int itemIndex = playQueue.indexOf(item);
         // Only update the playlist timeline for items at the current index or after.
