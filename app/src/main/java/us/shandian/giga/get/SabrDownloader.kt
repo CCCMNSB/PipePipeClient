@@ -4,6 +4,7 @@ import android.util.Log
 import org.schabi.newpipe.BuildConfig
 import org.schabi.newpipe.extractor.localization.Localization
 import org.schabi.newpipe.extractor.services.youtube.sabr.SabrProtocolException
+import org.schabi.newpipe.extractor.services.youtube.sabr.SabrRecoverableException
 import org.schabi.newpipe.extractor.services.youtube.sabr.SabrSegmentRequest
 import org.schabi.newpipe.extractor.services.youtube.sabr.YoutubeSabrInfo
 import org.schabi.newpipe.extractor.services.youtube.sabr.YoutubeSabrSession
@@ -463,6 +464,9 @@ internal class SabrDownloader(
     private fun isRetryableAttemptFailure(error: Exception): Boolean {
         if (error is RetryColdStartException || error is SabrDownloadException) {
             return false
+        }
+        if (error is SabrRecoverableException) {
+            return true
         }
         if (error is SabrProtocolException) {
             return false

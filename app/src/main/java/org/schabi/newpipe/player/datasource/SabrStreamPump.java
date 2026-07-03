@@ -8,6 +8,7 @@ import androidx.annotation.Nullable;
 import org.schabi.newpipe.extractor.exceptions.ExtractionException;
 import org.schabi.newpipe.extractor.localization.Localization;
 import org.schabi.newpipe.extractor.services.youtube.sabr.SabrMediaSegment;
+import org.schabi.newpipe.extractor.services.youtube.sabr.SabrRecoverableException;
 import org.schabi.newpipe.extractor.services.youtube.sabr.SabrSegmentRequest;
 import org.schabi.newpipe.extractor.services.youtube.sabr.YoutubeSabrSession;
 
@@ -208,7 +209,7 @@ final class SabrStreamPump {
                 } catch (final InterruptedException e) {
                     Thread.currentThread().interrupt();
                     break;
-                } catch (final IOException e) {
+                } catch (final IOException | SabrRecoverableException e) {
                     consecutiveIoErrors++;
                     if (consecutiveIoErrors >= MAX_CONSECUTIVE_IO_ERRORS) {
                         Log.w(TAG, "SABR pump network failure; evicting session "
