@@ -291,7 +291,6 @@ internal class SabrDownloader(
         writer: SabrSegmentWriter,
     ) {
         val localization = Localization("en", "US")
-        writer.writeDirectInitializations()
         writer.observeWrittenInitializations()
         if (targets.size == 1 && !targets.first().initializationWritten) {
             fetchInitializationsOrRetry(writer, localization)

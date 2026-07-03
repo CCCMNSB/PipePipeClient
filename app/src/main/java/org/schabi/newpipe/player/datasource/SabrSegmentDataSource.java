@@ -10,15 +10,12 @@ import androidx.media3.datasource.DataSource;
 import androidx.media3.datasource.DataSpec;
 import androidx.media3.datasource.TransferListener;
 
-import org.schabi.newpipe.extractor.NewPipe;
-import org.schabi.newpipe.extractor.downloader.Response;
 import org.schabi.newpipe.extractor.localization.Localization;
 import org.schabi.newpipe.extractor.services.youtube.sabr.SabrMediaSegment;
 import org.schabi.newpipe.extractor.services.youtube.sabr.SabrSegmentRequest;
 import org.schabi.newpipe.extractor.services.youtube.sabr.YoutubeSabrFormat;
 
 import java.io.IOException;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -120,41 +117,7 @@ public final class SabrSegmentDataSource implements DataSource {
             holder.setInitializationData(itag, data);
             return data;
         }
-        final String url = format.getInitializationUrl();
-        final long start = format.getInitRangeStart();
-        final long end = format.getInitRangeEnd();
-        if (url == null || url.isEmpty() || start < 0 || end < start) {
-            return awaitSegment(SabrSegmentRequest.initialization(format));
-        }
-
-        final String range = "bytes=" + start + "-" + end;
-        final Response response;
-        try {
-            response = NewPipe.getDownloader().get(url,
-                    Collections.singletonMap("Range", Collections.singletonList(range)));
-        } catch (final Exception e) {
-            throw new IOException("Could not fetch SABR init for itag=" + itag, e);
-        }
-        final byte[] data = response.rawResponseBody();
-        if (response.responseCode() != 206 && response.responseCode() != 200) {
-            throw new IOException("Could not fetch SABR init for itag=" + itag
-                    + ": HTTP " + response.responseCode());
-        }
-        if (data == null || data.length == 0) {
-            throw new IOException("Empty SABR init for itag=" + itag);
-        }
-        final long expectedLength = end - start + 1;
-        if (data.length > Math.max(expectedLength * 2, 1024 * 1024)) {
-            throw new IOException("Unexpectedly large SABR init for itag=" + itag
-                    + ": " + data.length + " bytes");
-        }
-        Log.d(TAG, "fetched init video=" + holder.videoId
-                + " itag=" + itag
-                + " bytes=" + data.length
-                + " range=" + range);
-        holder.session.getStreamState().ingestInitializationData(format, data);
-        holder.setInitializationData(itag, data);
-        return data;
+        return awaitSegment(SabrSegmentRequest.initialization(format));
     }
 
     @Override
