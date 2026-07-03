@@ -969,4 +969,13 @@
 <string name="use_dns_over_https_fallback_title">DNS-over-HTTPS-Fallback verwenden</string>
 <string name="use_dns_over_https_fallback_summary">Fehlgeschlagene System-DNS-Abfragen über Cloudflare DNS-over-HTTPS wiederholen. Durch diese Änderung wird die App neu gestartet.</string>
 <string name="youtube_player_client_title">YouTube-Extraktionsendpunkt</string>
+<string name="error_sabr_download_failed">SABR-Download fehlgeschlagen</string>
+<string name="error_sabr_download_format">Dieses SABR-Format kann nicht heruntergeladen werden</string>
+<string name="error_sabr_download_initialization">SABR-Initialisierung fehlgeschlagen</string>
+<string name="error_sabr_download_protected">Dieser SABR-Stream erfordert eine Attestierung</string>
+<string name="error_sabr_download_stalled">SABR liefert keine Medien mehr</string>
+<string name="error_sabr_download_network">SABR-Download aufgrund des Netzwerks fehlgeschlagen</string>
+<string name="error_sabr_download_muxing">SABR-Medien konnten nicht gemuxt werden</string>
+<string name="error_sabr_download_storage">Der SABR-Download konnte nicht geschrieben werden</string>
+<string name="error_sabr_download_protocol">SABR-Protokollfehler</string>
 </resources>

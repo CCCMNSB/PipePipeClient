@@ -1033,4 +1033,13 @@
 <string name="use_dns_over_https_fallback_title">使用 DNS over HTTPS 备用</string>
 <string name="use_dns_over_https_fallback_summary">使用 Cloudflare DNS over HTTPS 重试失败的系统 DNS 查询。更改此设置将重启应用。</string>
 <string name="youtube_player_client_title">YouTube提取端点</string>
+<string name="error_sabr_download_failed">SABR下载失败</string>
+<string name="error_sabr_download_format">该SABR格式无法下载</string>
+<string name="error_sabr_download_initialization">SABR初始化失败</string>
+<string name="error_sabr_download_protected">此SABR流需要认证</string>
+<string name="error_sabr_download_stalled">SABR停止返回媒体</string>
+<string name="error_sabr_download_network">由于网络原因，SABR下载失败</string>
+<string name="error_sabr_download_muxing">无法复用SABR媒体</string>
+<string name="error_sabr_download_storage">无法写入SABR下载内容</string>
+<string name="error_sabr_download_protocol">SABR协议错误</string>
 </resources>

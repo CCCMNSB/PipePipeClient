@@ -1078,4 +1078,13 @@ nSự khác biệt giữa hai loại này là cái nào nhanh thường thiếu 
 <string name="use_dns_over_https_fallback_title">Sử dụng DNS dự phòng qua HTTPS</string>
 <string name="use_dns_over_https_fallback_summary">Thử lại các tra cứu DNS hệ thống bị lỗi bằng Cloudflare DNS qua HTTPS. Thay đổi điều này sẽ khởi động lại ứng dụng.</string>
 <string name="youtube_player_client_title">Điểm cuối trích xuất YouTube</string>
+<string name="error_sabr_download_failed">Tải xuống SABR thất bại</string>
+<string name="error_sabr_download_format">Không thể tải xuống định dạng SABR này</string>
+<string name="error_sabr_download_initialization">Khởi tạo SABR thất bại</string>
+<string name="error_sabr_download_protected">Luồng SABR này cần được chứng thực</string>
+<string name="error_sabr_download_stalled">SABR đã ngừng trả về phương tiện</string>
+<string name="error_sabr_download_network">Tải xuống SABR thất bại do sự cố mạng</string>
+<string name="error_sabr_download_muxing">Không thể mux phương tiện SABR</string>
+<string name="error_sabr_download_storage">Không thể ghi dữ liệu tải xuống SABR</string>
+<string name="error_sabr_download_protocol">Lỗi giao thức SABR</string>
 </resources>

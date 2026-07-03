@@ -1025,4 +1025,13 @@
 <string name="use_dns_over_https_fallback_title">Usar DNS sobre HTTPS como respaldo</string>
 <string name="use_dns_over_https_fallback_summary">Reintentar las búsquedas de DNS del sistema fallidas utilizando DNS sobre HTTPS de Cloudflare. Cambiar esto reiniciará la aplicación.</string>
 <string name="youtube_player_client_title">Endpoint de extracción de YouTube</string>
+<string name="error_sabr_download_failed">La descarga de SABR falló</string>
+<string name="error_sabr_download_format">Este formato de SABR no se puede descargar</string>
+<string name="error_sabr_download_initialization">La inicialización de SABR falló</string>
+<string name="error_sabr_download_protected">Esta transmisión de SABR necesita certificación</string>
+<string name="error_sabr_download_stalled">SABR dejó de devolver contenido multimedia</string>
+<string name="error_sabr_download_network">La descarga de SABR falló debido a la red</string>
+<string name="error_sabr_download_muxing">No se pudo multiplexar el contenido multimedia de SABR</string>
+<string name="error_sabr_download_storage">No se pudo escribir la descarga de SABR</string>
+<string name="error_sabr_download_protocol">Error de protocolo de SABR</string>
 </resources>
