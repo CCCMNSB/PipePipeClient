@@ -24,7 +24,7 @@ internal class SabrDownloader(
         try {
             ensureRunning()
             val recoveries = validateRecoveryInfo()
-            val info = SabrDownloadFormatResolver.resolveInfo(recoveries)
+            var info = SabrDownloadFormatResolver.resolveInfo(recoveries)
 
             val expectedLength = recoveries.map { recovery ->
                 when (recovery.kind) {
@@ -38,8 +38,13 @@ internal class SabrDownloader(
             prepareMission(expectedLength)
             var coldStartAttempts = 0
             var transientAttempts = 0
+            var refreshInfo = false
             while (true) {
                 try {
+                    if (refreshInfo) {
+                        info = SabrDownloadFormatResolver.resolveInfo(recoveries)
+                        refreshInfo = false
+                    }
                     runSessionAttempt(info, recoveries, coldStartAttempts)
                     break
                 } catch (error: RetryColdStartException) {
@@ -52,6 +57,7 @@ internal class SabrDownloader(
                         )
                     }
                     logDebug("retry cold start attempt=$coldStartAttempts")
+                    refreshInfo = true
                 } catch (error: Exception) {
                     if (!isRetryableAttemptFailure(error)) {
                         throw error
@@ -66,6 +72,7 @@ internal class SabrDownloader(
                     transientAttempts++
                     logDebug("retry transient attempt=$transientAttempts error=${error.javaClass.simpleName}")
                     Thread.sleep(transientRetryDelayMs(transientAttempts))
+                    refreshInfo = true
                 }
             }
         } catch (error: InterruptedException) {
