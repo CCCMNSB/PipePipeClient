@@ -33,7 +33,7 @@ public final class SabrSegmentDataSource implements DataSource {
     private static final String TAG = "SabrSegmentDataSource";
 
     private static final long WAIT_MS = 250;
-    private static final long STALL_MS = 120_000;
+    private static final long STALL_MS = 60_000;
     // After waiting this long for a media segment that's BEHIND the buffered edge, treat it as a
     // backward seek onto an evicted segment and ask the pump to reposition the session there.
     private static final long REFETCH_AFTER_MS = 2_000;
