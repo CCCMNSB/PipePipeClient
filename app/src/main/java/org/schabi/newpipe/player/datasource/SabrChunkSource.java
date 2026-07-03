@@ -46,6 +46,7 @@ final class SabrChunkSource implements ChunkSource {
     private final Format trackFormat;
     private final int trackType;
     private final Localization localization;
+    private final long durationUs;
     private final ChunkExtractor extractor;
 
     @Nullable
@@ -56,13 +57,15 @@ final class SabrChunkSource implements ChunkSource {
                     final YoutubeSabrFormat format,
                     final Format trackFormat,
                     final int trackType,
-                    final Localization localization) {
+                    final Localization localization,
+                    final long durationUs) {
         this.holder = holder;
         this.readerOwner = readerOwner;
         this.format = format;
         this.trackFormat = trackFormat;
         this.trackType = trackType;
         this.localization = localization;
+        this.durationUs = durationUs;
         final String mime = format.getMimeType();
         final Extractor extractorImpl = mime != null && mime.contains("webm")
                 ? new MatroskaExtractor(SubtitleParser.Factory.UNSUPPORTED)
@@ -97,6 +100,10 @@ final class SabrChunkSource implements ChunkSource {
     @Override
     public void getNextChunk(final LoadingInfo loadingInfo, final long loadPositionUs,
                              final List<? extends MediaChunk> queue, final ChunkHolder out) {
+        if (durationUs != C.TIME_UNSET && loadPositionUs >= durationUs) {
+            out.endOfStream = true;
+            return;
+        }
         if (extractor.getSampleFormats() == null) {
             Log.d(TAG, "nextInit video=" + holder.videoId
                     + " itag=" + format.getItag());
