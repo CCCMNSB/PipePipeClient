@@ -23,6 +23,15 @@ import java.util.List;
  * other on a network round-trip, which is exactly what starved a track in the old on-demand approach.
  */
 final class SabrStreamPump {
+    enum State {
+        IDLE,
+        REQUESTING,
+        REPOSITIONING,
+        THROTTLED,
+        NETWORK_FAILED,
+        TERMINAL,
+        STOPPED
+    }
 
     private static final String TAG = "SabrStreamPump";
     private static final long IDLE_POLL_MS = 400;     // server paced us / nothing new this round
@@ -61,8 +70,8 @@ final class SabrStreamPump {
     private volatile boolean started;
     private volatile boolean stopped;
     private volatile boolean clearCacheOnStop;
-    private volatile boolean fatal;
-    private volatile boolean throttled;
+    private volatile State state = State.IDLE;
+    private volatile IOException networkFailure;
     private volatile long lastReadMs;
     // Set by a reader blocked on an evicted segment behind the edge (backward seek); the loop
     // repositions the session onto it next round. Single-slot: the latest rewind target wins.
@@ -84,15 +93,16 @@ final class SabrStreamPump {
     /** Start (or restart, if it idled out) the pump thread, and mark the session as actively read. */
     void ensureStarted() {
         lastReadMs = System.currentTimeMillis();
-        if (fatal || (started && !stopped)) {
+        if (state == State.TERMINAL || (started && !stopped)) {
             return;
         }
         synchronized (this) {
-            if (fatal || (started && !stopped)) {
+            if (state == State.TERMINAL || (started && !stopped)) {
                 return;
             }
             stopped = false;
             started = true;
+            state = State.IDLE;
             thread = new Thread(this::loop, "SabrStreamPump");
             thread.setDaemon(true);
             thread.start();
@@ -119,12 +129,16 @@ final class SabrStreamPump {
         return session.getCachedSegment(request);
     }
 
-    boolean isFatal() {
-        return fatal;
+    @Nullable
+    synchronized IOException takeNetworkFailure() {
+        final IOException failure = networkFailure;
+        networkFailure = null;
+        return failure;
     }
 
-    boolean isThrottled() {
-        return throttled;
+    boolean canRecover() {
+        return state != State.REQUESTING && state != State.REPOSITIONING
+                && state != State.TERMINAL;
     }
 
     /** A reader is blocked on an evicted segment behind the buffered edge (backward seek). Ask the
@@ -144,6 +158,7 @@ final class SabrStreamPump {
 
     private void loop() {
         int consecutiveIoErrors = 0;
+        state = State.IDLE;
         try {
             while (!stopped) {
                 // Don't die on completion/idle while a reposition is pending: a backward seek after
@@ -178,8 +193,10 @@ final class SabrStreamPump {
                     final SabrSegmentRequest refetch = pendingRefetch;
                     if (refetch != null) {
                         pendingRefetch = null;
+                        state = State.REPOSITIONING;
                         session.prepareForRewind(refetch);
                         session.pumpOnce(localization);
+                        state = State.IDLE;
                         consecutiveIoErrors = 0;
                         continue;
                     }
@@ -190,24 +207,28 @@ final class SabrStreamPump {
                     final SabrSegmentRequest forwardSeek = pendingForwardSeek;
                     if (forwardSeek != null) {
                         pendingForwardSeek = null;
+                        state = State.REPOSITIONING;
                         session.prepareForForwardJump(forwardSeek);
                         session.pumpOnce(localization);
+                        state = State.IDLE;
                         consecutiveIoErrors = 0;
                         continue;
                     }
-                    throttled = edgeMs - readerHeadMs > READAHEAD_CUSHION_MS
+                    final boolean throttled = edgeMs - readerHeadMs > READAHEAD_CUSHION_MS
                             || session.getCachedBytes() > MAX_AHEAD_BYTES;
                     if (throttled) {
+                        state = State.THROTTLED;
                         Thread.sleep(IDLE_POLL_MS);
                         continue;
                     }
-                    throttled = false;
+                    state = State.REQUESTING;
                     // Report the CONTIGUOUS buffered edge (not readerHead): the server fills from the
                     // reported position, so reporting readerHead (ahead of a laggard track) made it
                     // skip past the gap and the slow track's edge never advanced. Pace on readerHead,
                     // report on edge.
                     session.getStreamState().setPlayerTimeMs(edgeMs);
                     final List<SabrMediaSegment> segments = session.pumpOnce(localization);
+                    state = State.IDLE;
                     consecutiveIoErrors = 0;
                     if (segments.isEmpty()) {
                         Thread.sleep(IDLE_POLL_MS);
@@ -215,26 +236,30 @@ final class SabrStreamPump {
                 } catch (final InterruptedException e) {
                     Thread.currentThread().interrupt();
                     break;
-                } catch (final IOException | SabrRecoverableException e) {
+                } catch (final IOException e) {
                     consecutiveIoErrors++;
                     if (consecutiveIoErrors >= MAX_CONSECUTIVE_IO_ERRORS) {
-                        Log.w(TAG, "SABR pump network failure; evicting session "
+                        Log.w(TAG, "SABR pump network failure "
                                 + holder.videoId, e);
-                        fatal = true;
-                        SabrSessionStore.evict(holder.videoId);
+                        networkFailure = e;
+                        state = State.NETWORK_FAILED;
                         break;
                     }
                     sleepQuietly(ERROR_RETRY_MS);
+                } catch (final SabrRecoverableException e) {
+                    Log.i(TAG, "SABR media failure: " + e.getMessage());
+                    state = State.TERMINAL;
+                    holder.failTerminal(new SabrLogicException("SABR media failure", e));
+                    break;
                 } catch (final ExtractionException e) {
                     Log.i(TAG, "SABR pump fatal: " + e.getMessage());
-                    fatal = true;
-                    // Drop the dead session so a re-open rebuilds a fresh one (new token, new state).
-                    SabrSessionStore.evict(holder.videoId);
+                    state = State.TERMINAL;
+                    holder.failTerminal(new SabrLogicException("SABR logic failure", e));
                     break;
                 } catch (final OutOfMemoryError e) {
                     Log.e(TAG, "SABR pump OOM; evicting session " + holder.videoId, e);
-                    fatal = true;
-                    SabrSessionStore.evict(holder.videoId);
+                    state = State.TERMINAL;
+                    holder.failTerminal(new SabrLogicException("SABR memory failure", e));
                     break;
                 }
             }
@@ -244,6 +269,9 @@ final class SabrStreamPump {
             }
             synchronized (this) {
                 stopped = true;
+                if (state != State.TERMINAL && state != State.NETWORK_FAILED) {
+                    state = State.STOPPED;
+                }
             }
         }
     }

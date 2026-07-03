@@ -51,6 +51,10 @@ final class SabrChunkSource implements ChunkSource {
 
     @Nullable
     private IOException fatalError;
+    private int initializationRequests;
+    private int repeatedEmptyChunkRequests;
+    private int lastEmptySequence = -1;
+    private long lastEmptyLoadPositionUs = C.TIME_UNSET;
 
     SabrChunkSource(final SabrSessionStore.Holder holder,
                     final Object readerOwner,
@@ -105,6 +109,11 @@ final class SabrChunkSource implements ChunkSource {
             return;
         }
         if (extractor.getSampleFormats() == null) {
+            initializationRequests++;
+            if (initializationRequests > 1) {
+                failTerminal("SABR initialization produced no sample format");
+                return;
+            }
             Log.d(TAG, "nextInit video=" + holder.videoId
                     + " itag=" + format.getItag());
             out.chunk = new InitializationChunk(
@@ -118,8 +127,22 @@ final class SabrChunkSource implements ChunkSource {
         if (queue.isEmpty()) {
             nextSeq = holder.session.getStreamState()
                     .getSegmentNumberAtOrAfterTimeMs(format, loadPositionUs / 1000);
+            if (nextSeq == lastEmptySequence && loadPositionUs == lastEmptyLoadPositionUs) {
+                repeatedEmptyChunkRequests++;
+                if (repeatedEmptyChunkRequests >= 2) {
+                    failTerminal("SABR media chunk produced no sample");
+                    return;
+                }
+            } else {
+                lastEmptySequence = nextSeq;
+                lastEmptyLoadPositionUs = loadPositionUs;
+                repeatedEmptyChunkRequests = 0;
+            }
         } else {
             nextSeq = (int) (queue.get(queue.size() - 1).getNextChunkIndex());
+            repeatedEmptyChunkRequests = 0;
+            lastEmptySequence = -1;
+            lastEmptyLoadPositionUs = C.TIME_UNSET;
         }
         final long endSeq = holder.session.getStreamState().getEndSegment(format);
         if (endSeq > 0 && nextSeq > endSeq) {
@@ -159,6 +182,12 @@ final class SabrChunkSource implements ChunkSource {
 
     @Override
     public void onChunkLoadCompleted(final Chunk chunk) {
+    }
+
+    private void failTerminal(final String message) {
+        final SabrLogicException failure = new SabrLogicException(message);
+        fatalError = failure;
+        holder.failTerminal(failure);
     }
 
     @Override

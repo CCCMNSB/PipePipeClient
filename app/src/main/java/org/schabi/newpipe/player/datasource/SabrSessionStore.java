@@ -87,6 +87,7 @@ public final class SabrSessionStore {
         private volatile SabrStreamPump pump;
         private volatile Thread warmThread;
         private volatile boolean invalidated;
+        private volatile SabrLogicException terminalFailure;
 
         Holder(@NonNull final String videoId,
                @NonNull final YoutubeSabrInfo info,
@@ -258,6 +259,17 @@ public final class SabrSessionStore {
 
         boolean isInvalidated() {
             return invalidated;
+        }
+
+        void failTerminal(@NonNull final SabrLogicException failure) {
+            terminalFailure = failure;
+            evict(videoId, this);
+        }
+
+        void throwIfTerminal() throws SabrLogicException {
+            if (terminalFailure != null) {
+                throw terminalFailure;
+            }
         }
 
         void setWarmThread(@NonNull final Thread warmThread) {

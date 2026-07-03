@@ -46,7 +46,20 @@ final class SabrMediaPeriod implements MediaPeriod,
     private final DrmSessionEventListener.EventDispatcher drmEventDispatcher;
     private final MediaSourceEventListener.EventDispatcher mediaSourceEventDispatcher;
     private final LoadErrorHandlingPolicy loadErrorHandlingPolicy =
-            new DefaultLoadErrorHandlingPolicy();
+            new DefaultLoadErrorHandlingPolicy() {
+                @Override
+                public long getRetryDelayMsFor(
+                        final LoadErrorHandlingPolicy.LoadErrorInfo loadErrorInfo) {
+                    Throwable cause = loadErrorInfo.exception;
+                    while (cause != null) {
+                        if (cause instanceof SabrLogicException) {
+                            return C.TIME_UNSET;
+                        }
+                        cause = cause.getCause();
+                    }
+                    return super.getRetryDelayMsFor(loadErrorInfo);
+                }
+            };
 
     private final TrackGroupArray trackGroups;
     private final YoutubeSabrFormat[] sabrFormats;
