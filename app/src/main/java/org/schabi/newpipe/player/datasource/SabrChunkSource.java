@@ -41,6 +41,7 @@ final class SabrChunkSource implements ChunkSource {
     private static final String TAG = "SabrChunkSource";
 
     private final SabrSessionStore.Holder holder;
+    private final Object readerOwner;
     private final YoutubeSabrFormat format;
     private final Format trackFormat;
     private final int trackType;
@@ -51,11 +52,13 @@ final class SabrChunkSource implements ChunkSource {
     private IOException fatalError;
 
     SabrChunkSource(final SabrSessionStore.Holder holder,
+                    final Object readerOwner,
                     final YoutubeSabrFormat format,
                     final Format trackFormat,
                     final int trackType,
                     final Localization localization) {
         this.holder = holder;
+        this.readerOwner = readerOwner;
         this.format = format;
         this.trackFormat = trackFormat;
         this.trackType = trackType;
@@ -98,7 +101,7 @@ final class SabrChunkSource implements ChunkSource {
             Log.d(TAG, "nextInit video=" + holder.videoId
                     + " itag=" + format.getItag());
             out.chunk = new InitializationChunk(
-                    new SabrSegmentDataSource(holder, format, localization,
+                    new SabrSegmentDataSource(holder, readerOwner, format, localization,
                             /* prependInit= */ false),
                     new DataSpec(Uri.parse("sabrseg://" + format.getItag() + "/init")),
                     trackFormat, C.SELECTION_REASON_UNKNOWN, null, extractor);
@@ -133,7 +136,8 @@ final class SabrChunkSource implements ChunkSource {
         final long endUs = (endMs > 0 ? endMs : startMs) * 1000;
         final DataSpec spec = new DataSpec(Uri.parse("sabrseg://" + format.getItag() + "/" + seq));
         return new ContainerMediaChunk(
-                new SabrSegmentDataSource(holder, format, localization, /* prependInit= */ false),
+                new SabrSegmentDataSource(holder, readerOwner, format, localization,
+                        /* prependInit= */ false),
                 spec, trackFormat, C.SELECTION_REASON_UNKNOWN, null,
                 startUs, endUs, /* clippedStartTimeUs= */ startUs,
                 // No end clip, on purpose. The first chunk's declared end is basically a rumor: we

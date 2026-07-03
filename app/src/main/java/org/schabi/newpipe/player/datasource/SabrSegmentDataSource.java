@@ -43,6 +43,8 @@ public final class SabrSegmentDataSource implements DataSource {
     private static final long FORWARD_SEEK_AHEAD_MS = 30_000;
 
     private final SabrSessionStore.Holder holder;
+    private final Object readerOwner;
+    private final long readerGeneration;
     private final YoutubeSabrFormat format;
     private final Localization localization;
     // Prepend the init segment so each media chunk is a self-contained fmp4 (init + one fragment),
@@ -59,10 +61,13 @@ public final class SabrSegmentDataSource implements DataSource {
     private volatile boolean canceled;
 
     public SabrSegmentDataSource(final SabrSessionStore.Holder holder,
+                                 final Object readerOwner,
                                  final YoutubeSabrFormat format,
                                  final Localization localization,
                                  final boolean prependInit) {
         this.holder = holder;
+        this.readerOwner = readerOwner;
+        this.readerGeneration = holder.getReaderGeneration(readerOwner);
         this.format = format;
         this.localization = localization;
         this.prependInit = prependInit;
@@ -178,7 +183,7 @@ public final class SabrSegmentDataSource implements DataSource {
                     // Tell the pump how far this track has been loaded so it keeps feeding ahead
                     // (and repositions after a seek). Without this readerHead stayed 0 and the pump
                     // throttled forever after the initial fill.
-                    holder.setReaderPositionMs(format.getItag(),
+                    holder.setReaderPositionMs(readerOwner, readerGeneration, format.getItag(),
                             segment.getHeader().getStartMs() + segment.getHeader().getDurationMs());
                 }
                 return segment.getData();
@@ -208,7 +213,8 @@ public final class SabrSegmentDataSource implements DataSource {
                             .getSegmentStartMs(format, request.getSequenceNumber());
                     if (segStartMs < edgeMs) {
                         // Backward seek onto an evicted segment behind the edge.
-                        holder.setReaderPositionMs(format.getItag(), segStartMs);
+                        holder.setReaderPositionMs(readerOwner, readerGeneration,
+                                format.getItag(), segStartMs);
                         pump.requestRefetchFrom(request);
                         lastRefetchMs = now;
                     } else if (segStartMs > edgeMs + FORWARD_SEEK_AHEAD_MS) {
@@ -216,7 +222,11 @@ public final class SabrSegmentDataSource implements DataSource {
                         // at start, resume-from-history): jump the session onto it instead of waiting
                         // for the forward pump to crawl there. A merely-slow normal fetch (target just
                         // past the edge) stays on the pump, so steady playback is untouched.
-                        holder.setReaderPositionMs(format.getItag(), segStartMs);
+                        holder.setReaderPositionMs(readerOwner, readerGeneration,
+                                format.getItag(), segStartMs);
+                        pump.requestForwardSeekTo(request);
+                        lastRefetchMs = now;
+                    } else if (pump.isThrottled()) {
                         pump.requestForwardSeekTo(request);
                         lastRefetchMs = now;
                     }

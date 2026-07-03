@@ -62,6 +62,7 @@ final class SabrStreamPump {
     private volatile boolean stopped;
     private volatile boolean clearCacheOnStop;
     private volatile boolean fatal;
+    private volatile boolean throttled;
     private volatile long lastReadMs;
     // Set by a reader blocked on an evicted segment behind the edge (backward seek); the loop
     // repositions the session onto it next round. Single-slot: the latest rewind target wins.
@@ -120,6 +121,10 @@ final class SabrStreamPump {
 
     boolean isFatal() {
         return fatal;
+    }
+
+    boolean isThrottled() {
+        return throttled;
     }
 
     /** A reader is blocked on an evicted segment behind the buffered edge (backward seek). Ask the
@@ -190,12 +195,13 @@ final class SabrStreamPump {
                         consecutiveIoErrors = 0;
                         continue;
                     }
-                    final boolean throttled = edgeMs - readerHeadMs > READAHEAD_CUSHION_MS
+                    throttled = edgeMs - readerHeadMs > READAHEAD_CUSHION_MS
                             || session.getCachedBytes() > MAX_AHEAD_BYTES;
                     if (throttled) {
                         Thread.sleep(IDLE_POLL_MS);
                         continue;
                     }
+                    throttled = false;
                     // Report the CONTIGUOUS buffered edge (not readerHead): the server fills from the
                     // reported position, so reporting readerHead (ahead of a laggard track) made it
                     // skip past the gap and the slow track's edge never advanced. Pace on readerHead,
