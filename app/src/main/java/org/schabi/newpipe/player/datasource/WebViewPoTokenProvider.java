@@ -24,7 +24,9 @@ import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.Map;
@@ -51,7 +53,7 @@ public final class WebViewPoTokenProvider implements SabrPoTokenProvider {
     // The WebView mint can occasionally run long. 60s + one retry avoids a token-less cold start.
     private static final long PIPELINE_TIMEOUT_MS = 60_000L;
     // Persist minted tokens across process restarts so an app cold-start can reuse a valid token.
-    private static final String PREFS = "sabr_webpo_token_cache";
+    private static final String PREFS = "sabr_webpo_visitor_token_cache";
     private static final int READY_RETRIES = 20;
     private static final long READY_POLL_MS = 250L;
 
@@ -112,7 +114,7 @@ public final class WebViewPoTokenProvider implements SabrPoTokenProvider {
                 return null;
             }
             // One retry avoids failing playback on a transient WebPoClient error.
-            final String contentBinding = info.getVisitorData();
+            final String contentBinding = getContentBinding(info.getVisitorData());
             if (contentBinding == null || contentBinding.isEmpty()) {
                 return null;
             }
@@ -141,6 +143,26 @@ public final class WebViewPoTokenProvider implements SabrPoTokenProvider {
             diskSave(videoId, tokenB64, now);
             return token;
         }
+    }
+
+    @Nullable
+    private static String getContentBinding(@Nullable final String visitorData) {
+        if (visitorData == null || visitorData.isEmpty()) {
+            return null;
+        }
+        try {
+            final byte[] decoded = Base64.getUrlDecoder().decode(
+                    URLDecoder.decode(visitorData, StandardCharsets.UTF_8.name()));
+            if (decoded.length >= 13) {
+                final String visitorId = new String(Arrays.copyOfRange(decoded, 2, 13),
+                        StandardCharsets.UTF_8);
+                if (visitorId.matches("[A-Za-z0-9_-]{11}")) {
+                    return visitorId;
+                }
+            }
+        } catch (final Exception ignored) {
+        }
+        return visitorData;
     }
 
     /**
