@@ -35,30 +35,23 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * Generates YouTube SABR PO tokens by running the official BotGuard challenge inside a headless
- * WebView (the legitimate attestation runtime), then handing the minted, videoId-bound token to the
- * extractor's SABR session via {@link SabrPoTokenProvider}.
- *
- * <p>Validated end to end (emulator + Pixel 8 / GrapheneOS Vanadium): the WebView produces a token
- * GenerateIT accepts and that flips SABR protection status 2 -> 1.</p>
+ * Generates YouTube SABR PO tokens through YouTube's WebPoClient in a headless WebView, then hands
+ * the session-bound token to the extractor's SABR session via {@link SabrPoTokenProvider}.
  *
  * <p>The provider blocks the calling (loading) thread on a latch while the WebView, driven on the
- * main thread, runs the pipeline. Tokens are cached per videoId (~6h, well under the measured ~7-8h
- * lifetime).</p>
+ * main thread, runs the pipeline. Tokens are cached for each video session for six hours.</p>
  */
 public final class WebViewPoTokenProvider implements SabrPoTokenProvider {
 
     private static final String TAG = "WebViewPoToken";
-    private static final String ASSET = "sabr_potoken_poc.js";
+    private static final String ASSET = "sabr_webpo_client.js";
     private static final String DESKTOP_UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
             + "(KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36";
     private static final long TOKEN_TTL_MS = 6L * 60L * 60L * 1000L; // 6 hours
-    // The WebView BotGuard mint can occasionally run long; a single 45s shot timing out returned a
-    // null token -> token-less SABR -> cold-start failure. 60s + one retry (in getPoToken) is robust.
+    // The WebView mint can occasionally run long. 60s + one retry avoids a token-less cold start.
     private static final long PIPELINE_TIMEOUT_MS = 60_000L;
-    // Persist minted tokens across process restarts so an app cold-start doesn't pay the ~45s mint
-    // again while the videoId-bound token is still valid (<6h).
-    private static final String PREFS = "sabr_potoken_cache";
+    // Persist minted tokens across process restarts so an app cold-start can reuse a valid token.
+    private static final String PREFS = "sabr_webpo_token_cache";
     private static final int READY_RETRIES = 20;
     private static final long READY_POLL_MS = 250L;
 
@@ -99,7 +92,7 @@ public final class WebViewPoTokenProvider implements SabrPoTokenProvider {
                              final boolean forceRefresh) throws SabrProtocolException {
         final String videoId = info.getVideoId();
         if (forceRefresh) {
-            // Server rejected the cached token (expired): drop it (memory + disk) and mint fresh.
+            // Server rejected the cached token: drop it (memory + disk) and mint fresh.
             cache.remove(videoId);
             prefs.edit().remove(videoId).apply();
         }
@@ -118,14 +111,18 @@ public final class WebViewPoTokenProvider implements SabrPoTokenProvider {
             if (Thread.currentThread().isInterrupted()) {
                 return null;
             }
-            // One retry: the BotGuard mint occasionally times out, and a single null killed playback.
-            String tokenB64 = mintBlocking(videoId);
+            // One retry avoids failing playback on a transient WebPoClient error.
+            final String contentBinding = info.getVisitorData();
+            if (contentBinding == null || contentBinding.isEmpty()) {
+                return null;
+            }
+            String tokenB64 = mintBlocking(contentBinding);
             if (Thread.currentThread().isInterrupted()) {
                 return null;
             }
             if (tokenB64 == null || tokenB64.isEmpty()) {
                 Log.w(TAG, "PO token mint returned null, retrying once for " + videoId);
-                tokenB64 = mintBlocking(videoId);
+                tokenB64 = mintBlocking(contentBinding);
                 if (Thread.currentThread().isInterrupted()) {
                     return null;
                 }
@@ -188,7 +185,7 @@ public final class WebViewPoTokenProvider implements SabrPoTokenProvider {
     }
 
     @Nullable
-    private String mintBlocking(final String videoId) throws SabrProtocolException {
+    private String mintBlocking(final String contentBinding) throws SabrProtocolException {
         final CountDownLatch latch = new CountDownLatch(1);
         final AtomicBoolean canceled = new AtomicBoolean(false);
         final AtomicReference<String> tokenRef = new AtomicReference<>();
@@ -200,7 +197,7 @@ public final class WebViewPoTokenProvider implements SabrPoTokenProvider {
                 return;
             }
             try {
-                final WebView webView = createWebView(videoId, tokenRef, latch, canceled);
+                final WebView webView = createWebView(contentBinding, tokenRef, latch, canceled);
                 if (canceled.get()) {
                     destroyWebView(webView);
                     latch.countDown();
@@ -215,7 +212,7 @@ public final class WebViewPoTokenProvider implements SabrPoTokenProvider {
 
         try {
             if (!latch.await(PIPELINE_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
-                throw new SabrProtocolException("PO token pipeline timed out for " + videoId);
+                throw new SabrProtocolException("PO token pipeline timed out");
             }
         } catch (final InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -227,7 +224,7 @@ public final class WebViewPoTokenProvider implements SabrPoTokenProvider {
     }
 
     @SuppressLint("SetJavaScriptEnabled")
-    private WebView createWebView(final String videoId,
+    private WebView createWebView(final String contentBinding,
                                   final AtomicReference<String> tokenRef,
                                   final CountDownLatch latch,
                                   final AtomicBoolean canceled) {
@@ -257,14 +254,15 @@ public final class WebViewPoTokenProvider implements SabrPoTokenProvider {
                     return;
                 }
                 injected = true;
-                waitForReadyThenInject(view, videoId, 0, canceled);
+                waitForReadyThenInject(view, contentBinding, 0, canceled);
             }
         });
         webView.loadUrl("https://www.youtube.com/");
         return webView;
     }
 
-    private void waitForReadyThenInject(final WebView view, final String videoId, final int attempt,
+    private void waitForReadyThenInject(final WebView view, final String contentBinding,
+                                        final int attempt,
                                         final AtomicBoolean canceled) {
         if (canceled.get()) {
             return;
@@ -276,11 +274,12 @@ public final class WebViewPoTokenProvider implements SabrPoTokenProvider {
             final boolean complete = value != null && value.contains("complete");
             if (complete || attempt >= READY_RETRIES) {
                 view.evaluateJavascript(
-                        "window.__SABR_POC_VIDEO_ID=" + jsString(videoId) + ";", null);
+                        "window.__SABR_WEBPO_CONTENT_BINDING=" + jsString(contentBinding) + ";",
+                        null);
                 view.evaluateJavascript(loadPipelineScript(), null);
             } else {
                 mainHandler.postDelayed(
-                        () -> waitForReadyThenInject(view, videoId, attempt + 1, canceled),
+                        () -> waitForReadyThenInject(view, contentBinding, attempt + 1, canceled),
                         READY_POLL_MS);
             }
         });
