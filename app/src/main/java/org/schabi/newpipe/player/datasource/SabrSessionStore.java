@@ -1,6 +1,7 @@
 package org.schabi.newpipe.player.datasource;
 
 import android.content.Context;
+import android.util.Log;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -30,6 +31,8 @@ import java.util.concurrent.atomic.AtomicInteger;
  * <p>v1: uses the best audio/video formats from the player response and a fixed en/US locale.</p>
  */
 public final class SabrSessionStore {
+
+    private static final String TAG = "SabrSessionStore";
 
     private static final Map<String, Holder> SESSIONS = new ConcurrentHashMap<>();
     // The user-selected audio track id per video, applied on the next (re)build of its session.
@@ -417,9 +420,13 @@ public final class SabrSessionStore {
                     if (Thread.currentThread().isInterrupted() || !isCurrentHolder(videoId, holder)) {
                         return;
                     }
-                    provider.getPoToken(info, session.getStreamState());
-                } catch (final Exception ignored) {
-                    // Best-effort; the pump mints/fetches on demand if this fails.
+                    final byte[] token = provider.getPoToken(info, session.getStreamState());
+                    session.addDiagnosticEvent("token_prewarm bytes="
+                            + (token == null ? -1 : token.length));
+                } catch (final Exception e) {
+                    Log.w(TAG, "PO token prewarm failed video=" + videoId, e);
+                    session.addDiagnosticEvent("token_prewarm_failed type="
+                            + e.getClass().getSimpleName() + " message=" + e.getMessage());
                 } finally {
                     holder.clearWarmThread(Thread.currentThread());
                 }

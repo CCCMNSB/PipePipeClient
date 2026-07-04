@@ -2,10 +2,14 @@ package org.schabi.newpipe.player.datasource;
 
 import android.annotation.SuppressLint;
 import android.content.Context;
+import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
+import android.webkit.ConsoleMessage;
 import android.webkit.JavascriptInterface;
+import android.webkit.WebChromeClient;
+import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
@@ -91,6 +95,8 @@ public final class WebViewPoTokenProvider implements SabrPoTokenProvider {
     public byte[] getPoToken(final YoutubeSabrInfo info, final YoutubeSabrStreamState streamState,
                              final boolean forceRefresh) throws SabrProtocolException {
         final String videoId = info.getVideoId();
+        Log.i(TAG, "get video=" + videoId + " force=" + forceRefresh
+                + " thread=" + Thread.currentThread().getName());
         if (forceRefresh) {
             // Server rejected the cached token: drop it (memory + disk) and mint fresh.
             cache.remove(videoId);
@@ -106,13 +112,17 @@ public final class WebViewPoTokenProvider implements SabrPoTokenProvider {
                 }
             }
             if (cached != null && now - cached.mintedAtMs < TOKEN_TTL_MS) {
+                Log.i(TAG, "cache hit video=" + videoId + " bytes=" + cached.token.length
+                        + " ageMs=" + (now - cached.mintedAtMs));
                 return cached.token;
             }
             if (Thread.currentThread().isInterrupted()) {
+                Log.w(TAG, "mint skipped: interrupted video=" + videoId);
                 return null;
             }
             // One retry avoids failing playback on a transient WebPoClient error.
             final String contentBinding = info.getVideoId();
+            Log.i(TAG, "mint start video=" + videoId + " binding=video_id");
             String tokenB64 = mintBlocking(contentBinding);
             if (Thread.currentThread().isInterrupted()) {
                 return null;
@@ -125,6 +135,7 @@ public final class WebViewPoTokenProvider implements SabrPoTokenProvider {
                 }
             }
             if (tokenB64 == null || tokenB64.isEmpty()) {
+                Log.e(TAG, "PO token mint failed after retry video=" + videoId);
                 return null;
             }
             final byte[] token;
@@ -136,6 +147,7 @@ public final class WebViewPoTokenProvider implements SabrPoTokenProvider {
             }
             cache.put(videoId, new CachedToken(token, now));
             diskSave(videoId, tokenB64, now);
+            Log.i(TAG, "mint complete video=" + videoId + " bytes=" + token.length);
             return token;
         }
     }
@@ -187,21 +199,31 @@ public final class WebViewPoTokenProvider implements SabrPoTokenProvider {
         final AtomicBoolean canceled = new AtomicBoolean(false);
         final AtomicReference<String> tokenRef = new AtomicReference<>();
         final AtomicReference<WebView> webViewRef = new AtomicReference<>();
+        final AtomicReference<String> stage = new AtomicReference<>("posting_create");
+        final long startedAt = System.currentTimeMillis();
 
         mainHandler.post(() -> {
             if (canceled.get()) {
+                Log.w(TAG, "create canceled before main-thread start");
                 latch.countDown();
                 return;
             }
             try {
-                final WebView webView = createWebView(contentBinding, tokenRef, latch, canceled);
+                stage.set("creating_webview");
+                Log.i(TAG, "creating WebView mainThread="
+                        + (Looper.myLooper() == Looper.getMainLooper()));
+                final WebView webView = createWebView(contentBinding, tokenRef, latch, canceled,
+                        stage);
                 if (canceled.get()) {
+                    Log.w(TAG, "create completed after cancellation");
                     destroyWebView(webView);
                     latch.countDown();
                 } else {
                     webViewRef.set(webView);
+                    Log.i(TAG, "WebView created and load requested");
                 }
             } catch (final Exception e) {
+                stage.set("create_failed");
                 Log.e(TAG, "failed to start WebView pipeline", e);
                 latch.countDown();
             }
@@ -209,9 +231,17 @@ public final class WebViewPoTokenProvider implements SabrPoTokenProvider {
 
         try {
             if (!latch.await(PIPELINE_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
-                throw new SabrProtocolException("PO token pipeline timed out");
+                Log.e(TAG, "pipeline timeout stage=" + stage.get()
+                        + " elapsedMs=" + (System.currentTimeMillis() - startedAt)
+                        + " webView=" + (webViewRef.get() != null));
+                throw new SabrProtocolException("PO token pipeline timed out at " + stage.get());
             }
+            Log.i(TAG, "pipeline released stage=" + stage.get()
+                    + " elapsedMs=" + (System.currentTimeMillis() - startedAt)
+                    + " token=" + (tokenRef.get() == null ? "null" : "present"));
         } catch (final InterruptedException e) {
+            stage.set("interrupted");
+            Log.w(TAG, "pipeline interrupted stage=" + stage.get(), e);
             Thread.currentThread().interrupt();
         } finally {
             canceled.set(true);
@@ -224,20 +254,36 @@ public final class WebViewPoTokenProvider implements SabrPoTokenProvider {
     private WebView createWebView(final String contentBinding,
                                   final AtomicReference<String> tokenRef,
                                   final CountDownLatch latch,
-                                  final AtomicBoolean canceled) {
+                                  final AtomicBoolean canceled,
+                                  final AtomicReference<String> stage) {
         final WebView webView = new WebView(appContext);
         final AtomicBoolean injected = new AtomicBoolean(false);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
+                && WebView.getCurrentWebViewPackage() != null) {
+            Log.i(TAG, "WebView package=" + WebView.getCurrentWebViewPackage().packageName
+                    + " version=" + WebView.getCurrentWebViewPackage().versionName);
+        }
         final WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(true);
         settings.setUserAgentString(DESKTOP_UA);
-        webView.addJavascriptInterface(new Bridge(tokenRef, latch, canceled), "SabrPocBridge");
+        webView.addJavascriptInterface(new Bridge(tokenRef, latch, canceled, stage),
+                "SabrPocBridge");
+        webView.setWebChromeClient(new WebChromeClient() {
+            @Override
+            public boolean onConsoleMessage(final ConsoleMessage message) {
+                Log.i(TAG, "console " + message.messageLevel() + " " + message.message()
+                        + " @" + message.sourceId() + ':' + message.lineNumber());
+                return true;
+            }
+        });
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public WebResourceResponse shouldInterceptRequest(final WebView view,
                                                               final WebResourceRequest request) {
                 final String url = request.getUrl().toString();
                 if (url.contains("/js/th/")) {
+                    Log.i(TAG, "intercept interpreter url=" + url);
                     return fetchWithCors(url);
                 }
                 return super.shouldInterceptRequest(view, request);
@@ -246,46 +292,73 @@ public final class WebViewPoTokenProvider implements SabrPoTokenProvider {
             @Override
             public void onPageFinished(final WebView view, final String url) {
                 super.onPageFinished(view, url);
+                Log.i(TAG, "page finished url=" + url + " canceled=" + canceled.get());
                 if (canceled.get() || url == null || !url.contains("youtube.com")
                         || !injected.compareAndSet(false, true)) {
                     return;
                 }
-                waitForReadyThenInject(view, contentBinding, 0, canceled);
+                stage.set("page_finished");
+                waitForReadyThenInject(view, contentBinding, 0, canceled, stage);
             }
 
             @Override
             public void onPageCommitVisible(final WebView view, final String url) {
                 super.onPageCommitVisible(view, url);
+                Log.i(TAG, "page commit url=" + url + " canceled=" + canceled.get());
                 if (canceled.get() || url == null || !url.contains("youtube.com")
                         || !injected.compareAndSet(false, true)) {
                     return;
                 }
-                waitForReadyThenInject(view, contentBinding, 0, canceled);
+                stage.set("page_committed");
+                waitForReadyThenInject(view, contentBinding, 0, canceled, stage);
+            }
+
+            @Override
+            public void onReceivedError(final WebView view, final WebResourceRequest request,
+                                        final WebResourceError error) {
+                super.onReceivedError(view, request, error);
+                Log.w(TAG, "resource error main=" + request.isForMainFrame()
+                        + " code=" + error.getErrorCode() + " description="
+                        + error.getDescription() + " url=" + request.getUrl());
             }
         });
+        stage.set("loading_page");
+        Log.i(TAG, "load page");
         webView.loadUrl("https://www.youtube.com?themeRefresh=1");
         return webView;
     }
 
     private void waitForReadyThenInject(final WebView view, final String contentBinding,
                                         final int attempt,
-                                        final AtomicBoolean canceled) {
+                                        final AtomicBoolean canceled,
+                                        final AtomicReference<String> stage) {
         if (canceled.get()) {
+            Log.w(TAG, "ready poll canceled attempt=" + attempt);
             return;
         }
+        stage.set("ready_poll_" + attempt);
         view.evaluateJavascript("document.readyState", value -> {
             if (canceled.get()) {
+                Log.w(TAG, "ready result canceled attempt=" + attempt);
                 return;
             }
             final boolean complete = value != null && value.contains("complete");
+            Log.i(TAG, "ready attempt=" + attempt + " value=" + value
+                    + " complete=" + complete);
             if (complete || attempt >= READY_RETRIES) {
+                stage.set("injecting_binding");
                 view.evaluateJavascript(
                         "window.__SABR_WEBPO_CONTENT_BINDING=" + jsString(contentBinding) + ";",
-                        null);
-                view.evaluateJavascript(loadPipelineScript(), null);
+                        result -> Log.i(TAG, "binding injected result=" + result));
+                stage.set("injecting_script");
+                view.evaluateJavascript(loadPipelineScript(), result -> {
+                    stage.set("waiting_bridge");
+                    Log.i(TAG, "script injected result=" + result);
+                });
             } else {
                 mainHandler.postDelayed(
-                        () -> waitForReadyThenInject(view, contentBinding, attempt + 1, canceled),
+                        () -> waitForReadyThenInject(view, contentBinding, attempt + 1, canceled,
+                                stage),
                         READY_POLL_MS);
             }
         });
@@ -356,27 +429,39 @@ public final class WebViewPoTokenProvider implements SabrPoTokenProvider {
         private final AtomicReference<String> tokenRef;
         private final CountDownLatch latch;
         private final AtomicBoolean canceled;
+        private final AtomicReference<String> stage;
 
         Bridge(final AtomicReference<String> tokenRef, final CountDownLatch latch,
-               final AtomicBoolean canceled) {
+               final AtomicBoolean canceled, final AtomicReference<String> stage) {
             this.tokenRef = tokenRef;
             this.latch = latch;
             this.canceled = canceled;
+            this.stage = stage;
         }
 
         @JavascriptInterface
         public void onResult(final String json) {
+            stage.set("bridge_called");
+            Log.i(TAG, "bridge called canceled=" + canceled.get()
+                    + " jsonLength=" + (json == null ? -1 : json.length()));
             try {
                 if (canceled.get()) {
+                    Log.w(TAG, "bridge result ignored after cancellation");
                     return;
                 }
                 final JSONObject obj = new JSONObject(json);
                 if (obj.optBoolean("ok", false)) {
-                    tokenRef.set(obj.optString("poToken", null));
+                    final String token = obj.optString("poToken", null);
+                    tokenRef.set(token);
+                    stage.set("bridge_success");
+                    Log.i(TAG, "bridge success tokenB64Length="
+                            + (token == null ? -1 : token.length()));
                 } else {
+                    stage.set("bridge_failed");
                     Log.w(TAG, "PO token pipeline failed: " + obj.optString("error", "unknown"));
                 }
             } catch (final Exception e) {
+                stage.set("bridge_parse_failed");
                 Log.e(TAG, "could not parse pipeline result", e);
             } finally {
                 latch.countDown();
