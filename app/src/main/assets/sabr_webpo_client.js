@@ -1,7 +1,6 @@
 (function () {
     'use strict';
 
-    var clientPath = window.top['havuokmhhs-0']?.bevasrs?.wpc;
     var contentBinding = window.__SABR_WEBPO_CONTENT_BINDING;
 
     function report(result) {
@@ -9,8 +8,7 @@
     }
 
     function waitForClient(attempt) {
-        clientPath = window.top['havuokmhhs-0']?.bevasrs?.wpc;
-        if (typeof clientPath === 'function') {
+        if (typeof window.top['havuokmhhs-0']?.bevasrs?.wpc === 'function') {
             return Promise.resolve();
         }
         if (attempt >= 10) {
@@ -24,7 +22,7 @@
     }
 
     function mint(attempt) {
-        return clientPath().then(function (client) {
+        return window.top['havuokmhhs-0'].bevasrs.wpc().then(function (client) {
             return client.mws({c: contentBinding, mc: false, me: false});
         }).catch(function (error) {
             if (String(error).indexOf('SDF:notready') >= 0 && attempt < 10) {

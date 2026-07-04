@@ -229,14 +229,13 @@ public final class WebViewPoTokenProvider implements SabrPoTokenProvider {
                                   final CountDownLatch latch,
                                   final AtomicBoolean canceled) {
         final WebView webView = new WebView(appContext);
+        final AtomicBoolean injected = new AtomicBoolean(false);
         final WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(true);
         settings.setUserAgentString(DESKTOP_UA);
         webView.addJavascriptInterface(new Bridge(tokenRef, latch, canceled), "SabrPocBridge");
         webView.setWebViewClient(new WebViewClient() {
-            private boolean injected = false;
-
             @Override
             public WebResourceResponse shouldInterceptRequest(final WebView view,
                                                               final WebResourceRequest request) {
@@ -250,14 +249,24 @@ public final class WebViewPoTokenProvider implements SabrPoTokenProvider {
             @Override
             public void onPageFinished(final WebView view, final String url) {
                 super.onPageFinished(view, url);
-                if (canceled.get() || injected || url == null || !url.contains("youtube.com")) {
+                if (canceled.get() || url == null || !url.contains("youtube.com")
+                        || !injected.compareAndSet(false, true)) {
                     return;
                 }
-                injected = true;
+                waitForReadyThenInject(view, contentBinding, 0, canceled);
+            }
+
+            @Override
+            public void onPageCommitVisible(final WebView view, final String url) {
+                super.onPageCommitVisible(view, url);
+                if (canceled.get() || url == null || !url.contains("youtube.com")
+                        || !injected.compareAndSet(false, true)) {
+                    return;
+                }
                 waitForReadyThenInject(view, contentBinding, 0, canceled);
             }
         });
-        webView.loadUrl("https://www.youtube.com/");
+        webView.loadUrl("https://www.youtube.com?themeRefresh=1");
         return webView;
     }
 
