@@ -427,6 +427,9 @@ public final class SabrSessionStore {
                     Log.w(TAG, "PO token prewarm failed video=" + videoId, e);
                     session.addDiagnosticEvent("token_prewarm_failed type="
                             + e.getClass().getSimpleName() + " message=" + e.getMessage());
+                    holder.failTerminal(new SabrLogicException(
+                            "SABR PO token prewarm failed for video=" + videoId
+                                    + ": " + e.getMessage(), e));
                 } finally {
                     holder.clearWarmThread(Thread.currentThread());
                 }

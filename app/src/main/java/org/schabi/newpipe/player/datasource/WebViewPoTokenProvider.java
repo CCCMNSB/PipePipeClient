@@ -118,20 +118,20 @@ public final class WebViewPoTokenProvider implements SabrPoTokenProvider {
             }
             if (Thread.currentThread().isInterrupted()) {
                 Log.w(TAG, "mint skipped: interrupted video=" + videoId);
-                return null;
+                throw new SabrProtocolException("PO token mint interrupted before start");
             }
             // One retry avoids failing playback on a transient WebPoClient error.
             final String contentBinding = info.getVideoId();
             Log.i(TAG, "mint start video=" + videoId + " binding=video_id");
             String tokenB64 = mintBlocking(contentBinding);
             if (Thread.currentThread().isInterrupted()) {
-                return null;
+                throw new SabrProtocolException("PO token mint interrupted after pipeline");
             }
             if (tokenB64 == null || tokenB64.isEmpty()) {
                 Log.w(TAG, "PO token mint returned null, retrying once for " + videoId);
                 tokenB64 = mintBlocking(contentBinding);
                 if (Thread.currentThread().isInterrupted()) {
-                    return null;
+                    throw new SabrProtocolException("PO token mint interrupted after retry");
                 }
             }
             if (tokenB64 == null || tokenB64.isEmpty()) {
@@ -200,6 +200,7 @@ public final class WebViewPoTokenProvider implements SabrPoTokenProvider {
         final AtomicReference<String> tokenRef = new AtomicReference<>();
         final AtomicReference<WebView> webViewRef = new AtomicReference<>();
         final AtomicReference<String> stage = new AtomicReference<>("posting_create");
+        final AtomicReference<Throwable> failureRef = new AtomicReference<>();
         final long startedAt = System.currentTimeMillis();
 
         mainHandler.post(() -> {
@@ -213,7 +214,7 @@ public final class WebViewPoTokenProvider implements SabrPoTokenProvider {
                 Log.i(TAG, "creating WebView mainThread="
                         + (Looper.myLooper() == Looper.getMainLooper()));
                 final WebView webView = createWebView(contentBinding, tokenRef, latch, canceled,
-                        stage);
+                        stage, failureRef);
                 if (canceled.get()) {
                     Log.w(TAG, "create completed after cancellation");
                     destroyWebView(webView);
@@ -224,6 +225,7 @@ public final class WebViewPoTokenProvider implements SabrPoTokenProvider {
                 }
             } catch (final Exception e) {
                 stage.set("create_failed");
+                failureRef.set(e);
                 Log.e(TAG, "failed to start WebView pipeline", e);
                 latch.countDown();
             }
@@ -239,10 +241,20 @@ public final class WebViewPoTokenProvider implements SabrPoTokenProvider {
             Log.i(TAG, "pipeline released stage=" + stage.get()
                     + " elapsedMs=" + (System.currentTimeMillis() - startedAt)
                     + " token=" + (tokenRef.get() == null ? "null" : "present"));
+            final Throwable failure = failureRef.get();
+            if (failure != null) {
+                throw new SabrProtocolException("PO token pipeline failed at " + stage.get()
+                        + ": " + failure.getMessage(), failure);
+            }
+            if (tokenRef.get() == null || tokenRef.get().isEmpty()) {
+                throw new SabrProtocolException("PO token pipeline returned no token at "
+                        + stage.get());
+            }
         } catch (final InterruptedException e) {
             stage.set("interrupted");
             Log.w(TAG, "pipeline interrupted stage=" + stage.get(), e);
             Thread.currentThread().interrupt();
+            throw new SabrProtocolException("PO token pipeline interrupted", e);
         } finally {
             canceled.set(true);
             mainHandler.post(() -> destroyWebView(webViewRef.getAndSet(null)));
@@ -255,7 +267,8 @@ public final class WebViewPoTokenProvider implements SabrPoTokenProvider {
                                   final AtomicReference<String> tokenRef,
                                   final CountDownLatch latch,
                                   final AtomicBoolean canceled,
-                                  final AtomicReference<String> stage) {
+                                  final AtomicReference<String> stage,
+                                  final AtomicReference<Throwable> failureRef) {
         final WebView webView = new WebView(appContext);
         final AtomicBoolean injected = new AtomicBoolean(false);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
@@ -267,7 +280,7 @@ public final class WebViewPoTokenProvider implements SabrPoTokenProvider {
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(true);
         settings.setUserAgentString(DESKTOP_UA);
-        webView.addJavascriptInterface(new Bridge(tokenRef, latch, canceled, stage),
+        webView.addJavascriptInterface(new Bridge(tokenRef, latch, canceled, stage, failureRef),
                 "SabrPocBridge");
         webView.setWebChromeClient(new WebChromeClient() {
             @Override
@@ -298,7 +311,8 @@ public final class WebViewPoTokenProvider implements SabrPoTokenProvider {
                     return;
                 }
                 stage.set("page_finished");
-                waitForReadyThenInject(view, contentBinding, 0, canceled, stage);
+                waitForReadyThenInject(view, contentBinding, 0, canceled, stage, failureRef,
+                        latch);
             }
 
             @Override
@@ -310,7 +324,8 @@ public final class WebViewPoTokenProvider implements SabrPoTokenProvider {
                     return;
                 }
                 stage.set("page_committed");
-                waitForReadyThenInject(view, contentBinding, 0, canceled, stage);
+                waitForReadyThenInject(view, contentBinding, 0, canceled, stage, failureRef,
+                        latch);
             }
 
             @Override
@@ -320,6 +335,12 @@ public final class WebViewPoTokenProvider implements SabrPoTokenProvider {
                 Log.w(TAG, "resource error main=" + request.isForMainFrame()
                         + " code=" + error.getErrorCode() + " description="
                         + error.getDescription() + " url=" + request.getUrl());
+                if (request.isForMainFrame() && failureRef.compareAndSet(null,
+                        new IllegalStateException("WebView main page error "
+                                + error.getErrorCode() + ": " + error.getDescription()))) {
+                    stage.set("main_page_failed");
+                    latch.countDown();
+                }
             }
         });
         stage.set("loading_page");
@@ -331,7 +352,9 @@ public final class WebViewPoTokenProvider implements SabrPoTokenProvider {
     private void waitForReadyThenInject(final WebView view, final String contentBinding,
                                         final int attempt,
                                         final AtomicBoolean canceled,
-                                        final AtomicReference<String> stage) {
+                                        final AtomicReference<String> stage,
+                                        final AtomicReference<Throwable> failureRef,
+                                        final CountDownLatch latch) {
         if (canceled.get()) {
             Log.w(TAG, "ready poll canceled attempt=" + attempt);
             return;
@@ -351,14 +374,22 @@ public final class WebViewPoTokenProvider implements SabrPoTokenProvider {
                         "window.__SABR_WEBPO_CONTENT_BINDING=" + jsString(contentBinding) + ";",
                         result -> Log.i(TAG, "binding injected result=" + result));
                 stage.set("injecting_script");
-                view.evaluateJavascript(loadPipelineScript(), result -> {
+                final String script = loadPipelineScript();
+                if (script.isEmpty()) {
+                    failureRef.compareAndSet(null,
+                            new IllegalStateException("WebPo pipeline asset is empty"));
+                    stage.set("script_load_failed");
+                    latch.countDown();
+                    return;
+                }
+                view.evaluateJavascript(script, result -> {
                     stage.set("waiting_bridge");
                     Log.i(TAG, "script injected result=" + result);
                 });
             } else {
                 mainHandler.postDelayed(
                         () -> waitForReadyThenInject(view, contentBinding, attempt + 1, canceled,
-                                stage),
+                                stage, failureRef, latch),
                         READY_POLL_MS);
             }
         });
@@ -430,13 +461,16 @@ public final class WebViewPoTokenProvider implements SabrPoTokenProvider {
         private final CountDownLatch latch;
         private final AtomicBoolean canceled;
         private final AtomicReference<String> stage;
+        private final AtomicReference<Throwable> failureRef;
 
         Bridge(final AtomicReference<String> tokenRef, final CountDownLatch latch,
-               final AtomicBoolean canceled, final AtomicReference<String> stage) {
+               final AtomicBoolean canceled, final AtomicReference<String> stage,
+               final AtomicReference<Throwable> failureRef) {
             this.tokenRef = tokenRef;
             this.latch = latch;
             this.canceled = canceled;
             this.stage = stage;
+            this.failureRef = failureRef;
         }
 
         @JavascriptInterface
@@ -458,10 +492,13 @@ public final class WebViewPoTokenProvider implements SabrPoTokenProvider {
                             + (token == null ? -1 : token.length()));
                 } else {
                     stage.set("bridge_failed");
-                    Log.w(TAG, "PO token pipeline failed: " + obj.optString("error", "unknown"));
+                    final String error = obj.optString("error", "unknown");
+                    failureRef.compareAndSet(null, new IllegalStateException(error));
+                    Log.w(TAG, "PO token pipeline failed: " + error);
                 }
             } catch (final Exception e) {
                 stage.set("bridge_parse_failed");
+                failureRef.compareAndSet(null, e);
                 Log.e(TAG, "could not parse pipeline result", e);
             } finally {
                 latch.countDown();
