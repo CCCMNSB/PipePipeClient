@@ -3196,7 +3196,8 @@ public final class Player implements
                 }
                 break;
             case ERROR_CODE_IO_UNSPECIFIED:
-                if (error.getCause().getMessage() != null && error.getCause().getMessage().contains("403")) {
+                if (error.getCause().getMessage() != null
+                        && error.getCause().getMessage().contains("Response code: 403")) {
                     try {
                         AlertDialog.Builder builder = new AlertDialog.Builder(getParentActivity())
                                 .setTitle(R.string.network_error)
