@@ -3,6 +3,7 @@ package org.schabi.newpipe;
 import android.content.*;
 import android.content.pm.ResolveInfo;
 import android.os.Build;
+import android.text.TextUtils;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
@@ -138,6 +139,13 @@ public class App extends MultiDexApplication {
             }
         }
         if (!isYoutubePlayerClientValid) {
+            youtubePlayerClient = youtubePlayerClients[0];
+            prefs.edit().putString(youtubePlayerClientKey, youtubePlayerClient).apply();
+        }
+        final boolean hasYouTubeLogin = !TextUtils.isEmpty(prefs.getString(
+                getString(R.string.youtube_cookies_key), null));
+        if (hasYouTubeLogin && ("android_vr".equals(youtubePlayerClient)
+                || "tv_simply".equals(youtubePlayerClient))) {
             youtubePlayerClient = youtubePlayerClients[0];
             prefs.edit().putString(youtubePlayerClientKey, youtubePlayerClient).apply();
         }
