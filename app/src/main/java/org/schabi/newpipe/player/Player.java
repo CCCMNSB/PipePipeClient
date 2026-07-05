@@ -2360,8 +2360,10 @@ public final class Player implements
                     onPrepared(playWhenReady);
                 }
                 changeState(playWhenReady ? STATE_PLAYING : STATE_PAUSED);
-                NotificationUtil.getInstance()
-                        .createNotificationAndStartForeground(this, service.getInstance());
+                if (Build.VERSION.SDK_INT >= 37) {
+                    NotificationUtil.getInstance()
+                            .createNotificationAndStartForeground(this, service.getInstance());
+                }
                 break;
             case androidx.media3.common.Player.STATE_ENDED: // 4
                 changeState(STATE_COMPLETED);
