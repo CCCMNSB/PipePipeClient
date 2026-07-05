@@ -111,7 +111,7 @@ public class AdvancedSettingsFragment extends BasePreferenceFragment implements 
         } else if (key.equals(getString(R.string.auto_translated_subtitles_language_key))) {
             ServiceHelper.initServices(this.getContext());
         } else if (key.equals(getString(R.string.youtube_player_client_key))) {
-            NewPipe.setYoutubePlayerClient(sharedPreferences.getString(key, "web_safari"));
+            NewPipe.setYoutubePlayerClient(sharedPreferences.getString(key, "mweb"));
         }
     }
 

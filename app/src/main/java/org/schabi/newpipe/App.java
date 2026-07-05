@@ -132,7 +132,7 @@ public class App extends MultiDexApplication {
         final boolean hasYouTubeLogin = !TextUtils.isEmpty(prefs.getString(
                 getString(R.string.youtube_cookies_key), null));
         final String defaultYoutubePlayerClient = hasYouTubeLogin
-                ? "tv_downgraded" : "web_safari";
+                ? "tv_downgraded" : "mweb";
         String youtubePlayerClient = prefs.getString(youtubePlayerClientKey,
                 defaultYoutubePlayerClient);
         boolean isYoutubePlayerClientValid = false;
