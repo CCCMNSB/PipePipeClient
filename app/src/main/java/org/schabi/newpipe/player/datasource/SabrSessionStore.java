@@ -196,7 +196,7 @@ public final class SabrSessionStore {
         void releaseSource() {
             final int refs = sourceReferences.decrementAndGet();
             if (refs <= 0) {
-                evict(videoId, this);
+                evict(videoId, this, "sources_released refs=" + refs);
             }
         }
 
@@ -266,7 +266,7 @@ public final class SabrSessionStore {
 
         void failTerminal(@NonNull final SabrLogicException failure) {
             terminalFailure = failure;
-            evict(videoId, this);
+            evict(videoId, this, "terminal_failure message=" + failure.getMessage());
         }
 
         void throwIfTerminal() throws SabrLogicException {
@@ -285,7 +285,13 @@ public final class SabrSessionStore {
             }
         }
 
-        void stop() {
+        void stop(@NonNull final String reason) {
+            Log.w(TAG, "stop video=" + videoId + " reason=" + reason
+                    + " refs=" + sourceReferences.get() + " activeTracks=" + hasActiveTracks()
+                    + " warm=" + (warmThread == null ? "none" : warmThread.getState())
+                    + " pump=" + (pump == null ? "none" : pump.getStateName()));
+            session.addDiagnosticEvent("session_stop reason=" + reason
+                    + " refs=" + sourceReferences.get() + " activeTracks=" + hasActiveTracks());
             invalidated = true;
             synchronized (this) {
                 activeTrackModes.clear();
@@ -393,7 +399,11 @@ public final class SabrSessionStore {
                 // itag or audio track for the same video. The cached session is locked to its
                 // formats, so returning it would re-prepare the player on the old pick and
                 // dead-buffer. Drop it (stops the pump) + rebuild below.
-                evict(videoId);
+                evict(videoId, null, "format_change oldVideoItag="
+                        + current.videoFormat.getItag() + " requestedVideoItag="
+                        + preferredVideoItag + " oldAudioTrack="
+                        + current.audioFormat.getAudioTrackId() + " requestedAudioTrack="
+                        + preferredAudioTrackId);
             }
             final Localization localization = new Localization("en", "US");
             final ContentCountry contentCountry = new ContentCountry("US");
@@ -424,6 +434,14 @@ public final class SabrSessionStore {
                     session.addDiagnosticEvent("token_prewarm bytes="
                             + (token == null ? -1 : token.length));
                 } catch (final Exception e) {
+                    if (Thread.currentThread().isInterrupted()) {
+                        Log.i(TAG, "PO token prewarm canceled video=" + videoId
+                                + " current=" + isCurrentHolder(videoId, holder)
+                                + " message=" + e.getMessage());
+                        session.addDiagnosticEvent("token_prewarm_canceled current="
+                                + isCurrentHolder(videoId, holder) + " message=" + e.getMessage());
+                        return;
+                    }
                     Log.w(TAG, "PO token prewarm failed video=" + videoId, e);
                     session.addDiagnosticEvent("token_prewarm_failed type="
                             + e.getClass().getSimpleName() + " message=" + e.getMessage());
@@ -536,7 +554,7 @@ public final class SabrSessionStore {
 
     /** Evict a cached session, stopping its pump so the thread + buffers are released. */
     public static void evict(@NonNull final String videoId) {
-        evict(videoId, null);
+        evict(videoId, null, "explicit");
     }
 
     private static void trimSessions(@Nullable final String protectedVideoId) {
@@ -562,13 +580,14 @@ public final class SabrSessionStore {
                 ORDER.remove(candidate);
             }
             if (holder != null) {
-                holder.stop();
+                holder.stop("session_trim protectedVideo=" + protectedVideoId);
             }
         }
     }
 
     private static void evict(@NonNull final String videoId,
-                              @Nullable final Holder expectedHolder) {
+                              @Nullable final Holder expectedHolder,
+                              @NonNull final String reason) {
         final Holder holder;
         synchronized (SabrSessionStore.class) {
             holder = SESSIONS.get(videoId);
@@ -579,7 +598,7 @@ public final class SabrSessionStore {
             ORDER.remove(videoId);
         }
         if (holder != null) {
-            holder.stop();
+            holder.stop(reason);
         }
     }
 

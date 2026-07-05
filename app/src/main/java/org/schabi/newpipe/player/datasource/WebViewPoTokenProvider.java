@@ -254,10 +254,13 @@ public final class WebViewPoTokenProvider implements SabrPoTokenProvider {
                         + stage.get() + ", detail=" + detail.get());
             }
         } catch (final InterruptedException e) {
-            stage.set("interrupted");
-            Log.w(TAG, "pipeline interrupted stage=" + stage.get(), e);
+            final String interruptedStage = stage.get();
+            Log.w(TAG, "pipeline interrupted stage=" + interruptedStage
+                    + " elapsedMs=" + (System.currentTimeMillis() - startedAt)
+                    + " detail=" + detail.get(), e);
             Thread.currentThread().interrupt();
-            throw new SabrProtocolException("PO token pipeline interrupted", e);
+            throw new SabrProtocolException("PO token pipeline interrupted at "
+                    + interruptedStage + ", detail=" + detail.get(), e);
         } finally {
             canceled.set(true);
             mainHandler.post(() -> destroyWebView(webViewRef.getAndSet(null)));

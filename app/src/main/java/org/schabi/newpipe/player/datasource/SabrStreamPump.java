@@ -263,6 +263,14 @@ final class SabrStreamPump {
                     holder.failTerminal(new SabrLogicException("SABR media failure", e));
                     break;
                 } catch (final ExtractionException e) {
+                    if (Thread.currentThread().isInterrupted() || holder.isInvalidated()) {
+                        Log.i(TAG, "SABR pump canceled video=" + holder.videoId
+                                + " invalidated=" + holder.isInvalidated()
+                                + " message=" + e.getMessage());
+                        holder.session.addDiagnosticEvent("pump_canceled invalidated="
+                                + holder.isInvalidated() + " message=" + e.getMessage());
+                        break;
+                    }
                     Log.i(TAG, "SABR pump fatal: " + e.getMessage());
                     state = State.TERMINAL;
                     holder.failTerminal(new SabrLogicException("SABR logic failure", e));
