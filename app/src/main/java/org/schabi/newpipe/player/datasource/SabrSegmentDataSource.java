@@ -159,7 +159,7 @@ public final class SabrSegmentDataSource implements DataSource {
     private byte[] awaitSegment(final SabrSegmentRequest request) throws IOException {
         holder.throwIfTerminal();
         if (holder.isInvalidated()) {
-            throw new SabrLogicException("SABR session invalidated for itag=" + format.getItag());
+            throw invalidatedException();
         }
         final SabrStreamPump pump = holder.getPump(localization);
         final long waitStart = System.currentTimeMillis();
@@ -171,8 +171,7 @@ public final class SabrSegmentDataSource implements DataSource {
             }
             holder.throwIfTerminal();
             if (holder.isInvalidated()) {
-                throw new SabrLogicException(
-                        "SABR session invalidated for itag=" + format.getItag());
+                throw invalidatedException();
             }
             final IOException networkFailure = pump.takeNetworkFailure();
             if (networkFailure != null) {
@@ -280,6 +279,11 @@ public final class SabrSegmentDataSource implements DataSource {
                 throw new IOException("Interrupted awaiting SABR segment", ie);
             }
         }
+    }
+
+    private SabrLogicException invalidatedException() {
+        return new SabrLogicException("SABR session invalidated for video=" + holder.videoId
+                + ", itag=" + format.getItag() + ", " + holder.getInvalidationDetails());
     }
 
     @Nullable

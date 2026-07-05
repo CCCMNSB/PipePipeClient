@@ -90,6 +90,7 @@ public final class SabrSessionStore {
         private volatile SabrStreamPump pump;
         private volatile Thread warmThread;
         private volatile boolean invalidated;
+        private volatile String stopReason;
         private volatile SabrLogicException terminalFailure;
 
         Holder(@NonNull final String videoId,
@@ -264,6 +265,12 @@ public final class SabrSessionStore {
             return invalidated;
         }
 
+        String getInvalidationDetails() {
+            return "reason=" + stopReason
+                    + ", refs=" + sourceReferences.get()
+                    + ", trace=" + session.getDiagnosticTrace();
+        }
+
         void failTerminal(@NonNull final SabrLogicException failure) {
             terminalFailure = failure;
             evict(videoId, this, "terminal_failure message=" + failure.getMessage());
@@ -290,6 +297,7 @@ public final class SabrSessionStore {
                     + " refs=" + sourceReferences.get() + " activeTracks=" + hasActiveTracks()
                     + " warm=" + (warmThread == null ? "none" : warmThread.getState())
                     + " pump=" + (pump == null ? "none" : pump.getStateName()));
+            stopReason = reason;
             session.addDiagnosticEvent("session_stop reason=" + reason
                     + " refs=" + sourceReferences.get() + " activeTracks=" + hasActiveTracks());
             invalidated = true;
