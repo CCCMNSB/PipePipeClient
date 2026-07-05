@@ -111,7 +111,7 @@ public class AdvancedSettingsFragment extends BasePreferenceFragment implements 
         } else if (key.equals(getString(R.string.auto_translated_subtitles_language_key))) {
             ServiceHelper.initServices(this.getContext());
         } else if (key.equals(getString(R.string.youtube_player_client_key))) {
-            NewPipe.setYoutubePlayerClient(sharedPreferences.getString(key, "mweb"));
+            NewPipe.setYoutubePlayerClient(sharedPreferences.getString(key, "web_safari"));
         }
     }
 
@@ -156,10 +156,10 @@ public class AdvancedSettingsFragment extends BasePreferenceFragment implements 
             preference.setEntryValues(new CharSequence[]{values[0], values[1], values[2], values[5]});
             final String selected = preference.getValue();
             if ("android_vr".equals(selected) || "tv_simply".equals(selected)) {
-                preference.setValue(values[0]);
+                preference.setValue("tv_downgraded");
                 defaultPreferences.edit().putString(
-                        getString(R.string.youtube_player_client_key), values[0]).apply();
-                NewPipe.setYoutubePlayerClient(values[0]);
+                        getString(R.string.youtube_player_client_key), "tv_downgraded").apply();
+                NewPipe.setYoutubePlayerClient("tv_downgraded");
             }
         } else {
             preference.setEntries(entries);
