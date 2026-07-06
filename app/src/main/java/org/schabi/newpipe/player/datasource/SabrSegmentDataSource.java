@@ -164,6 +164,7 @@ public final class SabrSegmentDataSource implements DataSource {
         final SabrStreamPump pump = holder.getPump(localization);
         final long waitStart = System.currentTimeMillis();
         long recoveryAtMs = -1;
+        long lastRecoveryAtMs = -1;
         boolean loggedWait = false;
         while (true) {
             if (canceled) {
@@ -217,12 +218,13 @@ public final class SabrSegmentDataSource implements DataSource {
             // reposition the session there. The edge check leaves a merely-slow forward fetch (the
             // segment is still ahead of the edge) to the normal pump, so forward playback is untouched.
             final long now = System.currentTimeMillis();
-            if (recoveryAtMs < 0 && now - waitStart > REFETCH_AFTER_MS
+            if (now - waitStart > REFETCH_AFTER_MS
+                    && (lastRecoveryAtMs < 0 || now - lastRecoveryAtMs > REFETCH_AFTER_MS)
                     && pump.canRecover()) {
                 String recovery;
                 if (request.isInitializationSegment()) {
                     recovery = "init";
-                    pump.requestForwardSeekTo(request);
+                    pump.requestInitialization(format);
                 } else {
                     final long edgeMs = holder.session.getStreamState().getMinBufferedEndMs();
                     final long segStartMs = holder.session.getStreamState()
@@ -253,7 +255,10 @@ public final class SabrSegmentDataSource implements DataSource {
                         + " seq=" + request.getSequenceNumber()
                         + " pump=" + pump.getStateName()
                         + " edgeMs=" + holder.session.getStreamState().getMinBufferedEndMs());
-                recoveryAtMs = now;
+                if (recoveryAtMs < 0) {
+                    recoveryAtMs = now;
+                }
+                lastRecoveryAtMs = now;
             }
             if (recoveryAtMs >= 0 && now - recoveryAtMs > RECOVERY_FAILURE_MS
                     && pump.canRecover()) {
@@ -269,6 +274,13 @@ public final class SabrSegmentDataSource implements DataSource {
                                 + ", readerTailMs=" + holder.getReaderTailMs()
                                 + ", cachedBytes=" + holder.session.getCachedBytes()
                                 + ", trace=" + holder.session.getDiagnosticTrace());
+                if (request.isInitializationSegment()) {
+                    try {
+                        return fetchInitializationFallback();
+                    } catch (final IOException fallbackFailure) {
+                        failure.addSuppressed(fallbackFailure);
+                    }
+                }
                 holder.failTerminal(failure);
                 throw failure;
             }
@@ -279,6 +291,12 @@ public final class SabrSegmentDataSource implements DataSource {
                 throw new IOException("Interrupted awaiting SABR segment", ie);
             }
         }
+    }
+
+    private byte[] fetchInitializationFallback() throws IOException {
+        final byte[] data = holder.session.fetchInitializationDataFallback(format, localization);
+        holder.setInitializationData(format.getItag(), data);
+        return data;
     }
 
     private SabrLogicException invalidatedException() {

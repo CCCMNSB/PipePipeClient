@@ -253,6 +253,18 @@ public final class SabrSessionStore {
             return tail == Long.MAX_VALUE ? 0 : tail;
         }
 
+        public boolean hasUnstartedActiveReader() {
+            if (activeReaderItags.isEmpty()) {
+                return false;
+            }
+            for (final int itag : activeReaderItags) {
+                if (!readerPositions.containsKey(itag)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
         /** Lazily create the single background pump that feeds both data sources for this video. */
         synchronized SabrStreamPump getPump(@NonNull final Localization localization) {
             if (pump == null) {

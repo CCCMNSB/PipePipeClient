@@ -320,7 +320,7 @@ internal class SabrDownloader(
 
             val playerTimeMs = downloadPlayerTimeMs(session, targets)
             session.streamState.setPlayerTimeMs(playerTimeMs)
-            val segments = session.pumpOnce(localization)
+            val segmentCount = session.pumpOnceStreaming(localization)
             writer.observeWrittenInitializations()
             wroteSegment = writer.drainCachedInitializations() || wroteSegment
             wroteSegment = writer.drainCachedSegments() || wroteSegment
@@ -340,7 +340,7 @@ internal class SabrDownloader(
             if (isDownloadComplete(session, targets)) {
                 break
             }
-            if (wroteSegment || segments.isNotEmpty()) {
+            if (wroteSegment || segmentCount > 0) {
                 emptyResponses = 0
             } else {
                 emptyResponses++

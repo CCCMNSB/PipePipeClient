@@ -364,24 +364,42 @@ public final class DownloaderImpl extends Downloader {
      * was OOM-ing the 512MB heap). Mirrors execute()'s request building; caller closes the result.
      */
     @Override
+    public StreamingResponse getStreaming(final String url,
+                                          @Nullable final Map<String, List<String>> headers,
+                                          @Nullable final Localization localization)
+            throws IOException, ReCaptchaException {
+        return executeStreaming(Request.newBuilder().get(url).headers(headers)
+                .localization(localization).build());
+    }
+
+    @Override
     public StreamingResponse postStreaming(final String url,
                                            @Nullable final Map<String, List<String>> headers,
                                            @Nullable final byte[] dataToSend,
                                            @Nullable final Localization localization)
             throws IOException, ReCaptchaException {
-        final Map<String, List<String>> hdrs = headers == null ? Collections.emptyMap() : headers;
-        final RequestBody requestBody = RequestBody.create(null,
-                dataToSend == null ? new byte[0] : dataToSend);
+        return executeStreaming(Request.newBuilder().post(url, dataToSend).headers(headers)
+                .localization(localization).build());
+    }
+
+    private StreamingResponse executeStreaming(@NonNull final Request request)
+            throws IOException, ReCaptchaException {
+        final String url = request.url();
+        final Map<String, List<String>> headers = request.headers();
+        final byte[] data = request.dataToSend();
+        final RequestBody requestBody = data == null
+                ? ("POST".equals(request.httpMethod()) ? RequestBody.create(null, new byte[0]) : null)
+                : RequestBody.create(null, data);
         final okhttp3.Request.Builder requestBuilder = new okhttp3.Request.Builder()
-                .method("POST", requestBody).url(url);
-        if (!hdrs.containsKey("User-Agent")) {
+                .method(request.httpMethod(), requestBody).url(url);
+        if (!headers.containsKey("User-Agent")) {
             requestBuilder.header("User-Agent", USER_AGENT);
         }
         final String cookies = getCookies(url);
-        if (!hdrs.containsKey("Cookie") && !cookies.isEmpty()) {
+        if (!headers.containsKey("Cookie") && !cookies.isEmpty()) {
             requestBuilder.header("Cookie", cookies);
         }
-        for (final Map.Entry<String, List<String>> pair : hdrs.entrySet()) {
+        for (final Map.Entry<String, List<String>> pair : headers.entrySet()) {
             final List<String> values = pair.getValue();
             if (values.size() > 1) {
                 requestBuilder.removeHeader(pair.getKey());

@@ -10,10 +10,10 @@ import org.schabi.newpipe.extractor.localization.Localization;
 import org.schabi.newpipe.extractor.services.youtube.sabr.SabrMediaSegment;
 import org.schabi.newpipe.extractor.services.youtube.sabr.SabrRecoverableException;
 import org.schabi.newpipe.extractor.services.youtube.sabr.SabrSegmentRequest;
+import org.schabi.newpipe.extractor.services.youtube.sabr.YoutubeSabrFormat;
 import org.schabi.newpipe.extractor.services.youtube.sabr.YoutubeSabrSession;
 
 import java.io.IOException;
-import java.util.List;
 
 /**
  * Single consumer of a {@link YoutubeSabrSession}: one daemon thread pumps the server-driven SABR
@@ -44,6 +44,7 @@ final class SabrStreamPump {
     // Margin the buffered edge stays ahead of the furthest-read track. Driven off the reader (not the
     // play head) it only needs to cover a few segments, so it stays small -> bounded memory even at 4K.
     private static final long READAHEAD_CUSHION_MS = 30_000;
+    private static final long STARTUP_READAHEAD_CUSHION_MS = 10_000;
     // Hard byte ceiling on read-ahead so a high-bitrate (4K) stream can't OOM the heap: 50s of 4K is
     // ~160MB and crashed. ~100MB still covers the player's ~30s read-ahead, well under the OOM line.
     private static final long MAX_AHEAD_BYTES = 100L * 1024 * 1024;
@@ -80,6 +81,7 @@ final class SabrStreamPump {
     // SponsorBlock skip at start, resume-from-history). The forward pump fills from edge 0 and would
     // take minutes to reach it, so the loop jumps the session onto it next round. Single-slot.
     private volatile SabrSegmentRequest pendingForwardSeek;
+    private volatile YoutubeSabrFormat pendingInitialization;
     private Thread thread;
 
     SabrStreamPump(@NonNull final YoutubeSabrSession session,
@@ -160,6 +162,11 @@ final class SabrStreamPump {
         ensureStarted();
     }
 
+    void requestInitialization(@NonNull final YoutubeSabrFormat format) {
+        pendingInitialization = format;
+        ensureStarted();
+    }
+
     private void loop() {
         int consecutiveIoErrors = 0;
         state = State.IDLE;
@@ -171,6 +178,7 @@ final class SabrStreamPump {
                 // waited forever (full buffer on rewind-after-end). prepareForRewind resets the
                 // buffered head, so isComplete() turns false again once the reposition runs.
                 if (pendingRefetch == null && pendingForwardSeek == null
+                        && pendingInitialization == null
                         && (System.currentTimeMillis() - lastReadMs > IDLE_STOP_MS
                                 || session.isComplete())) {
                     break;
@@ -190,6 +198,18 @@ final class SabrStreamPump {
                     session.setPlayHeadMs(Math.max(0, holder.getReaderTailMs() - backBufferMs));
                     session.evictPlayed();
                     final long edgeMs = session.getStreamState().getMinBufferedEndMs();
+                    final YoutubeSabrFormat initialization = pendingInitialization;
+                    if (initialization != null) {
+                        pendingInitialization = null;
+                        state = State.REPOSITIONING;
+                        session.addDiagnosticEvent("pump_initialization itag="
+                                + initialization.getItag());
+                        session.prepareForInitialization(initialization);
+                        session.pumpOnceStreaming(localization);
+                        state = State.IDLE;
+                        consecutiveIoErrors = 0;
+                        continue;
+                    }
                     // Backward seek beyond the back-buffer: a reader is blocked on an evicted segment
                     // behind the edge. Reposition the session onto it (prepareForMediaSegment sets
                     // buffered=up-to-(seg-1) + playerTime=seg start, so the server re-sends from there)
@@ -202,7 +222,7 @@ final class SabrStreamPump {
                                 + refetch.getFormat().getItag()
                                 + " seq=" + refetch.getSequenceNumber());
                         session.prepareForRewind(refetch);
-                        session.pumpOnce(localization);
+                        session.pumpOnceStreaming(localization);
                         state = State.IDLE;
                         consecutiveIoErrors = 0;
                         continue;
@@ -220,14 +240,26 @@ final class SabrStreamPump {
                                 + " init=" + forwardSeek.isInitializationSegment()
                                 + " seq=" + forwardSeek.getSequenceNumber());
                         session.prepareForForwardJump(forwardSeek);
-                        session.pumpOnce(localization);
+                        session.pumpOnceStreaming(localization);
                         state = State.IDLE;
                         consecutiveIoErrors = 0;
                         continue;
                     }
-                    final boolean throttled = edgeMs - readerHeadMs > READAHEAD_CUSHION_MS
+                    final long readaheadCushionMs = holder.hasUnstartedActiveReader()
+                            ? STARTUP_READAHEAD_CUSHION_MS : READAHEAD_CUSHION_MS;
+                    final boolean throttled = edgeMs - readerHeadMs > readaheadCushionMs
                             || session.getCachedBytes() > MAX_AHEAD_BYTES;
                     if (throttled) {
+                        if (state != State.THROTTLED) {
+                            session.addDiagnosticEvent("pump_throttled cushionMs="
+                                    + readaheadCushionMs
+                                    + " unstartedReader=" + holder.hasUnstartedActiveReader()
+                                    + " edgeMs=" + edgeMs
+                                    + " readerHeadMs=" + readerHeadMs
+                                    + " readerTailMs=" + holder.getReaderTailMs()
+                                    + " cachedBytes=" + session.getCachedBytes()
+                                    + " requestNumber=" + session.getRequestNumber());
+                        }
                         state = State.THROTTLED;
                         Thread.sleep(IDLE_POLL_MS);
                         continue;
@@ -238,10 +270,10 @@ final class SabrStreamPump {
                     // skip past the gap and the slow track's edge never advanced. Pace on readerHead,
                     // report on edge.
                     session.getStreamState().setPlayerTimeMs(edgeMs);
-                    final List<SabrMediaSegment> segments = session.pumpOnce(localization);
+                    final int segmentCount = session.pumpOnceStreaming(localization);
                     state = State.IDLE;
                     consecutiveIoErrors = 0;
-                    if (segments.isEmpty()) {
+                    if (segmentCount == 0) {
                         Thread.sleep(IDLE_POLL_MS);
                     }
                 } catch (final InterruptedException e) {
