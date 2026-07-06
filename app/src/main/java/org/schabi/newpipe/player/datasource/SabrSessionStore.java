@@ -178,6 +178,33 @@ public final class SabrSessionStore {
             return readerOwner == owner ? readerGeneration : -1;
         }
 
+        void requestSeek(final long positionMs, @NonNull final Localization localization) {
+            if (positionMs <= 1_000 && playerTimeMs <= 1_000) {
+                setPlayerTimeMs(positionMs);
+                return;
+            }
+            final boolean backward = positionMs < playerTimeMs;
+            setPlayerTimeMs(positionMs);
+            // Video segment boundaries are the seek timeline's sync points. Always notify the pump:
+            // Media3 can seek inside its sample queue without blocking on a missing SABR segment, but
+            // the server session still has to drop the old read-ahead span and continue from the new
+            // play head instead of filling bytes the user skipped over.
+            final YoutubeSabrFormat targetFormat = videoFormat;
+            final int sequence = session.getStreamState()
+                    .getSegmentNumberAtOrAfterTimeMs(targetFormat, positionMs);
+            final SabrSegmentRequest request = SabrSegmentRequest.media(targetFormat, sequence);
+            final int audioSequence = session.getStreamState()
+                    .getSegmentNumberAtOrAfterTimeMs(audioFormat, positionMs);
+            final SabrSegmentRequest audioRequest = SabrSegmentRequest.media(
+                    audioFormat, audioSequence);
+            if (session.getCachedSegment(request) == null
+                    || session.getCachedSegment(audioRequest) == null) {
+                getPump(localization).requestSeekTo(request, backward);
+            } else {
+                getPump(localization).noteSeekWithinCache();
+            }
+        }
+
         private synchronized boolean hasActiveTracks() {
             return !activeTrackModes.isEmpty();
         }

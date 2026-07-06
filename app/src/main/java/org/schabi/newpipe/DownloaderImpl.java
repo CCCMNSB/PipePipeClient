@@ -26,6 +26,7 @@ import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
 import javax.net.ssl.X509TrustManager;
 import java.io.ByteArrayInputStream;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.UnknownHostException;
@@ -54,6 +55,8 @@ public final class DownloaderImpl extends Downloader {
     private final OkHttpClient client;
     private final boolean dnsOverHttpsFallbackEnabled;
     private Integer customTimeout;
+    @Nullable
+    private volatile YoutubePlayerResponseCache youtubePlayerResponseCache;
 
     private DownloaderImpl(final OkHttpClient.Builder builder,
                            final boolean dnsOverHttpsFallbackEnabled) {
@@ -126,6 +129,17 @@ public final class DownloaderImpl extends Downloader {
     public boolean isDnsOverHttpsFallbackEnabled() {
         return dnsOverHttpsFallbackEnabled;
     }
+
+    /**
+     * Enable a persistent player-response cache for playback benchmarks. A missing response is
+     * fetched and stored; existing entries are only overwritten when {@code replace} is true.
+     */
+    public void configureYoutubePlayerResponseCacheForBenchmark(
+            @Nullable final File directory, final boolean replace) {
+        youtubePlayerResponseCache = directory == null
+                ? null : new YoutubePlayerResponseCache(directory, replace);
+    }
+
     public DownloaderImpl setCustomTimeout(final Integer value) {
         this.customTimeout = value;
         return this;
@@ -468,8 +482,23 @@ public final class DownloaderImpl extends Downloader {
             tmpClient = builder.build();
         }
 
-        Call call = tmpClient.newCall(requestBuilder.build());
-        CancellableCall cancellableCall = new CancellableCall(call);
+        final Call call = tmpClient.newCall(requestBuilder.build());
+        final CancellableCall cancellableCall = new CancellableCall(call);
+        final YoutubePlayerResponseCache responseCache = youtubePlayerResponseCache;
+        if (responseCache != null && responseCache.handles(url)) {
+            final byte[] cachedBody = responseCache.read(url, headers, dataToSend);
+            if (cachedBody != null) {
+                try {
+                    callback.onSuccess(new Response(200, "OK", Collections.emptyMap(),
+                            new String(cachedBody, StandardCharsets.UTF_8), cachedBody, url));
+                } catch (final Exception e) {
+                    callback.onError(e);
+                } finally {
+                    cancellableCall.setFinished();
+                }
+                return cancellableCall;
+            }
+        }
         call.enqueue(new Callback() {
             @Override
             public void onFailure(Call call, IOException e) {
@@ -495,6 +524,11 @@ public final class DownloaderImpl extends Downloader {
                     if (body != null) {
                         rawBodyBytes = body.bytes();
                         responseBodyToReturn = new String(rawBodyBytes, StandardCharsets.UTF_8);
+                    }
+
+                    if (responseCache != null && responseCache.handles(url)
+                            && response.isSuccessful() && rawBodyBytes != null) {
+                        responseCache.write(url, headers, dataToSend, rawBodyBytes);
                     }
 
                     String latestUrl = response.request().url().toString();

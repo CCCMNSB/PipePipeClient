@@ -279,8 +279,8 @@ public final class SabrPlaybackSmokeTest {
                         PLAYBACK_TIMEOUT_SECONDS);
                 assertNull("Player failed after evicted-segment rewind", playerError.get());
                 final String trace = holder.session.getDiagnosticTrace();
-                assertTrue("Evicted media segment did not enter rewind recovery: " + trace,
-                        trace.contains("recovery type=rewind"));
+                // MediaPeriod now asks the pump to rewind as soon as it sees an out-of-buffer seek.
+                // The old data-source timeout path ("recovery type=rewind") is only a fallback.
                 assertTrue("SABR pump did not execute rewind recovery: " + trace,
                         trace.contains("pump_rewind"));
             }
