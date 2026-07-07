@@ -631,10 +631,8 @@ public final class YoutubePlaybackBenchmarkTest {
                     .put("seekSabrCachedBytesDelta",seekTrace.sabrCachedBytesDelta)
                     .put("seekSabrCacheBefore",seekTrace.sabrCacheBefore.toJson())
                     .put("seekSabrCacheAfter",seekTrace.sabrCacheAfter.toJson())
-                    .put("seekSabrResponsesBefore",new JSONArray(seekTrace.sabrResponsesBefore))
                     .put("seekSabrSegmentsBefore",new JSONArray(seekTrace.sabrSegmentsBefore))
                     .put("seekSabrDiscardsBefore",new JSONArray(seekTrace.sabrDiscardsBefore))
-                    .put("seekSabrResponses",new JSONArray(seekTrace.sabrResponses))
                     .put("seekSabrSegments",new JSONArray(seekTrace.sabrSegments))
                     .put("seekSabrDiscards",new JSONArray(seekTrace.sabrDiscards))
                     .put("seekTransfers",new JSONArray(seekTrace.transfers));
@@ -764,14 +762,14 @@ public final class YoutubePlaybackBenchmarkTest {
     private static final class SeekTrace {
         private static final SeekTrace EMPTY = new SeekTrace(-1, -1, -1, -1, -1,
                 -1, -1, -1, Collections.emptyList(), Collections.emptyList(),
-                Collections.emptyList(), Collections.emptyList(),
+                Collections.emptyList(),
                 SeekCacheSnapshot.EMPTY, SeekCacheSnapshot.EMPTY,
-                Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
+                Collections.emptyList(), Collections.emptyList());
         private final long networkBytes, sabrResponseBytes, sabrMediaPayloadBytes,
                 sabrControlPayloadBytes, sabrUmpOverheadBytes, sabrDiscardedBytes,
                 sabrRequestCount, sabrCachedBytesDelta;
-        private final List<String> sabrResponses, sabrSegments, sabrDiscards, transfers,
-                sabrResponsesBefore, sabrSegmentsBefore, sabrDiscardsBefore;
+        private final List<String> sabrSegments, sabrDiscards, transfers,
+                sabrSegmentsBefore, sabrDiscardsBefore;
         private final SeekCacheSnapshot sabrCacheBefore, sabrCacheAfter;
 
         private SeekTrace(final long networkBytes,
@@ -782,13 +780,11 @@ public final class YoutubePlaybackBenchmarkTest {
                           final long sabrDiscardedBytes,
                           final long sabrRequestCount,
                           final long sabrCachedBytesDelta,
-                          final List<String> sabrResponses,
                           final List<String> sabrSegments,
                           final List<String> sabrDiscards,
                           final List<String> transfers,
                           final SeekCacheSnapshot sabrCacheBefore,
                           final SeekCacheSnapshot sabrCacheAfter,
-                          final List<String> sabrResponsesBefore,
                           final List<String> sabrSegmentsBefore,
                           final List<String> sabrDiscardsBefore) {
             this.networkBytes = networkBytes;
@@ -799,13 +795,11 @@ public final class YoutubePlaybackBenchmarkTest {
             this.sabrDiscardedBytes = sabrDiscardedBytes;
             this.sabrRequestCount = sabrRequestCount;
             this.sabrCachedBytesDelta = sabrCachedBytesDelta;
-            this.sabrResponses = sabrResponses;
             this.sabrSegments = sabrSegments;
             this.sabrDiscards = sabrDiscards;
             this.transfers = transfers;
             this.sabrCacheBefore = sabrCacheBefore;
             this.sabrCacheAfter = sabrCacheAfter;
-            this.sabrResponsesBefore = sabrResponsesBefore;
             this.sabrSegmentsBefore = sabrSegmentsBefore;
             this.sabrDiscardsBefore = sabrDiscardsBefore;
         }
@@ -813,10 +807,10 @@ public final class YoutubePlaybackBenchmarkTest {
         private static SeekTrace fromNetwork(final long networkBytes,
                                              final List<String> transfers) {
             return new SeekTrace(networkBytes, -1, -1, -1, -1, -1, -1, -1,
-                    Collections.emptyList(), Collections.emptyList(), Collections.emptyList(),
+                    Collections.emptyList(), Collections.emptyList(),
                     transfers,
                     SeekCacheSnapshot.EMPTY, SeekCacheSnapshot.EMPTY,
-                    Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
+                    Collections.emptyList(), Collections.emptyList());
         }
 
         private static SeekTrace fromSabr(
@@ -837,11 +831,9 @@ public final class YoutubePlaybackBenchmarkTest {
                     after.getDiscardedBytes() - before.getDiscardedBytes(),
                     after.getRequestNumber() - before.getRequestNumber(),
                     after.getCachedBytes() - before.getCachedBytes(),
-                    delta(after.getResponses(), before.getResponses().size()),
                     delta(after.getSegments(), before.getSegments().size()),
                     delta(after.getDiscards(), before.getDiscards().size()),
                     Collections.emptyList(), cacheBefore, cacheAfter,
-                    tail(before.getResponses(), 24),
                     tail(before.getSegments(), 24), tail(before.getDiscards(), 24));
         }
 
