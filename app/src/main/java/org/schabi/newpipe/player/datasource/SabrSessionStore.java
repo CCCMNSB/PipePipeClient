@@ -9,6 +9,7 @@ import androidx.annotation.Nullable;
 import org.schabi.newpipe.extractor.exceptions.ExtractionException;
 import org.schabi.newpipe.extractor.localization.ContentCountry;
 import org.schabi.newpipe.extractor.localization.Localization;
+import org.schabi.newpipe.extractor.services.youtube.sabr.SabrPoTokenProvider;
 import org.schabi.newpipe.extractor.services.youtube.sabr.SabrSegmentRequest;
 import org.schabi.newpipe.extractor.services.youtube.sabr.YoutubeSabrClientProfile;
 import org.schabi.newpipe.extractor.services.youtube.sabr.YoutubeSabrFormat;
@@ -88,7 +89,6 @@ public final class SabrSessionStore {
         private Object readerOwner;
         private long readerGeneration;
         private volatile SabrStreamPump pump;
-        private volatile Thread warmThread;
         private volatile boolean invalidated;
         private volatile String stopReason;
         private volatile SabrLogicException terminalFailure;
@@ -321,20 +321,9 @@ public final class SabrSessionStore {
             }
         }
 
-        void setWarmThread(@NonNull final Thread warmThread) {
-            this.warmThread = warmThread;
-        }
-
-        void clearWarmThread(final Thread thread) {
-            if (warmThread == thread) {
-                warmThread = null;
-            }
-        }
-
         void stop(@NonNull final String reason) {
             Log.w(TAG, "stop video=" + videoId + " reason=" + reason
                     + " refs=" + sourceReferences.get() + " activeTracks=" + hasActiveTracks()
-                    + " warm=" + (warmThread == null ? "none" : warmThread.getState())
                     + " pump=" + (pump == null ? "none" : pump.getStateName()));
             stopReason = reason;
             session.addDiagnosticEvent("session_stop reason=" + reason
@@ -346,10 +335,6 @@ public final class SabrSessionStore {
                 readerGeneration++;
                 readerPositions.clear();
                 applyActiveTracks();
-            }
-            final Thread warm = warmThread;
-            if (warm != null && warm != Thread.currentThread()) {
-                warm.interrupt();
             }
             final SabrStreamPump streamPump = pump;
             pump = null;
@@ -465,45 +450,40 @@ public final class SabrSessionStore {
             final LocalDomPoTokenProvider provider = provider(context);
             final YoutubeSabrSession session =
                     new YoutubeSabrSession(info, audioFormat, videoFormat, provider);
+            attachPoToken(videoId, info, provider, session);
             final Holder holder = new Holder(videoId, info, session, audioFormat, videoFormat);
             SESSIONS.put(videoId, holder);
             ORDER.remove(videoId);
             ORDER.addLast(videoId);
             trimSessions(videoId);
-            // Pre-warm the PO token off-thread so BotGuard/minter initialization overlaps the
-            // initial probe and buffering instead of stalling the pump on its first protected
-            // response.
-            final Thread warm = new Thread(() -> {
-                try {
-                    if (Thread.currentThread().isInterrupted() || !isCurrentHolder(videoId, holder)) {
-                        return;
-                    }
-                    final byte[] token = provider.getPoToken(info, session.getStreamState());
-                    session.addDiagnosticEvent("token_prewarm bytes="
-                            + (token == null ? -1 : token.length));
-                } catch (final Exception e) {
-                    if (Thread.currentThread().isInterrupted()) {
-                        Log.i(TAG, "PO token prewarm canceled video=" + videoId
-                                + " current=" + isCurrentHolder(videoId, holder)
-                                + " message=" + e.getMessage());
-                        session.addDiagnosticEvent("token_prewarm_canceled current="
-                                + isCurrentHolder(videoId, holder) + " message=" + e.getMessage());
-                        return;
-                    }
-                    Log.w(TAG, "PO token prewarm failed video=" + videoId, e);
-                    session.addDiagnosticEvent("token_prewarm_failed type="
-                            + e.getClass().getSimpleName() + " message=" + e.getMessage());
-                    holder.failTerminal(new SabrLogicException(
-                            "SABR PO token prewarm failed for video=" + videoId
-                                    + ": " + e.getMessage(), e));
-                } finally {
-                    holder.clearWarmThread(Thread.currentThread());
-                }
-            }, "SabrTokenPrewarm");
-            warm.setDaemon(true);
-            holder.setWarmThread(warm);
-            warm.start();
             return holder;
+        }
+    }
+
+    private static void attachPoToken(@NonNull final String videoId,
+                                      @NonNull final YoutubeSabrInfo info,
+                                      @NonNull final SabrPoTokenProvider provider,
+                                      @NonNull final YoutubeSabrSession session)
+            throws IOException, ExtractionException {
+        try {
+            final byte[] token = provider.getPoToken(info, session.getStreamState());
+            if (token == null || token.length == 0) {
+                throw new SabrLogicException("SABR PO token provider returned no token for video="
+                        + videoId);
+            }
+            session.getStreamState().setPoToken(token);
+            session.addDiagnosticEvent("token_attach bytes="
+                    + token.length);
+        } catch (final IOException | ExtractionException e) {
+            Log.w(TAG, "PO token attach failed video=" + videoId, e);
+            session.addDiagnosticEvent("token_attach_failed type="
+                    + e.getClass().getSimpleName() + " message=" + e.getMessage());
+            throw e;
+        } catch (final RuntimeException e) {
+            Log.w(TAG, "PO token attach failed video=" + videoId, e);
+            session.addDiagnosticEvent("token_attach_failed type="
+                    + e.getClass().getSimpleName() + " message=" + e.getMessage());
+            throw new SabrLogicException("SABR PO token attach failed for video=" + videoId, e);
         }
     }
 
@@ -648,10 +628,5 @@ public final class SabrSessionStore {
         if (holder != null) {
             holder.stop(reason);
         }
-    }
-
-    private static boolean isCurrentHolder(@NonNull final String videoId,
-                                           @NonNull final Holder holder) {
-        return SESSIONS.get(videoId) == holder;
     }
 }
