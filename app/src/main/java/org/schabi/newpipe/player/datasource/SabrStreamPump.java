@@ -48,7 +48,7 @@ final class SabrStreamPump {
     private static final long READAHEAD_CUSHION_MS = 10_000;
     private static final long STARTUP_READAHEAD_CUSHION_MS = 6_000;
     private static final long STARTUP_BURST_READAHEAD_CUSHION_MS = 25_000;
-    private static final long STARTUP_BURST_MS = 15_000;
+    private static final long STARTUP_BURST_MS = 25_000;
     private static final long SEEK_READAHEAD_CUSHION_MS = 5_000;
     private static final long SEEK_MODE_MS = 8_000;
     private static final long MIN_SERVER_READAHEAD_CUSHION_MS = 3_000;
