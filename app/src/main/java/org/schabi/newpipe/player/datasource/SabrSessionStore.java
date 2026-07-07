@@ -41,21 +41,21 @@ public final class SabrSessionStore {
     // Mutated only under the class lock.
     private static final int MAX_SESSIONS = 3;
     private static final java.util.Deque<String> ORDER = new java.util.ArrayDeque<>();
-    // Shared across videos so the PO-token cache (videoId-keyed, ~6h) is reused and a single
-    // WebView is held instead of one per video.
-    private static volatile WebViewPoTokenProvider sharedProvider;
+    // Shared across videos so the PO-token cache (videoId-keyed, ~6h), BotGuard minter, and shared
+    // WebView runtime are reused instead of reinitialized per video.
+    private static volatile LocalDomPoTokenProvider sharedProvider;
 
     private SabrSessionStore() {
     }
 
     @NonNull
-    private static WebViewPoTokenProvider provider(@NonNull final Context context) {
-        WebViewPoTokenProvider p = sharedProvider;
+    private static LocalDomPoTokenProvider provider(@NonNull final Context context) {
+        LocalDomPoTokenProvider p = sharedProvider;
         if (p == null) {
             synchronized (SabrSessionStore.class) {
                 p = sharedProvider;
                 if (p == null) {
-                    p = new WebViewPoTokenProvider(context.getApplicationContext());
+                    p = new LocalDomPoTokenProvider(context.getApplicationContext());
                     sharedProvider = p;
                 }
             }
@@ -462,7 +462,7 @@ public final class SabrSessionStore {
             if (audioFormat == null || videoFormat == null) {
                 throw new IOException("SABR: could not select audio/video formats for " + videoId);
             }
-            final WebViewPoTokenProvider provider = provider(context);
+            final LocalDomPoTokenProvider provider = provider(context);
             final YoutubeSabrSession session =
                     new YoutubeSabrSession(info, audioFormat, videoFormat, provider);
             final Holder holder = new Holder(videoId, info, session, audioFormat, videoFormat);
@@ -470,8 +470,9 @@ public final class SabrSessionStore {
             ORDER.remove(videoId);
             ORDER.addLast(videoId);
             trimSessions(videoId);
-            // Pre-warm the PO token off-thread so the ~45s WebView mint overlaps the initial probe
-            // and buffering instead of stalling the pump on its first protected response.
+            // Pre-warm the PO token off-thread so BotGuard/minter initialization overlaps the
+            // initial probe and buffering instead of stalling the pump on its first protected
+            // response.
             final Thread warm = new Thread(() -> {
                 try {
                     if (Thread.currentThread().isInterrupted() || !isCurrentHolder(videoId, holder)) {

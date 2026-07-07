@@ -45,6 +45,7 @@ import org.schabi.newpipe.player.datasource.SabrSessionStore;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -96,10 +97,11 @@ public final class SabrPlaybackSmokeTest {
                         .anyMatch(SabrPlaybackSmokeTest::isSabr));
 
         final int maxVideoHeight = Integer.parseInt(arguments.getString("maxVideoHeight", "360"));
+        final String targetCodec = arguments.getString("targetCodec", "");
         final PlayerDataSource dataSource = new PlayerDataSource(context,
                 DownloaderImpl.USER_AGENT, new DefaultBandwidthMeter.Builder(context).build());
         final VideoPlaybackResolver resolver = new VideoPlaybackResolver(context, dataSource,
-                new BoundedQualityResolver(maxVideoHeight));
+                new BoundedQualityResolver(maxVideoHeight, targetCodec));
         final MediaSource mediaSource = resolver.resolve(info);
         assertNotNull("VideoPlaybackResolver returned no MediaSource", mediaSource);
         final boolean useAdaptiveInitFallback = Boolean.parseBoolean(
@@ -229,6 +231,7 @@ public final class SabrPlaybackSmokeTest {
             assertNull("Player failed during linear playback", playerError.get());
 
             final long durationMs = durationOf(playerRef.get());
+            final String seekFractionArgument = arguments.getString("seekFraction");
             final long seekPositionMs;
             if (simulateEvictedRewind) {
                 seekPositionMs = durationMs == C.TIME_UNSET
@@ -236,6 +239,13 @@ public final class SabrPlaybackSmokeTest {
                                 Math.max(60_000, durationMs * 2 / 3));
                 assertTrue("Video is too short for an eviction/rewind test: " + durationMs,
                         seekPositionMs >= 60_000);
+            } else if (seekFractionArgument != null) {
+                assertTrue("Cannot seek by fraction when duration is unset", durationMs != C.TIME_UNSET);
+                final double seekFraction = Double.parseDouble(seekFractionArgument);
+                assertTrue("seekFraction must be in (0, 1): " + seekFraction,
+                        seekFraction > 0.0 && seekFraction < 1.0);
+                seekPositionMs = Math.max(1_000,
+                        Math.min(durationMs - 1_000, Math.round(durationMs * seekFraction)));
             } else {
                 seekPositionMs = durationMs == C.TIME_UNSET
                         ? 10_000 : Math.max(1_000, Math.min(30_000, durationMs / 2));
@@ -518,9 +528,15 @@ public final class SabrPlaybackSmokeTest {
 
     private static final class BoundedQualityResolver implements QualityResolver {
         private final int maxHeight;
+        private final String targetCodec;
 
         private BoundedQualityResolver(final int maxHeight) {
+            this(maxHeight, "");
+        }
+
+        private BoundedQualityResolver(final int maxHeight, final String targetCodec) {
             this.maxHeight = maxHeight;
+            this.targetCodec = targetCodec == null ? "" : targetCodec.toLowerCase(Locale.ROOT);
         }
 
         @Override
@@ -532,6 +548,11 @@ public final class SabrPlaybackSmokeTest {
             for (int i = 0; i < sortedVideos.size(); i++) {
                 final VideoStream stream = sortedVideos.get(i);
                 if (!isSabr(stream)) {
+                    continue;
+                }
+                final String codec = stream.getCodec() == null
+                        ? "" : stream.getCodec().toLowerCase(Locale.ROOT);
+                if (!targetCodec.isEmpty() && !codec.isEmpty() && !codec.contains(targetCodec)) {
                     continue;
                 }
                 final int height = stream.getHeight();
