@@ -298,8 +298,7 @@ public final class SabrSegmentDataSource implements DataSource {
                                 segStartMs);
                         pump.requestForwardSeekTo(request);
                     } else {
-                        recovery = "near_edge";
-                        pump.requestForwardSeekTo(request);
+                        recovery = "near_edge_wait";
                     }
                 }
                 holder.session.addDiagnosticEvent("recovery type=" + recovery

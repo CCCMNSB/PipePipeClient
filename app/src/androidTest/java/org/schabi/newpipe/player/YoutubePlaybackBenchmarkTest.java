@@ -35,6 +35,7 @@ import org.schabi.newpipe.App;
 import org.schabi.newpipe.DownloaderImpl;
 import org.schabi.newpipe.extractor.NewPipe;
 import org.schabi.newpipe.extractor.ServiceList;
+import org.schabi.newpipe.extractor.services.youtube.sabr.SabrSegmentRequest;
 import org.schabi.newpipe.extractor.services.youtube.sabr.SabrNextRequestPolicy;
 import org.schabi.newpipe.extractor.stream.AudioStream;
 import org.schabi.newpipe.extractor.stream.DeliveryMethod;
@@ -301,6 +302,8 @@ public final class YoutubePlaybackBenchmarkTest {
             final org.schabi.newpipe.extractor.services.youtube.sabr.YoutubeSabrSession
                     .TraceSnapshot sabrTraceBefore = sabrHolder == null ? null
                     : sabrHolder.session.getTraceSnapshot();
+            final SeekCacheSnapshot sabrCacheBefore = SeekCacheSnapshot.fromSabr(
+                    sabrHolder, target);
             transfers.startSeekTrace();
             final long seekStart = SystemClock.elapsedRealtimeNanos();
             InstrumentationRegistry.getInstrumentation().runOnMainSync(
@@ -314,7 +317,10 @@ public final class YoutubePlaybackBenchmarkTest {
                 final org.schabi.newpipe.extractor.services.youtube.sabr.YoutubeSabrSession
                         .TraceSnapshot sabrTraceAfter = sabrHolder == null ? null
                         : sabrHolder.session.getTraceSnapshot();
-                seekTrace = SeekTrace.fromSabr(sabrTraceBefore, sabrTraceAfter);
+                final SeekCacheSnapshot sabrCacheAfter = SeekCacheSnapshot.fromSabr(
+                        sabrHolder, target);
+                seekTrace = SeekTrace.fromSabr(sabrTraceBefore, sabrTraceAfter,
+                        sabrCacheBefore, sabrCacheAfter);
             } else {
                 seekTrace = transfers.finishSeekTrace();
             }
@@ -623,20 +629,150 @@ public final class YoutubePlaybackBenchmarkTest {
                     .put("seekSabrDiscardedBytes",seekTrace.sabrDiscardedBytes)
                     .put("seekSabrRequestCount",seekTrace.sabrRequestCount)
                     .put("seekSabrCachedBytesDelta",seekTrace.sabrCachedBytesDelta)
+                    .put("seekSabrCacheBefore",seekTrace.sabrCacheBefore.toJson())
+                    .put("seekSabrCacheAfter",seekTrace.sabrCacheAfter.toJson())
+                    .put("seekSabrResponsesBefore",new JSONArray(seekTrace.sabrResponsesBefore))
+                    .put("seekSabrSegmentsBefore",new JSONArray(seekTrace.sabrSegmentsBefore))
+                    .put("seekSabrDiscardsBefore",new JSONArray(seekTrace.sabrDiscardsBefore))
+                    .put("seekSabrResponses",new JSONArray(seekTrace.sabrResponses))
                     .put("seekSabrSegments",new JSONArray(seekTrace.sabrSegments))
                     .put("seekSabrDiscards",new JSONArray(seekTrace.sabrDiscards))
                     .put("seekTransfers",new JSONArray(seekTrace.transfers));
         }
     }
 
+    private static final class SeekCacheSnapshot {
+        private static final SeekCacheSnapshot EMPTY = new SeekCacheSnapshot(-1, -1, -1, -1,
+                false, -1, false, -1, false, -1, -1, -1, false, -1, -1, -1, -1, -1);
+        private final long targetMs;
+        private final int videoSeq;
+        private final long videoStartMs, videoEndMs;
+        private final boolean videoHit;
+        private final int previousVideoSeq;
+        private final boolean previousVideoHit;
+        private final int nextVideoSeq;
+        private final boolean nextVideoHit;
+        private final int audioSeq;
+        private final long audioStartMs, audioEndMs;
+        private final boolean audioHit;
+        private final long edgeMs, videoBufferedEndMs, audioBufferedEndMs, cachedBytes,
+                requestNumber;
+
+        private SeekCacheSnapshot(final long targetMs,
+                                  final int videoSeq,
+                                  final long videoStartMs,
+                                  final long videoEndMs,
+                                  final boolean videoHit,
+                                  final int previousVideoSeq,
+                                  final boolean previousVideoHit,
+                                  final int nextVideoSeq,
+                                  final boolean nextVideoHit,
+                                  final int audioSeq,
+                                  final long audioStartMs,
+                                  final long audioEndMs,
+                                  final boolean audioHit,
+                                  final long edgeMs,
+                                  final long videoBufferedEndMs,
+                                  final long audioBufferedEndMs,
+                                  final long cachedBytes,
+                                  final long requestNumber) {
+            this.targetMs = targetMs;
+            this.videoSeq = videoSeq;
+            this.videoStartMs = videoStartMs;
+            this.videoEndMs = videoEndMs;
+            this.videoHit = videoHit;
+            this.previousVideoSeq = previousVideoSeq;
+            this.previousVideoHit = previousVideoHit;
+            this.nextVideoSeq = nextVideoSeq;
+            this.nextVideoHit = nextVideoHit;
+            this.audioSeq = audioSeq;
+            this.audioStartMs = audioStartMs;
+            this.audioEndMs = audioEndMs;
+            this.audioHit = audioHit;
+            this.edgeMs = edgeMs;
+            this.videoBufferedEndMs = videoBufferedEndMs;
+            this.audioBufferedEndMs = audioBufferedEndMs;
+            this.cachedBytes = cachedBytes;
+            this.requestNumber = requestNumber;
+        }
+
+        private static SeekCacheSnapshot fromSabr(final SabrSessionStore.Holder holder,
+                                                  final long targetMs) {
+            if (holder == null) {
+                return EMPTY;
+            }
+            final int videoSeq = holder.session.getStreamState()
+                    .getSegmentNumberAtOrAfterTimeMs(holder.videoFormat, targetMs);
+            final int previousVideoSeq = Math.max(1, videoSeq - 1);
+            final int nextVideoSeq = videoSeq + 1;
+            final int audioSeq = holder.session.getStreamState()
+                    .getSegmentNumberAtOrAfterTimeMs(holder.audioFormat, targetMs);
+            return new SeekCacheSnapshot(targetMs, videoSeq,
+                    holder.session.getStreamState().getSegmentStartMs(holder.videoFormat,
+                            videoSeq),
+                    holder.session.getStreamState().getSegmentEndMs(holder.videoFormat,
+                            videoSeq),
+                    hasMediaSegment(holder, holder.videoFormat, videoSeq),
+                    previousVideoSeq,
+                    hasMediaSegment(holder, holder.videoFormat, previousVideoSeq),
+                    nextVideoSeq,
+                    hasMediaSegment(holder, holder.videoFormat, nextVideoSeq),
+                    audioSeq,
+                    holder.session.getStreamState().getSegmentStartMs(holder.audioFormat,
+                            audioSeq),
+                    holder.session.getStreamState().getSegmentEndMs(holder.audioFormat,
+                            audioSeq),
+                    hasMediaSegment(holder, holder.audioFormat, audioSeq),
+                    holder.session.getStreamState().getMinBufferedEndMs(),
+                    holder.session.getStreamState().getBufferedEndMs(holder.videoFormat),
+                    holder.session.getStreamState().getBufferedEndMs(holder.audioFormat),
+                    holder.session.getCachedBytes(),
+                    holder.session.getRequestNumber());
+        }
+
+        private static boolean hasMediaSegment(final SabrSessionStore.Holder holder,
+                                               final org.schabi.newpipe.extractor.services.youtube
+                                                       .sabr.YoutubeSabrFormat format,
+                                               final int sequence) {
+            return holder.session.getCachedSegment(SabrSegmentRequest.media(format, sequence))
+                    != null;
+        }
+
+        private JSONObject toJson() throws Exception {
+            return new JSONObject()
+                    .put("targetMs", targetMs)
+                    .put("videoSeq", videoSeq)
+                    .put("videoStartMs", videoStartMs)
+                    .put("videoEndMs", videoEndMs)
+                    .put("videoHit", videoHit)
+                    .put("previousVideoSeq", previousVideoSeq)
+                    .put("previousVideoHit", previousVideoHit)
+                    .put("nextVideoSeq", nextVideoSeq)
+                    .put("nextVideoHit", nextVideoHit)
+                    .put("audioSeq", audioSeq)
+                    .put("audioStartMs", audioStartMs)
+                    .put("audioEndMs", audioEndMs)
+                    .put("audioHit", audioHit)
+                    .put("edgeMs", edgeMs)
+                    .put("videoBufferedEndMs", videoBufferedEndMs)
+                    .put("audioBufferedEndMs", audioBufferedEndMs)
+                    .put("cachedBytes", cachedBytes)
+                    .put("requestNumber", requestNumber);
+        }
+    }
+
     private static final class SeekTrace {
         private static final SeekTrace EMPTY = new SeekTrace(-1, -1, -1, -1, -1,
                 -1, -1, -1, Collections.emptyList(), Collections.emptyList(),
-                Collections.emptyList());
+                Collections.emptyList(), Collections.emptyList(),
+                SeekCacheSnapshot.EMPTY, SeekCacheSnapshot.EMPTY,
+                Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
         private final long networkBytes, sabrResponseBytes, sabrMediaPayloadBytes,
                 sabrControlPayloadBytes, sabrUmpOverheadBytes, sabrDiscardedBytes,
                 sabrRequestCount, sabrCachedBytesDelta;
-        private final List<String> sabrSegments, sabrDiscards, transfers;
+        private final List<String> sabrResponses, sabrSegments, sabrDiscards, transfers,
+                sabrResponsesBefore, sabrSegmentsBefore, sabrDiscardsBefore;
+        private final SeekCacheSnapshot sabrCacheBefore, sabrCacheAfter;
 
         private SeekTrace(final long networkBytes,
                           final long sabrResponseBytes,
@@ -646,9 +782,15 @@ public final class YoutubePlaybackBenchmarkTest {
                           final long sabrDiscardedBytes,
                           final long sabrRequestCount,
                           final long sabrCachedBytesDelta,
+                          final List<String> sabrResponses,
                           final List<String> sabrSegments,
                           final List<String> sabrDiscards,
-                          final List<String> transfers) {
+                          final List<String> transfers,
+                          final SeekCacheSnapshot sabrCacheBefore,
+                          final SeekCacheSnapshot sabrCacheAfter,
+                          final List<String> sabrResponsesBefore,
+                          final List<String> sabrSegmentsBefore,
+                          final List<String> sabrDiscardsBefore) {
             this.networkBytes = networkBytes;
             this.sabrResponseBytes = sabrResponseBytes;
             this.sabrMediaPayloadBytes = sabrMediaPayloadBytes;
@@ -657,22 +799,33 @@ public final class YoutubePlaybackBenchmarkTest {
             this.sabrDiscardedBytes = sabrDiscardedBytes;
             this.sabrRequestCount = sabrRequestCount;
             this.sabrCachedBytesDelta = sabrCachedBytesDelta;
+            this.sabrResponses = sabrResponses;
             this.sabrSegments = sabrSegments;
             this.sabrDiscards = sabrDiscards;
             this.transfers = transfers;
+            this.sabrCacheBefore = sabrCacheBefore;
+            this.sabrCacheAfter = sabrCacheAfter;
+            this.sabrResponsesBefore = sabrResponsesBefore;
+            this.sabrSegmentsBefore = sabrSegmentsBefore;
+            this.sabrDiscardsBefore = sabrDiscardsBefore;
         }
 
         private static SeekTrace fromNetwork(final long networkBytes,
                                              final List<String> transfers) {
             return new SeekTrace(networkBytes, -1, -1, -1, -1, -1, -1, -1,
-                    Collections.emptyList(), Collections.emptyList(), transfers);
+                    Collections.emptyList(), Collections.emptyList(), Collections.emptyList(),
+                    transfers,
+                    SeekCacheSnapshot.EMPTY, SeekCacheSnapshot.EMPTY,
+                    Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
         }
 
         private static SeekTrace fromSabr(
                 final org.schabi.newpipe.extractor.services.youtube.sabr.YoutubeSabrSession
                         .TraceSnapshot before,
                 final org.schabi.newpipe.extractor.services.youtube.sabr.YoutubeSabrSession
-                        .TraceSnapshot after) {
+                        .TraceSnapshot after,
+                final SeekCacheSnapshot cacheBefore,
+                final SeekCacheSnapshot cacheAfter) {
             if (before == null || after == null) {
                 return EMPTY;
             }
@@ -684,9 +837,12 @@ public final class YoutubePlaybackBenchmarkTest {
                     after.getDiscardedBytes() - before.getDiscardedBytes(),
                     after.getRequestNumber() - before.getRequestNumber(),
                     after.getCachedBytes() - before.getCachedBytes(),
+                    delta(after.getResponses(), before.getResponses().size()),
                     delta(after.getSegments(), before.getSegments().size()),
                     delta(after.getDiscards(), before.getDiscards().size()),
-                    Collections.emptyList());
+                    Collections.emptyList(), cacheBefore, cacheAfter,
+                    tail(before.getResponses(), 24),
+                    tail(before.getSegments(), 24), tail(before.getDiscards(), 24));
         }
 
         private static List<String> delta(final List<String> values, final int start) {
@@ -694,6 +850,14 @@ public final class YoutubePlaybackBenchmarkTest {
                 return Collections.emptyList();
             }
             return new ArrayList<>(values.subList(Math.max(0, start), values.size()));
+        }
+
+        private static List<String> tail(final List<String> values, final int count) {
+            if (values.isEmpty()) {
+                return Collections.emptyList();
+            }
+            return new ArrayList<>(values.subList(Math.max(0, values.size() - count),
+                    values.size()));
         }
     }
 

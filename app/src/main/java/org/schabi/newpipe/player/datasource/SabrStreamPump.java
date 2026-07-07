@@ -48,6 +48,10 @@ final class SabrStreamPump {
     private static final long READAHEAD_CUSHION_MS = 10_000;
     private static final long STARTUP_READAHEAD_CUSHION_MS = 6_000;
     private static final long STARTUP_BURST_READAHEAD_CUSHION_MS = 25_000;
+    // Startup bursts need to fill enough media for exact seeks, but YouTube SABR starts returning
+    // policy-only responses when the reported server-side readahead gets too large. Cap only the
+    // request-time player timestamp so local throttling and eviction still use the actual playhead.
+    private static final long STARTUP_BURST_SERVER_AHEAD_MS = 16_000;
     private static final long STARTUP_BURST_MS = 25_000;
     private static final long SEEK_READAHEAD_CUSHION_MS = 5_000;
     private static final long SEEK_MODE_MS = 8_000;
@@ -87,6 +91,7 @@ final class SabrStreamPump {
     // SponsorBlock skip at start, resume-from-history). The forward pump fills from edge 0 and would
     // take minutes to reach it, so the loop jumps the session onto it next round. Single-slot.
     private volatile SabrSegmentRequest pendingForwardSeek;
+    private volatile long pendingForwardSeekPositionMs = -1;
     private volatile YoutubeSabrFormat pendingInitialization;
     private volatile long seekModeUntilMs;
     private volatile long startedAtMs;
@@ -171,19 +176,28 @@ final class SabrStreamPump {
     void requestForwardSeekTo(@NonNull final SabrSegmentRequest request) {
         activateSeekMode();
         pendingForwardSeek = request;
+        pendingForwardSeekPositionMs = -1;
         ensureStarted();
         wake();
     }
 
     /** Reposition immediately when Media3 reports a seek outside its buffered sample queue. */
     void requestSeekTo(@NonNull final SabrSegmentRequest request, final boolean backward) {
+        requestSeekTo(request, backward, -1);
+    }
+
+    /** Reposition immediately when Media3 reports a seek outside its buffered sample queue. */
+    void requestSeekTo(@NonNull final SabrSegmentRequest request, final boolean backward,
+                       final long positionMs) {
         activateSeekMode();
         if (backward) {
             pendingForwardSeek = null;
+            pendingForwardSeekPositionMs = -1;
             pendingRefetch = request;
         } else {
             pendingRefetch = null;
             pendingForwardSeek = request;
+            pendingForwardSeekPositionMs = positionMs;
         }
         ensureStarted();
         wake();
@@ -267,7 +281,17 @@ final class SabrStreamPump {
                     // pacing follows the new position instead of ping-ponging back to the old span).
                     final SabrSegmentRequest forwardSeek = pendingForwardSeek;
                     if (forwardSeek != null) {
+                        final long forwardSeekPositionMs = pendingForwardSeekPositionMs;
                         pendingForwardSeek = null;
+                        pendingForwardSeekPositionMs = -1;
+                        if (isSeekTargetCached(forwardSeek, forwardSeekPositionMs)) {
+                            session.addDiagnosticEvent("pump_forward_cached itag="
+                                    + forwardSeek.getFormat().getItag()
+                                    + " seq=" + forwardSeek.getSequenceNumber()
+                                    + " positionMs=" + forwardSeekPositionMs);
+                            state = State.IDLE;
+                            continue;
+                        }
                         state = State.REPOSITIONING;
                         session.addDiagnosticEvent("pump_forward itag="
                                 + forwardSeek.getFormat().getItag()
@@ -303,10 +327,9 @@ final class SabrStreamPump {
                         continue;
                     }
                     state = State.REQUESTING;
-                    // Report actual playback time. Buffered ranges separately describe the loaded
-                    // edge; reporting the edge as player time made the server see zero readahead and
-                    // send another full batch even when Media3 was already far ahead.
-                    session.getStreamState().setPlayerTimeMs(playerTimeMs);
+                    final long requestPlayerTimeMs = startupRequestPlayerTimeMs(playerTimeMs,
+                            edgeMs);
+                    session.getStreamState().setPlayerTimeMs(requestPlayerTimeMs);
                     final int segmentCount = pumpOnceStreaming();
                     state = State.IDLE;
                     consecutiveIoErrors = 0;
@@ -373,7 +396,7 @@ final class SabrStreamPump {
         if (isSeekMode()) {
             return SEEK_READAHEAD_CUSHION_MS;
         }
-        if (startedAtMs > 0 && System.currentTimeMillis() - startedAtMs < STARTUP_BURST_MS) {
+        if (isStartupBurst()) {
             return STARTUP_BURST_READAHEAD_CUSHION_MS;
         }
         if (holder.hasUnstartedActiveReader()) {
@@ -390,6 +413,17 @@ final class SabrStreamPump {
         }
         return Math.max(MIN_SERVER_READAHEAD_CUSHION_MS,
                 Math.min(READAHEAD_CUSHION_MS, serverTargetMs));
+    }
+
+    private long startupRequestPlayerTimeMs(final long playerTimeMs, final long edgeMs) {
+        if (!isStartupBurst()) {
+            return playerTimeMs;
+        }
+        return Math.max(playerTimeMs, edgeMs - STARTUP_BURST_SERVER_AHEAD_MS);
+    }
+
+    private boolean isStartupBurst() {
+        return startedAtMs > 0 && System.currentTimeMillis() - startedAtMs < STARTUP_BURST_MS;
     }
 
     private boolean isHeartbeatDue() {
@@ -422,6 +456,32 @@ final class SabrStreamPump {
 
     private boolean isSeekMode() {
         return System.currentTimeMillis() < seekModeUntilMs;
+    }
+
+    private boolean isSeekTargetCached(@NonNull final SabrSegmentRequest request,
+                                       final long positionMs) {
+        if (session.getCachedSegment(request) == null) {
+            return false;
+        }
+        if (request.isInitializationSegment()) {
+            return true;
+        }
+        final YoutubeSabrFormat targetFormat = request.getFormat();
+        final YoutubeSabrFormat companionFormat;
+        if (targetFormat.getItag() == holder.videoFormat.getItag()) {
+            companionFormat = holder.audioFormat;
+        } else if (targetFormat.getItag() == holder.audioFormat.getItag()) {
+            companionFormat = holder.videoFormat;
+        } else {
+            return true;
+        }
+        final long companionTimeMs = positionMs >= 0 ? positionMs
+                : session.getStreamState().getSegmentStartMs(targetFormat,
+                        request.getSequenceNumber());
+        final int companionSequence = session.getStreamState()
+                .getSegmentNumberAtOrAfterTimeMs(companionFormat, companionTimeMs);
+        return session.getCachedSegment(SabrSegmentRequest.media(companionFormat,
+                companionSequence)) != null;
     }
 
     private static void sleepQuietly(final long ms) {

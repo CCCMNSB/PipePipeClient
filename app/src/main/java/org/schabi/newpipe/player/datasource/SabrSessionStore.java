@@ -199,7 +199,7 @@ public final class SabrSessionStore {
                     audioFormat, audioSequence);
             if (session.getCachedSegment(request) == null
                     || session.getCachedSegment(audioRequest) == null) {
-                getPump(localization).requestSeekTo(request, backward);
+                getPump(localization).requestSeekTo(request, backward, positionMs);
             } else {
                 getPump(localization).noteSeekWithinCache();
             }

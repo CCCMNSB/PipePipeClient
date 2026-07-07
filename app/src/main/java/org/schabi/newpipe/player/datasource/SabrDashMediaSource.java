@@ -90,6 +90,7 @@ public final class SabrDashMediaSource extends CompositeMediaSource<Integer> {
     @Override
     protected void prepareSourceInternal(@Nullable final TransferListener mediaTransferListener) {
         super.prepareSourceInternal(mediaTransferListener);
+        holder.getPump(localization).ensureStarted();
         prepareChildSource(0, childSource);
     }
 
