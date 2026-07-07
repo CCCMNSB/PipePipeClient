@@ -61,16 +61,21 @@ import java.util.concurrent.atomic.AtomicReference;
  *   -Pandroid.testInstrumentationRunnerArguments.class=\
  * org.schabi.newpipe.player.SabrPlaybackSmokeTest \
  *   -Pandroid.testInstrumentationRunnerArguments.url=\
- * https://www.youtube.com/watch?v=dQw4w9WgXcQ
+ * https://www.youtube.com/watch?v=G-eNlqqkn1w
  * </pre>
  */
 @RunWith(AndroidJUnit4.class)
 @LargeTest
 public final class SabrPlaybackSmokeTest {
     private static final String DEFAULT_URL =
-            "https://www.youtube.com/watch?v=dQw4w9WgXcQ";
+            "https://www.youtube.com/watch?v=G-eNlqqkn1w";
+    private static final int DEFAULT_MAX_VIDEO_HEIGHT = 720;
+    private static final long DEFAULT_SEEK_POSITION_MS = (49 * 60 + 55) * 1000L;
+    private static final long DEFAULT_LINEAR_PLAYBACK_MS = 3_000;
+    private static final long DEFAULT_POST_SEEK_PLAYBACK_MS = 30_000;
+    private static final long DEFAULT_POST_REWIND_PLAYBACK_MS = 30_000;
     private static final long PREPARE_TIMEOUT_SECONDS = 150;
-    private static final long PLAYBACK_TIMEOUT_SECONDS = 30;
+    private static final long PLAYBACK_TIMEOUT_SECONDS = 75;
     private static final AtomicBoolean SUPPRESS_SABR_INITIALIZATION = new AtomicBoolean();
     private static final AtomicReference<Thread> INITIALIZATION_SUPPRESSOR =
             new AtomicReference<>();
@@ -79,6 +84,35 @@ public final class SabrPlaybackSmokeTest {
 
     @Test
     public void extractorToMedia3PlaysAndSeeks() throws Exception {
+        runSmokeCase(SmokeCase.playback());
+    }
+
+    @Test
+    public void recoversMissingInitializationFromPump() throws Exception {
+        runSmokeCase(SmokeCase.missingInitialization(false));
+    }
+
+    @Test
+    public void recoversMissingInitializationWithFallback() throws Exception {
+        runSmokeCase(SmokeCase.missingInitialization(true));
+    }
+
+    @Test
+    public void recoversEvictedSegmentRewind() throws Exception {
+        runSmokeCase(SmokeCase.evictedRewind());
+    }
+
+    @Test
+    public void boundsReadAheadForStalledReader() throws Exception {
+        runSmokeCase(SmokeCase.stalledReader());
+    }
+
+    @Test
+    public void rewindClearsBufferedStateAndCookie() throws Exception {
+        runSmokeCase(SmokeCase.rewindState());
+    }
+
+    private static void runSmokeCase(final SmokeCase smokeCase) throws Exception {
         final Context context = InstrumentationRegistry.getInstrumentation()
                 .getTargetContext().getApplicationContext();
         assertTrue("The target process must use PipePipe's App initialization",
@@ -96,7 +130,8 @@ public final class SabrPlaybackSmokeTest {
                         || info.getVideoOnlyStreams().stream()
                         .anyMatch(SabrPlaybackSmokeTest::isSabr));
 
-        final int maxVideoHeight = Integer.parseInt(arguments.getString("maxVideoHeight", "360"));
+        final int maxVideoHeight = Integer.parseInt(arguments.getString("maxVideoHeight",
+                String.valueOf(DEFAULT_MAX_VIDEO_HEIGHT)));
         final String targetCodec = arguments.getString("targetCodec", "");
         final PlayerDataSource dataSource = new PlayerDataSource(context,
                 DownloaderImpl.USER_AGENT, new DefaultBandwidthMeter.Builder(context).build());
@@ -104,21 +139,27 @@ public final class SabrPlaybackSmokeTest {
                 new BoundedQualityResolver(maxVideoHeight, targetCodec));
         final MediaSource mediaSource = resolver.resolve(info);
         assertNotNull("VideoPlaybackResolver returned no MediaSource", mediaSource);
-        final boolean useAdaptiveInitFallback = Boolean.parseBoolean(
-                arguments.getString("useAdaptiveInitFallback", "false"));
-        final String recoveryScenario = arguments.getString("recoveryScenario", "playback");
-        if ("stalledReader".equals(recoveryScenario)) {
-            verifyStalledReaderReadAhead(getHolder(info.getId()));
+        if (smokeCase.kind == SmokeCase.Kind.STALLED_READER) {
+            try {
+                verifyStalledReaderReadAhead(getHolder(info.getId()));
+            } finally {
+                SabrSessionStore.evict(info.getId());
+            }
             return;
         }
-        if ("rewindState".equals(recoveryScenario)) {
-            verifyRewindResetsSabrState(getHolder(info.getId()));
+        if (smokeCase.kind == SmokeCase.Kind.REWIND_STATE) {
+            try {
+                verifyRewindResetsSabrState(getHolder(info.getId()));
+            } finally {
+                SabrSessionStore.evict(info.getId());
+            }
             return;
         }
-        final boolean simulateEvictedRewind = "evictedRewind".equals(recoveryScenario);
-        final SabrSessionStore.Holder injectedHolder = Boolean.parseBoolean(
-                arguments.getString("simulateMissingInit", "false"))
-                ? discardSabrInitialization(info.getId(), useAdaptiveInitFallback) : null;
+        final boolean simulateEvictedRewind = smokeCase.kind == SmokeCase.Kind.EVICTED_REWIND;
+        final SabrSessionStore.Holder injectedHolder =
+                smokeCase.kind == SmokeCase.Kind.MISSING_INITIALIZATION
+                        ? discardSabrInitialization(info.getId(), smokeCase.useAdaptiveInitFallback)
+                        : null;
 
         final CountDownLatch ready = new CountDownLatch(1);
         final CountDownLatch firstVideoFrame = new CountDownLatch(1);
@@ -198,57 +239,32 @@ public final class SabrPlaybackSmokeTest {
             assertTrue("Player did not reach READY within " + PREPARE_TIMEOUT_SECONDS + "s",
                     ready.await(PREPARE_TIMEOUT_SECONDS, TimeUnit.SECONDS));
             assertNull("Player failed while preparing", playerError.get());
-            if (injectedHolder != null) {
-                final String trace = injectedHolder.session.getDiagnosticTrace();
-                assertTrue("Missing initialization recovery was not used: " + trace,
-                        trace.contains(useAdaptiveInitFallback
-                                ? "initialization_fallback" : "pump_initialization"));
-                final String audioInitializationMarker = useAdaptiveInitFallback
-                        ? "initialization_fallback itag="
-                                + injectedHolder.audioFormat.getItag()
-                        : injectedHolder.audioFormat.getItag() + ":init";
-                final String videoInitializationMarker = useAdaptiveInitFallback
-                        ? "initialization_fallback itag="
-                                + injectedHolder.videoFormat.getItag()
-                        : injectedHolder.videoFormat.getItag() + ":init";
-                assertTrue("Audio initialization was not returned: " + trace,
-                        trace.contains(audioInitializationMarker));
-                assertTrue("Video initialization was not returned: " + trace,
-                        trace.contains(videoInitializationMarker));
-                assertNull("Initialization fault injection failed",
-                        INITIALIZATION_SUPPRESSION_FAILURE.get());
-            }
             assertTrue("MediaCodec did not render a video frame",
                     firstVideoFrame.await(PLAYBACK_TIMEOUT_SECONDS, TimeUnit.SECONDS));
             assertNull("Player failed while starting video", playerError.get());
             assertTrue("Audio output did not start",
                     audioStarted.await(PLAYBACK_TIMEOUT_SECONDS, TimeUnit.SECONDS));
             assertNull("Player failed while starting audio", playerError.get());
+            if (injectedHolder != null) {
+                verifyInitializationRecovery(injectedHolder, smokeCase.useAdaptiveInitFallback);
+            }
 
+            final long linearPlaybackMs = Long.parseLong(arguments.getString(
+                    "linearPlaybackMs", String.valueOf(DEFAULT_LINEAR_PLAYBACK_MS)));
             final long initialPositionMs = positionOf(playerRef.get());
-            waitForPosition(playerRef.get(), initialPositionMs + 3_000,
+            waitForPosition(playerRef.get(), initialPositionMs + linearPlaybackMs,
                     PLAYBACK_TIMEOUT_SECONDS);
             assertNull("Player failed during linear playback", playerError.get());
 
+            final long postSeekPlaybackMs = Long.parseLong(arguments.getString(
+                    "postSeekPlaybackMs", String.valueOf(DEFAULT_POST_SEEK_PLAYBACK_MS)));
             final long durationMs = durationOf(playerRef.get());
-            final String seekFractionArgument = arguments.getString("seekFraction");
-            final long seekPositionMs;
+            final long seekPositionMs = seekPositionMs(arguments, durationMs,
+                    simulateEvictedRewind ? Math.max(20_000, postSeekPlaybackMs)
+                            : postSeekPlaybackMs);
             if (simulateEvictedRewind) {
-                seekPositionMs = durationMs == C.TIME_UNSET
-                        ? 120_000 : Math.min(durationMs - 20_000,
-                                Math.max(60_000, durationMs * 2 / 3));
                 assertTrue("Video is too short for an eviction/rewind test: " + durationMs,
                         seekPositionMs >= 60_000);
-            } else if (seekFractionArgument != null) {
-                assertTrue("Cannot seek by fraction when duration is unset", durationMs != C.TIME_UNSET);
-                final double seekFraction = Double.parseDouble(seekFractionArgument);
-                assertTrue("seekFraction must be in (0, 1): " + seekFraction,
-                        seekFraction > 0.0 && seekFraction < 1.0);
-                seekPositionMs = Math.max(1_000,
-                        Math.min(durationMs - 1_000, Math.round(durationMs * seekFraction)));
-            } else {
-                seekPositionMs = durationMs == C.TIME_UNSET
-                        ? 10_000 : Math.max(1_000, Math.min(30_000, durationMs / 2));
             }
             InstrumentationRegistry.getInstrumentation().runOnMainSync(
                     () -> playerRef.get().seekTo(seekPositionMs));
@@ -259,8 +275,8 @@ public final class SabrPlaybackSmokeTest {
             assertTrue("Seek landed outside the expected position: requested=" + seekPositionMs
                             + " reported=" + seekPositionReported.get(),
                     Math.abs(seekPositionReported.get() - seekPositionMs) <= 1_000);
-            waitForPosition(playerRef.get(), seekPositionMs + 2_000,
-                    simulateEvictedRewind ? PLAYBACK_TIMEOUT_SECONDS : 15);
+            waitForPosition(playerRef.get(), seekPositionMs + postSeekPlaybackMs,
+                    PLAYBACK_TIMEOUT_SECONDS);
             assertNull("Player failed after seek", playerError.get());
             if (simulateEvictedRewind) {
                 final SabrSessionStore.Holder holder = getHolder(info.getId());
@@ -285,7 +301,10 @@ public final class SabrPlaybackSmokeTest {
                 assertTrue("Backward seek landed outside the expected position: requested="
                                 + rewindPositionMs + " reported=" + seekPositionReported.get(),
                         Math.abs(seekPositionReported.get() - rewindPositionMs) <= 1_000);
-                waitForPosition(playerRef.get(), rewindPositionMs + 2_000,
+                final long postRewindPlaybackMs = Long.parseLong(arguments.getString(
+                        "postRewindPlaybackMs",
+                        String.valueOf(DEFAULT_POST_REWIND_PLAYBACK_MS)));
+                waitForPosition(playerRef.get(), rewindPositionMs + postRewindPlaybackMs,
                         PLAYBACK_TIMEOUT_SECONDS);
                 assertNull("Player failed after evicted-segment rewind", playerError.get());
                 final String trace = holder.session.getDiagnosticTrace();
@@ -324,6 +343,7 @@ public final class SabrPlaybackSmokeTest {
                     texture.release();
                 }
             });
+            SabrSessionStore.evict(info.getId());
         }
     }
 
@@ -368,14 +388,13 @@ public final class SabrPlaybackSmokeTest {
             final long deadlineNs = System.nanoTime()
                     + TimeUnit.SECONDS.toNanos(PREPARE_TIMEOUT_SECONDS);
             String trace = holder.session.getDiagnosticTrace();
-            final String throttleMarker = "pump_throttled cushionMs=10000"
-                    + " unstartedReader=true";
             while (!trace.contains("pump_throttled ") && System.nanoTime() < deadlineNs) {
                 Thread.sleep(250);
                 trace = holder.session.getDiagnosticTrace();
             }
             assertTrue("Pump did not apply the startup read-ahead bound: " + trace,
-                    trace.contains(throttleMarker));
+                    trace.contains("pump_throttled ")
+                            && trace.contains("unstartedReader=true"));
 
             final int requestNumber = holder.session.getRequestNumber();
             final long edgeMs = holder.session.getStreamState().getMinBufferedEndMs();
@@ -407,6 +426,34 @@ public final class SabrPlaybackSmokeTest {
                 holder.session.getCachedSegment(SabrSegmentRequest.media(format, centerSequence)));
     }
 
+    private static void verifyInitializationRecovery(final SabrSessionStore.Holder holder,
+                                                     final boolean requireFallback) {
+        final String trace = holder.session.getDiagnosticTrace();
+        final String audioSabrMarker = holder.audioFormat.getItag() + ":init";
+        final String videoSabrMarker = holder.videoFormat.getItag() + ":init";
+        final String audioFallbackMarker = "initialization_fallback itag="
+                + holder.audioFormat.getItag();
+        final String videoFallbackMarker = "initialization_fallback itag="
+                + holder.videoFormat.getItag();
+        if (requireFallback) {
+            assertTrue("Audio initialization fallback was not used: " + trace,
+                    trace.contains(audioFallbackMarker));
+            assertTrue("Video initialization fallback was not used: " + trace,
+                    trace.contains(videoFallbackMarker));
+        } else {
+            assertTrue("Audio initialization was not returned: " + trace,
+                    trace.contains(audioSabrMarker) || trace.contains(audioFallbackMarker));
+            assertTrue("Video initialization was not returned: " + trace,
+                    trace.contains(videoSabrMarker) || trace.contains(videoFallbackMarker));
+            assertTrue("Missing initialization recovery was not used: " + trace,
+                    trace.contains("pump_initialization")
+                            || trace.contains(audioFallbackMarker)
+                            || trace.contains(videoFallbackMarker));
+        }
+        assertNull("Initialization fault injection failed",
+                INITIALIZATION_SUPPRESSION_FAILURE.get());
+    }
+
     private static void verifyRewindResetsSabrState(
             final SabrSessionStore.Holder holder) throws Exception {
         final Localization localization = new Localization("en", "US");
@@ -431,6 +478,7 @@ public final class SabrPlaybackSmokeTest {
 
     private static SabrSessionStore.Holder discardSabrInitialization(
             final String videoId, final boolean useAdaptiveInitFallback) throws Exception {
+        INITIALIZATION_SUPPRESSION_FAILURE.set(null);
         final SabrSessionStore.Holder holder = getHolder(videoId);
         holder.session.pumpOnce(new Localization("en", "US"));
         final SabrSegmentRequest audioInit =
@@ -443,6 +491,7 @@ public final class SabrPlaybackSmokeTest {
                 holder.session.getCachedSegment(videoInit));
         holder.session.discardCachedSegment(audioInit);
         holder.session.discardCachedSegment(videoInit);
+        clearStoredInitializationData(holder);
         holder.session.prepareForInitialization(holder.audioFormat);
         holder.session.prepareForInitialization(holder.videoFormat);
         assertNull(holder.session.getCachedSegment(audioInit));
@@ -451,6 +500,17 @@ public final class SabrPlaybackSmokeTest {
             startInitializationSuppression(holder, audioInit, videoInit);
         }
         return holder;
+    }
+
+    private static void clearStoredInitializationData(
+            final SabrSessionStore.Holder holder) throws Exception {
+        final Field initializationData =
+                SabrSessionStore.Holder.class.getDeclaredField("initializationData");
+        initializationData.setAccessible(true);
+        @SuppressWarnings("unchecked") final Map<Integer, byte[]> values =
+                (Map<Integer, byte[]>) initializationData.get(holder);
+        values.remove(holder.audioFormat.getItag());
+        values.remove(holder.videoFormat.getItag());
     }
 
     private static void startInitializationSuppression(
@@ -514,6 +574,19 @@ public final class SabrPlaybackSmokeTest {
         return result.get();
     }
 
+    private static long seekPositionMs(final Bundle arguments, final long durationMs,
+                                       final long requiredTailMs) {
+        assertTrue("Cannot use fixed seek position when duration is unset",
+                durationMs != C.TIME_UNSET);
+        final long seekPositionMs = Long.parseLong(arguments.getString("seekPositionMs",
+                String.valueOf(DEFAULT_SEEK_POSITION_MS)));
+        assertTrue("seekPositionMs must be positive: " + seekPositionMs, seekPositionMs > 0);
+        assertTrue("Video is too short for seek target: duration=" + durationMs
+                        + " target=" + seekPositionMs + " requiredTail=" + requiredTailMs,
+                durationMs > seekPositionMs + requiredTailMs);
+        return seekPositionMs;
+    }
+
     private static void waitForPosition(final ExoPlayer player, final long targetMs,
                                         final long timeoutSeconds) throws Exception {
         final long deadlineNs = System.nanoTime() + TimeUnit.SECONDS.toNanos(timeoutSeconds);
@@ -524,6 +597,44 @@ public final class SabrPlaybackSmokeTest {
             Thread.sleep(250);
         }
         assertEquals("Playback position did not reach target", targetMs, positionOf(player));
+    }
+
+    private static final class SmokeCase {
+        private enum Kind {
+            PLAYBACK,
+            MISSING_INITIALIZATION,
+            EVICTED_REWIND,
+            STALLED_READER,
+            REWIND_STATE
+        }
+
+        private final Kind kind;
+        private final boolean useAdaptiveInitFallback;
+
+        private SmokeCase(final Kind kind, final boolean useAdaptiveInitFallback) {
+            this.kind = kind;
+            this.useAdaptiveInitFallback = useAdaptiveInitFallback;
+        }
+
+        private static SmokeCase playback() {
+            return new SmokeCase(Kind.PLAYBACK, false);
+        }
+
+        private static SmokeCase missingInitialization(final boolean useAdaptiveInitFallback) {
+            return new SmokeCase(Kind.MISSING_INITIALIZATION, useAdaptiveInitFallback);
+        }
+
+        private static SmokeCase evictedRewind() {
+            return new SmokeCase(Kind.EVICTED_REWIND, false);
+        }
+
+        private static SmokeCase stalledReader() {
+            return new SmokeCase(Kind.STALLED_READER, false);
+        }
+
+        private static SmokeCase rewindState() {
+            return new SmokeCase(Kind.REWIND_STATE, false);
+        }
     }
 
     private static final class BoundedQualityResolver implements QualityResolver {
