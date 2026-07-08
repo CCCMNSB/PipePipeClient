@@ -197,6 +197,7 @@ public final class SabrSessionStore {
             final boolean backward = positionMs < previousPlayerTimeMs;
             setPlayerTimeMs(positionMs);
             anchorReaderPositionMs(positionMs);
+            session.getStreamState().setSelectVideoFormatBeforeAudio(positionMs > 1_000);
             if (positionMs <= 1_000 && previousPlayerTimeMs <= 1_000) {
                 return;
             }

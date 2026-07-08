@@ -33,6 +33,7 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.schabi.newpipe.App;
 import org.schabi.newpipe.DownloaderImpl;
+import org.schabi.newpipe.SharedWebViewRuntime;
 import org.schabi.newpipe.extractor.NewPipe;
 import org.schabi.newpipe.extractor.ServiceList;
 import org.schabi.newpipe.extractor.services.youtube.sabr.SabrSegmentRequest;
@@ -79,11 +80,15 @@ public final class YoutubePlaybackBenchmarkTest {
         final Context context = InstrumentationRegistry.getInstrumentation()
                 .getTargetContext().getApplicationContext();
         assertTrue(context instanceof App);
+        SharedWebViewRuntime.get(context).ensureReady(120_000L, "benchmark WebView warmup");
         final Bundle args = InstrumentationRegistry.getArguments();
         final String url = args.getString("url", DEFAULT_URL);
         final int repetitions = positive(args.getString("repetitions", "5"), "repetitions");
         final int warmups = Integer.parseInt(args.getString("warmups", "1"));
         final int playSeconds = positive(args.getString("playSeconds", "10"), "playSeconds");
+        final long startPositionMs = Long.parseLong(args.getString("startPositionMs", "-1"));
+        assertTrue("startPositionMs must be unset or non-negative: " + startPositionMs,
+                startPositionMs >= -1);
         final int maxHeight = positive(args.getString("maxVideoHeight", "1080"),
                 "maxVideoHeight");
         final String targetCodec = args.getString("targetCodec", "avc")
@@ -92,6 +97,7 @@ public final class YoutubePlaybackBenchmarkTest {
                 "hlsExtractionRetries");
         final boolean replacePlayerCache = Boolean.parseBoolean(
                 args.getString("replacePlayerCache", "false"));
+        final String pathFilter = args.getString("paths", "");
         final File playerCacheDirectory = new File(context.getFilesDir(),
                 "youtube-playback-benchmark/player-responses");
         DownloaderImpl.getInstance().configureYoutubePlayerResponseCacheForBenchmark(
@@ -100,11 +106,12 @@ public final class YoutubePlaybackBenchmarkTest {
                 .put("directory", playerCacheDirectory.getAbsolutePath())
                 .put("replace", replacePlayerCache));
 
-        final List<Path> paths = Arrays.asList(
+        final List<Path> paths = filterPaths(Arrays.asList(
                 new Path("sabr", "mweb", DeliveryMethod.SABR),
                 new Path("hls", "web_safari", DeliveryMethod.HLS),
                 new Path("android_vr_generated_dash", "android_vr",
-                        DeliveryMethod.PROGRESSIVE_HTTP));
+                        DeliveryMethod.PROGRESSIVE_HTTP)), pathFilter);
+        assertTrue("No benchmark paths selected by paths=" + pathFilter, !paths.isEmpty());
         final Map<Path, CachedExtraction> extractions = new LinkedHashMap<>();
         for (final Path path : paths) {
             final int maxAttempts = path.sourceDelivery == DeliveryMethod.HLS
@@ -153,7 +160,7 @@ public final class YoutubePlaybackBenchmarkTest {
             for (final Path path : roundOrder) {
                 final boolean warmup = round < 0;
                 final Result result = runTrial(context, path, extractions.get(path).info,
-                        round, warmup, playSeconds, maxHeight, targetCodec);
+                        round, warmup, playSeconds, startPositionMs, maxHeight, targetCodec);
                 emit("PIPEPIPE_BENCHMARK_RESULT", result.toJson());
                 if (!warmup) {
                     measured.add(result);
@@ -168,6 +175,7 @@ public final class YoutubePlaybackBenchmarkTest {
 
     private static Result runTrial(final Context context, final Path path, final StreamInfo info,
                                    final int round, final boolean warmup, final int playSeconds,
+                                   final long startPositionMs,
                                    final int maxHeight, final String targetCodec) throws Exception {
         NewPipe.setYoutubePlayerClient(path.client);
         SabrSessionStore.evict(info.getId());
@@ -220,6 +228,9 @@ public final class YoutubePlaybackBenchmarkTest {
         final long uidRxBefore = TrafficStats.getUidRxBytes(Process.myUid());
         final long cpuBefore = Process.getElapsedCpuTime();
         final long prepareNs = SystemClock.elapsedRealtimeNanos();
+        if (startPositionMs >= 0) {
+            transfers.startSeekTrace();
+        }
         InstrumentationRegistry.getInstrumentation().runOnMainSync(() -> {
             final SurfaceTexture texture = new SurfaceTexture(0);
             final Surface surface = new Surface(texture);
@@ -275,6 +286,9 @@ public final class YoutubePlaybackBenchmarkTest {
             player.setVideoSurface(surface);
             player.setVolume(0f);
             player.setMediaSource(source);
+            if (startPositionMs >= 0) {
+                player.seekTo(startPositionMs);
+            }
             player.prepare();
             player.play();
             textureRef.set(texture);
@@ -288,41 +302,53 @@ public final class YoutubePlaybackBenchmarkTest {
         try {
             waitUntil(() -> frameNs.get() != 0 || error.get() != null, START_TIMEOUT_MS);
             throwPlayerError(error.get());
-            waitUntil(() -> position(playerRef.get(), info.getId()) >= playSeconds * 1_000L
+            final long playbackStartPositionMs = startPositionMs >= 0 ? startPositionMs : 0;
+            waitUntil(() -> position(playerRef.get(), info.getId())
+                            >= playbackStartPositionMs + playSeconds * 1_000L
                     || error.get() != null, START_TIMEOUT_MS);
             throwPlayerError(error.get());
-            final long duration = duration(playerRef.get());
-            final long target = duration == C.TIME_UNSET ? 30_000
-                    : Math.max(1_000, Math.min(30_000, duration / 2));
-            countRebuffers.set(false);
-            final long linearBuffer = bufferingStartNs.getAndSet(0);
-            if (linearBuffer != 0) {
-                rebufferNs.addAndGet(SystemClock.elapsedRealtimeNanos() - linearBuffer);
-            }
-            final org.schabi.newpipe.extractor.services.youtube.sabr.YoutubeSabrSession
-                    .TraceSnapshot sabrTraceBefore = sabrHolder == null ? null
-                    : sabrHolder.session.getTraceSnapshot();
-            final SeekCacheSnapshot sabrCacheBefore = SeekCacheSnapshot.fromSabr(
-                    sabrHolder, target);
-            transfers.startSeekTrace();
-            final long seekStart = SystemClock.elapsedRealtimeNanos();
-            InstrumentationRegistry.getInstrumentation().runOnMainSync(
-                    () -> playerRef.get().seekTo(target));
-            waitUntil(() -> position(playerRef.get(), info.getId()) >= target + 1_000
-                    || error.get() != null, START_TIMEOUT_MS);
-            throwPlayerError(error.get());
-            seekRecoveryMs = elapsedMs(seekStart);
-            if (path.sourceDelivery == DeliveryMethod.SABR) {
-                sabrStats = sabrStats(info.getId());
-                final org.schabi.newpipe.extractor.services.youtube.sabr.YoutubeSabrSession
-                        .TraceSnapshot sabrTraceAfter = sabrHolder == null ? null
-                        : sabrHolder.session.getTraceSnapshot();
-                final SeekCacheSnapshot sabrCacheAfter = SeekCacheSnapshot.fromSabr(
-                        sabrHolder, target);
-                seekTrace = SeekTrace.fromSabr(sabrTraceBefore, sabrTraceAfter,
-                        sabrCacheBefore, sabrCacheAfter);
+            if (startPositionMs >= 0) {
+                countRebuffers.set(false);
+                if (path.sourceDelivery == DeliveryMethod.SABR) {
+                    sabrStats = sabrStats(info.getId());
+                    seekTrace = SeekTrace.fromSabrStartup(sabrHolder, startPositionMs);
+                } else {
+                    seekTrace = transfers.finishSeekTrace();
+                }
             } else {
-                seekTrace = transfers.finishSeekTrace();
+                final long duration = duration(playerRef.get());
+                final long target = duration == C.TIME_UNSET ? 30_000
+                        : Math.max(1_000, Math.min(30_000, duration / 2));
+                countRebuffers.set(false);
+                final long linearBuffer = bufferingStartNs.getAndSet(0);
+                if (linearBuffer != 0) {
+                    rebufferNs.addAndGet(SystemClock.elapsedRealtimeNanos() - linearBuffer);
+                }
+                final org.schabi.newpipe.extractor.services.youtube.sabr.YoutubeSabrSession
+                        .TraceSnapshot sabrTraceBefore = sabrHolder == null ? null
+                        : sabrHolder.session.getTraceSnapshot();
+                final SeekCacheSnapshot sabrCacheBefore = SeekCacheSnapshot.fromSabr(
+                        sabrHolder, target);
+                transfers.startSeekTrace();
+                final long seekStart = SystemClock.elapsedRealtimeNanos();
+                InstrumentationRegistry.getInstrumentation().runOnMainSync(
+                        () -> playerRef.get().seekTo(target));
+                waitUntil(() -> position(playerRef.get(), info.getId()) >= target + 1_000
+                        || error.get() != null, START_TIMEOUT_MS);
+                throwPlayerError(error.get());
+                seekRecoveryMs = elapsedMs(seekStart);
+                if (path.sourceDelivery == DeliveryMethod.SABR) {
+                    sabrStats = sabrStats(info.getId());
+                    final org.schabi.newpipe.extractor.services.youtube.sabr.YoutubeSabrSession
+                            .TraceSnapshot sabrTraceAfter = sabrHolder == null ? null
+                            : sabrHolder.session.getTraceSnapshot();
+                    final SeekCacheSnapshot sabrCacheAfter = SeekCacheSnapshot.fromSabr(
+                            sabrHolder, target);
+                    seekTrace = SeekTrace.fromSabr(sabrTraceBefore, sabrTraceAfter,
+                            sabrCacheBefore, sabrCacheAfter);
+                } else {
+                    seekTrace = transfers.finishSeekTrace();
+                }
             }
         } finally {
             final long openBuffer = bufferingStartNs.getAndSet(0);
@@ -464,6 +490,20 @@ public final class YoutubePlaybackBenchmarkTest {
         InstrumentationRegistry.getInstrumentation().runOnMainSync(
                 () -> value.set(player.getDuration()));
         return value.get();
+    }
+
+    private static List<Path> filterPaths(final List<Path> paths, final String filter) {
+        if (filter == null || filter.trim().isEmpty()) {
+            return paths;
+        }
+        final List<String> selected = Arrays.asList(filter.toLowerCase(Locale.ROOT).split(","));
+        final List<Path> filtered = new ArrayList<>();
+        for (final Path path : paths) {
+            if (selected.contains(path.name.toLowerCase(Locale.ROOT))) {
+                filtered.add(path);
+            }
+        }
+        return filtered;
     }
 
     private static long elapsedMs(final long startNs) {
@@ -835,6 +875,30 @@ public final class YoutubePlaybackBenchmarkTest {
                     delta(after.getDiscards(), before.getDiscards().size()),
                     Collections.emptyList(), cacheBefore, cacheAfter,
                     tail(before.getSegments(), 24), tail(before.getDiscards(), 24));
+        }
+
+        private static SeekTrace fromSabrStartup(final SabrSessionStore.Holder holder,
+                                                 final long startPositionMs) {
+            if (holder == null) {
+                return EMPTY;
+            }
+            final org.schabi.newpipe.extractor.services.youtube.sabr.YoutubeSabrSession
+                    .TraceSnapshot after = holder.session.getTraceSnapshot();
+            return new SeekTrace(-1,
+                    after.getResponseBytes(),
+                    after.getMediaPayloadBytes(),
+                    after.getControlPayloadBytes(),
+                    after.getUmpOverheadBytes(),
+                    after.getDiscardedBytes(),
+                    after.getRequestNumber(),
+                    after.getCachedBytes(),
+                    new ArrayList<>(after.getSegments()),
+                    new ArrayList<>(after.getDiscards()),
+                    Collections.emptyList(),
+                    SeekCacheSnapshot.EMPTY,
+                    SeekCacheSnapshot.fromSabr(holder, startPositionMs),
+                    Collections.emptyList(),
+                    Collections.emptyList());
         }
 
         private static List<String> delta(final List<String> values, final int start) {

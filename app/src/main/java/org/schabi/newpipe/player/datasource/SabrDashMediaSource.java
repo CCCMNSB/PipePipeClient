@@ -90,7 +90,6 @@ public final class SabrDashMediaSource extends CompositeMediaSource<Integer> {
     @Override
     protected void prepareSourceInternal(@Nullable final TransferListener mediaTransferListener) {
         super.prepareSourceInternal(mediaTransferListener);
-        holder.getPump(localization).ensureStarted();
         prepareChildSource(0, childSource);
     }
 
@@ -241,6 +240,8 @@ public final class SabrDashMediaSource extends CompositeMediaSource<Integer> {
         private final MediaPeriod child;
         @Nullable
         private Callback callback;
+        private long preparedPositionUs = C.TIME_UNSET;
+        private boolean initialPositionApplied;
 
         SabrDashMediaPeriod(final MediaPeriod child) {
             this.child = child;
@@ -249,6 +250,7 @@ public final class SabrDashMediaSource extends CompositeMediaSource<Integer> {
         @Override
         public void prepare(final Callback cb, final long positionUs) {
             this.callback = cb;
+            this.preparedPositionUs = positionUs;
             playbackState.setReaderOwner(this);
             child.prepare(new Callback() {
                 @Override
@@ -285,12 +287,13 @@ public final class SabrDashMediaSource extends CompositeMediaSource<Integer> {
                                  final boolean[] streamResetFlags,
                                  final long positionUs) {
             playbackState.setReaderOwner(this);
-            updateActiveTracks(selections);
+            final boolean hasActiveTracks = updateActiveTracks(selections);
+            applyInitialStartPosition(positionUs, hasActiveTracks);
             return child.selectTracks(selections, mayRetainStreamFlags, streams, streamResetFlags,
                     positionUs);
         }
 
-        private void updateActiveTracks(final ExoTrackSelection[] selections) {
+        private boolean updateActiveTracks(final ExoTrackSelection[] selections) {
             boolean videoActive = false;
             boolean audioActive = false;
             for (final ExoTrackSelection selection : selections) {
@@ -309,6 +312,26 @@ public final class SabrDashMediaSource extends CompositeMediaSource<Integer> {
             holder.setActiveTracks(this, videoActive, audioActive);
             Log.d(TAG, "activeTracks video=" + holder.videoId
                     + " video=" + videoActive + " audio=" + audioActive);
+            return videoActive || audioActive;
+        }
+
+        private void applyInitialStartPosition(final long positionUs,
+                                               final boolean hasActiveTracks) {
+            if (initialPositionApplied || !hasActiveTracks) {
+                return;
+            }
+            initialPositionApplied = true;
+            final long targetUs = Math.max(validPositionUs(preparedPositionUs),
+                    validPositionUs(positionUs));
+            if (targetUs <= 0) {
+                return;
+            }
+            Log.d(TAG, "initialStart video=" + holder.videoId + " positionUs=" + targetUs);
+            holder.requestSeek(targetUs / 1000L, localization);
+        }
+
+        private long validPositionUs(final long positionUs) {
+            return positionUs == C.TIME_UNSET ? 0 : Math.max(0, positionUs);
         }
 
         @Override
