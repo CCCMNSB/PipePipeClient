@@ -94,7 +94,7 @@ public final class SabrSegmentDataSource implements DataSource {
             this.data = awaitSegment(request);
         }
         this.opened = true;
-        final int remaining = data.length - pos;
+        final int remaining = Math.max(0, data.length - pos);
         this.bytesRemaining = dataSpec.length == C.LENGTH_UNSET
                 ? remaining : Math.min(dataSpec.length, remaining);
         Log.d(TAG, "opened video=" + holder.videoId
@@ -195,6 +195,14 @@ public final class SabrSegmentDataSource implements DataSource {
             if (holder.isInvalidated()) {
                 throw invalidatedException(request.getFormat());
             }
+            if (holder.session.isBeyondEnd(request)) {
+                Log.d(TAG, "beyond end video=" + holder.videoId
+                        + " itag=" + format.getItag()
+                        + " seq=" + request.getSequenceNumber());
+                holder.session.addDiagnosticEvent("beyond_end itag=" + format.getItag()
+                        + " seq=" + request.getSequenceNumber());
+                return new byte[0];
+            }
             final IOException networkFailure = pump.takeNetworkFailure();
             if (networkFailure != null) {
                 throw networkFailure;
@@ -223,6 +231,14 @@ public final class SabrSegmentDataSource implements DataSource {
                             segment.getHeader().getStartMs() + segment.getHeader().getDurationMs());
                 }
                 return segment.getData();
+            }
+            if (holder.session.isBeyondEnd(request)) {
+                Log.d(TAG, "beyond end video=" + holder.videoId
+                        + " itag=" + format.getItag()
+                        + " seq=" + request.getSequenceNumber());
+                holder.session.addDiagnosticEvent("beyond_end itag=" + format.getItag()
+                        + " seq=" + request.getSequenceNumber());
+                return new byte[0];
             }
             if (!request.isInitializationSegment()) {
                 pump.requestSegmentDemand(request, readerOwner, readerGeneration);
@@ -297,13 +313,6 @@ public final class SabrSegmentDataSource implements DataSource {
                                 + ", readerTailMs=" + holder.getReaderTailMs()
                                 + ", cachedBytes=" + holder.session.getCachedBytes()
                                 + ", trace=" + holder.session.getDiagnosticTrace());
-                if (request.isInitializationSegment()) {
-                    try {
-                        return fetchInitializationFallback(request.getFormat());
-                    } catch (final IOException fallbackFailure) {
-                        failure.addSuppressed(fallbackFailure);
-                    }
-                }
                 holder.failTerminal(failure);
                 throw failure;
             }
@@ -321,12 +330,6 @@ public final class SabrSegmentDataSource implements DataSource {
                 pump.clearSegmentDemand(request, readerOwner, readerGeneration);
             }
         }
-    }
-
-    private byte[] fetchInitializationFallback(final YoutubeSabrFormat format) throws IOException {
-        final byte[] data = holder.session.fetchInitializationDataFallback(format, localization);
-        holder.setInitializationData(format.getItag(), data);
-        return data;
     }
 
     private SabrLogicException invalidatedException(final YoutubeSabrFormat format) {

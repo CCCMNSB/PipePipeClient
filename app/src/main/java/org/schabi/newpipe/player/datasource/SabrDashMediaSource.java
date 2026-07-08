@@ -38,10 +38,12 @@ import java.util.List;
 public final class SabrDashMediaSource extends CompositeMediaSource<Integer> {
     private static final String TAG = "SabrDashMediaSource";
     private static final long SEEK_FORWARD_SYNC_TOLERANCE_US = 2_000_000L;
+    private static final long END_SEEK_BACKOFF_US = 1_000L;
 
     private final MediaItem mediaItem;
     private final SabrSessionStore.Holder holder;
     private final Localization localization;
+    private final long durationUs;
     private final DashMediaSource childSource;
     private final PlaybackState playbackState = new PlaybackState();
     private boolean released;
@@ -54,12 +56,12 @@ public final class SabrDashMediaSource extends CompositeMediaSource<Integer> {
         this.localization = localization;
         this.holder.retainSource();
         this.playbackState.setReaderOwner(this);
-        preloadInitialization(holder.videoFormat);
-        preloadInitialization(holder.audioFormat);
+        final long durationMs = streamDurationMs(holder);
+        this.durationUs = durationMs > 0 ? durationMs * 1000L : C.TIME_UNSET;
         final DataSource.Factory sabrDataSourceFactory =
                 () -> new SabrSegmentDataSource(holder, playbackState.getReaderOwner(),
                         localization, /* prependInit= */ false);
-        final DashManifest manifest = buildManifest(holder);
+        final DashManifest manifest = buildManifest(holder, durationMs);
         this.childSource = new DashMediaSource.Factory(
                 new DefaultDashChunkSource.Factory(sabrDataSourceFactory),
                 /* manifestDataSourceFactory= */ null)
@@ -67,14 +69,6 @@ public final class SabrDashMediaSource extends CompositeMediaSource<Integer> {
         Log.d(TAG, "create source video=" + holder.videoId
                 + " videoItag=" + holder.videoFormat.getItag()
                 + " audioItag=" + holder.audioFormat.getItag());
-    }
-
-    private void preloadInitialization(final YoutubeSabrFormat format) throws IOException {
-        if (holder.getInitializationData(format.getItag()) != null) {
-            return;
-        }
-        final byte[] data = holder.session.fetchInitializationDataFallback(format, localization);
-        holder.setInitializationData(format.getItag(), data);
     }
 
     @NonNull
@@ -123,10 +117,14 @@ public final class SabrDashMediaSource extends CompositeMediaSource<Integer> {
         }
     }
 
-    private static DashManifest buildManifest(final SabrSessionStore.Holder holder)
-            throws IOException {
-        final long durationMs = Math.max(holder.audioFormat.getApproxDurationMs(),
+    private static long streamDurationMs(final SabrSessionStore.Holder holder) {
+        return Math.max(holder.audioFormat.getApproxDurationMs(),
                 holder.videoFormat.getApproxDurationMs());
+    }
+
+    private static DashManifest buildManifest(final SabrSessionStore.Holder holder,
+                                              final long durationMs)
+            throws IOException {
         final String mpd = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
                 + "<MPD xmlns=\"urn:mpeg:dash:schema:mpd:2011\" type=\"static\" "
                 + "profiles=\"urn:mpeg:dash:profile:isoff-on-demand:2011\" "
@@ -284,9 +282,10 @@ public final class SabrDashMediaSource extends CompositeMediaSource<Integer> {
                                  final long positionUs) {
             playbackState.setReaderOwner(this);
             final boolean hasActiveTracks = updateActiveTracks(selections);
-            applyInitialStartPosition(positionUs, hasActiveTracks);
+            final long normalizedPositionUs = normalizeSeekPositionUs(positionUs);
+            applyInitialStartPosition(normalizedPositionUs, hasActiveTracks);
             return child.selectTracks(selections, mayRetainStreamFlags, streams, streamResetFlags,
-                    positionUs);
+                    normalizedPositionUs);
         }
 
         private boolean updateActiveTracks(final ExoTrackSelection[] selections) {
@@ -322,8 +321,10 @@ public final class SabrDashMediaSource extends CompositeMediaSource<Integer> {
             if (targetUs <= 0) {
                 return;
             }
-            Log.d(TAG, "initialStart video=" + holder.videoId + " positionUs=" + targetUs);
-            holder.requestSeek(targetUs / 1000L, localization);
+            final long normalizedTargetUs = normalizeSeekPositionUs(targetUs);
+            Log.d(TAG, "initialStart video=" + holder.videoId
+                    + " positionUs=" + normalizedTargetUs);
+            holder.requestSeek(normalizedTargetUs / 1000L, localization);
         }
 
         private long validPositionUs(final long positionUs) {
@@ -344,16 +345,27 @@ public final class SabrDashMediaSource extends CompositeMediaSource<Integer> {
         public long seekToUs(final long positionUs) {
             playbackState.setReaderOwner(this);
             holder.advanceReaderGeneration(this);
-            holder.requestSeek(positionUs / 1000L, localization);
-            return child.seekToUs(positionUs);
+            final long normalizedPositionUs = normalizeSeekPositionUs(positionUs);
+            holder.requestSeek(normalizedPositionUs / 1000L, localization);
+            return child.seekToUs(normalizedPositionUs);
         }
 
         @Override
         public long getAdjustedSeekPositionUs(final long positionUs,
                                               final SeekParameters seekParameters) {
+            final long normalizedPositionUs = normalizeSeekPositionUs(positionUs);
             return child.getAdjustedSeekPositionUs(
-                    adjustSeekForwardToNearSegmentBoundary(positionUs, seekParameters),
+                    adjustSeekForwardToNearSegmentBoundary(normalizedPositionUs, seekParameters),
                     seekParameters);
+        }
+
+        private long normalizeSeekPositionUs(final long positionUs) {
+            final long normalizedPositionUs = Math.max(0, positionUs);
+            if (durationUs == C.TIME_UNSET || durationUs <= 0
+                    || normalizedPositionUs < durationUs) {
+                return normalizedPositionUs;
+            }
+            return Math.max(0, durationUs - END_SEEK_BACKOFF_US);
         }
 
         private long adjustSeekForwardToNearSegmentBoundary(final long positionUs,
@@ -371,7 +383,7 @@ public final class SabrDashMediaSource extends CompositeMediaSource<Integer> {
                     seekParameters.toleranceAfterUs);
             if (nextStartUs > positionUs
                     && nextStartUs - positionUs <= toleranceUs) {
-                return nextStartUs;
+                return normalizeSeekPositionUs(nextStartUs);
             }
             return positionUs;
         }
