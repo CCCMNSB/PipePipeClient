@@ -10,6 +10,8 @@ captures/
 *.class
 app/debug/
 app/release/
+.kotlin/
+log/
 
 # vscode / eclipse files
 *.classpath
