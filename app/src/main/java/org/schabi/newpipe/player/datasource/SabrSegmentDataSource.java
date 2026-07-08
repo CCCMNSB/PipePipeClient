@@ -202,11 +202,13 @@ public final class SabrSegmentDataSource implements DataSource {
             throw invalidatedException(request.getFormat());
         }
         final SabrStreamPump pump = holder.getPump(localization);
+        final long readerGeneration = holder.getReaderGeneration(readerOwner);
         final long waitStart = System.currentTimeMillis();
         long recoveryAtMs = -1;
         long lastRecoveryAtMs = -1;
         boolean loggedWait = false;
-        while (true) {
+        try {
+            while (true) {
             if (canceled) {
                 throw new IOException("SABR segment read canceled");
             }
@@ -245,6 +247,9 @@ public final class SabrSegmentDataSource implements DataSource {
                             segment.getHeader().getStartMs() + segment.getHeader().getDurationMs());
                 }
                 return segment.getData();
+            }
+            if (!request.isInitializationSegment()) {
+                pump.requestSegmentDemand(request, readerOwner, readerGeneration);
             }
             if (!loggedWait && System.currentTimeMillis() - waitStart > 1000) {
                 loggedWait = true;
@@ -343,6 +348,11 @@ public final class SabrSegmentDataSource implements DataSource {
                     Thread.currentThread().interrupt();
                     throw new IOException("Interrupted awaiting SABR initialization", e);
                 }
+            }
+        }
+        } finally {
+            if (!request.isInitializationSegment()) {
+                pump.clearSegmentDemand(request, readerOwner, readerGeneration);
             }
         }
     }

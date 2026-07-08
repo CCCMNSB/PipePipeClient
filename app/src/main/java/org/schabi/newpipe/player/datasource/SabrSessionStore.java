@@ -178,13 +178,28 @@ public final class SabrSessionStore {
             return readerOwner == owner ? readerGeneration : -1;
         }
 
-        void requestSeek(final long positionMs, @NonNull final Localization localization) {
-            if (positionMs <= 1_000 && playerTimeMs <= 1_000) {
-                setPlayerTimeMs(positionMs);
+        synchronized boolean isReaderGenerationActive(@NonNull final Object owner,
+                                                      final long generation) {
+            return readerOwner == owner && readerGeneration == generation;
+        }
+
+        private synchronized void anchorReaderPositionMs(final long positionMs) {
+            if (readerOwner == null || activeReaderItags.isEmpty()) {
                 return;
             }
-            final boolean backward = positionMs < playerTimeMs;
+            for (final int itag : activeReaderItags) {
+                readerPositions.put(itag, positionMs);
+            }
+        }
+
+        void requestSeek(final long positionMs, @NonNull final Localization localization) {
+            final long previousPlayerTimeMs = playerTimeMs;
+            final boolean backward = positionMs < previousPlayerTimeMs;
             setPlayerTimeMs(positionMs);
+            anchorReaderPositionMs(positionMs);
+            if (positionMs <= 1_000 && previousPlayerTimeMs <= 1_000) {
+                return;
+            }
             // Video segment boundaries are the seek timeline's sync points. Always notify the pump:
             // Media3 can seek inside its sample queue without blocking on a missing SABR segment, but
             // the server session still has to drop the old read-ahead span and continue from the new
