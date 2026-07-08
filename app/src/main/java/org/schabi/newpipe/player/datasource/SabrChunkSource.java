@@ -30,13 +30,6 @@ import org.schabi.newpipe.extractor.services.youtube.sabr.YoutubeSabrFormat;
 import java.io.IOException;
 import java.util.List;
 
-/**
- * Tier-2: feeds the media3 chunk framework one SABR segment per chunk. Because the framework drives
- * loading by chunk INDEX (mapped from time), seeking is time-based and real, unlike the v1 byte
- * stream that could not land a seek. One {@link FragmentedMp4Extractor} is shared per track via a
- * {@link BundledChunkExtractor}; the init segment is loaded once as an {@link InitializationChunk},
- * then each media segment is a {@link ContainerMediaChunk}.
- */
 final class SabrChunkSource implements ChunkSource {
     private static final String TAG = "SabrChunkSource";
 
@@ -170,11 +163,8 @@ final class SabrChunkSource implements ChunkSource {
                         /* prependInit= */ false),
                 spec, trackFormat, C.SELECTION_REASON_UNKNOWN, null,
                 startUs, endUs, /* clippedStartTimeUs= */ startUs,
-                // No end clip, on purpose. The first chunk's declared end is basically a rumor: we
-                // compute it before the init metadata shows up to admit audio segments are ~10s, not 5s.
-                // Clip to that rumor and you toss the real 5-10s of audio out the window, so the player
-                // faceplants from 0:04 straight to 0:10. A SABR chunk is one whole segment with honest,
-                // non-overlapping absolute timestamps, so we shut up and let the container have the last word.
+                // Do not clip SABR chunks to the estimated segment end; container timestamps are
+                // authoritative after initialization metadata is parsed.
                 /* clippedEndTimeUs= */ C.TIME_UNSET,
                 /* chunkIndex= */ seq, /* chunkCount= */ 1, /* sampleOffsetUs= */ 0L,
                 extractor);

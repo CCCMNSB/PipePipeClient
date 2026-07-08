@@ -19,27 +19,12 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Tier-2 chunk source helper: a {@link DataSource} that serves exactly ONE SABR segment (the init
- * segment or one media segment) from the session cache, then ends. The chunk framework
- * ({@code ChunkSampleStream}) opens one of these per chunk, so seeking is handled by the framework
- * picking the chunk index, NOT by byte-skipping a continuous stream (which the v1 source could not
- * land).
- *
- * <p>The segment is identified by the {@link DataSpec} uri: {@code sabrseg://<itag>/init} or
- * {@code sabrseg://<itag>/<sequenceNumber>}.</p>
- */
 public final class SabrSegmentDataSource implements DataSource {
     private static final String TAG = "SabrSegmentDataSource";
 
     private static final long WAIT_MS = 250;
     private static final long RECOVERY_FAILURE_MS = 10_000;
-    // After waiting this long for a media segment that's BEHIND the buffered edge, treat it as a
-    // backward seek onto an evicted segment and ask the pump to reposition the session there.
     private static final long REFETCH_AFTER_MS = 2_000;
-    // If a media segment is this far AHEAD of the buffered edge after REFETCH_AFTER_MS, it's a cold
-    // forward seek (SponsorBlock skip at start, resume-from-history): the pump fills forward from the
-    // edge and would take minutes to reach it, so jump the session onto it instead of waiting.
     private static final long FORWARD_SEEK_AHEAD_MS = 30_000;
 
     private final SabrSessionStore.Holder holder;
@@ -47,9 +32,6 @@ public final class SabrSegmentDataSource implements DataSource {
     @Nullable
     private final YoutubeSabrFormat fixedFormat;
     private final Localization localization;
-    // Prepend the init segment so each media chunk is a self-contained fmp4 (init + one fragment),
-    // which a fresh FragmentedMp4Extractor parses fully. SABR's init isn't a clean standalone atom
-    // boundary, so feeding it on its own (DASH-style InitializationChunk) hit an EOF mid-atom.
     private final boolean prependInit;
 
     @Nullable
@@ -86,7 +68,6 @@ public final class SabrSegmentDataSource implements DataSource {
 
     @Override
     public void addTransferListener(final TransferListener transferListener) {
-        // Bandwidth metering not wired for the SABR source.
     }
 
     @Override
@@ -155,7 +136,6 @@ public final class SabrSegmentDataSource implements DataSource {
     }
 
     private SabrSegmentRequest requestFromUri(final Uri u) throws IOException {
-        // sabrseg://<itag>/<init|seq>
         final YoutubeSabrFormat format = formatFromUri(u);
         final String seg = u.getLastPathSegment();
         if (seg == null) {
@@ -194,7 +174,6 @@ public final class SabrSegmentDataSource implements DataSource {
         throw new SabrLogicException("Unknown SABR segment itag=" + itag + " uri=" + u);
     }
 
-    /** Block until the pump has cached this segment, or give up on a real stall / cancellation. */
     private byte[] awaitSegment(final SabrSegmentRequest request) throws IOException {
         final YoutubeSabrFormat format = request.getFormat();
         holder.throwIfTerminal();
@@ -239,9 +218,6 @@ public final class SabrSegmentDataSource implements DataSource {
                         + " seq=" + request.getSequenceNumber()
                         + " bytes=" + segment.getData().length);
                 if (!segment.getHeader().isInitSegment()) {
-                    // Tell the pump how far this track has been loaded so it keeps feeding ahead
-                    // (and repositions after a seek). Without this readerHead stayed 0 and the pump
-                    // throttled forever after the initial fill.
                     holder.setReaderPositionMs(readerOwner,
                             holder.getReaderGeneration(readerOwner), format.getItag(),
                             segment.getHeader().getStartMs() + segment.getHeader().getDurationMs());
@@ -268,11 +244,6 @@ public final class SabrSegmentDataSource implements DataSource {
                         + " edgeMs=" + holder.session.getStreamState().getMinBufferedEndMs()
                         + " readerHeadMs=" + holder.getReaderHeadMs());
             }
-            // Backward seek to an evicted segment behind the buffered edge: the forward pump never
-            // re-fetches it, so it would never arrive. Drop our read position onto it (so eviction +
-            // pacing follow the rewind, not the stale pre-seek position) and ask the pump to
-            // reposition the session there. The edge check leaves a merely-slow forward fetch (the
-            // segment is still ahead of the edge) to the normal pump, so forward playback is untouched.
             final long now = System.currentTimeMillis();
             if (now - waitStart > REFETCH_AFTER_MS
                     && (lastRecoveryAtMs < 0 || now - lastRecoveryAtMs > REFETCH_AFTER_MS)
@@ -287,17 +258,12 @@ public final class SabrSegmentDataSource implements DataSource {
                             .getSegmentStartMs(format, request.getSequenceNumber());
                     if (segStartMs < edgeMs) {
                         recovery = "rewind";
-                        // Backward seek onto an evicted segment behind the edge.
                         holder.setReaderPositionMs(readerOwner,
                                 holder.getReaderGeneration(readerOwner), format.getItag(),
                                 segStartMs);
                         pump.requestRefetchFrom(request);
                     } else if (segStartMs > edgeMs + FORWARD_SEEK_AHEAD_MS) {
                         recovery = "forward";
-                        // Cold/forward seek far ahead of where the pump is filling (SponsorBlock skip
-                        // at start, resume-from-history): jump the session onto it instead of waiting
-                        // for the forward pump to crawl there. A merely-slow normal fetch (target just
-                        // past the edge) stays on the pump, so steady playback is untouched.
                         holder.setReaderPositionMs(readerOwner,
                                 holder.getReaderGeneration(readerOwner), format.getItag(),
                                 segStartMs);

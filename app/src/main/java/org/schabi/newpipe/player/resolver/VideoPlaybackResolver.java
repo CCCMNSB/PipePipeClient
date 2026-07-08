@@ -72,8 +72,6 @@ public class VideoPlaybackResolver implements PlaybackResolver {
             return liveSource;
         }
 
-        // Hand the user-selected audio language to the SABR session store before it (re)builds the
-        // session for this video, so the switch actually changes the streamed track.
         SabrSessionStore.setPreferredAudioTrack(info.getId(), audioTrack);
 
         final List<MediaSource> mediaSources = new ArrayList<>();
@@ -134,10 +132,6 @@ public class VideoPlaybackResolver implements PlaybackResolver {
                         dataSource, video, info, PlayerHelper.cacheKeyOf(info, video), tag);
                 mediaSources.add(streamSource);
             } catch (final IOException e) {
-                // For SABR, surface the real failure (probe / session creation) with its cause
-                // instead of swallowing it into a generic "Unable to resolve source from stream info"
-                // downstream where you can't tell where it came from. Non-SABR keeps returning null
-                // (sourceOf then falls back to the audio source), so that path is unchanged.
                 if (video.getDeliveryMethod()
                         == org.schabi.newpipe.extractor.stream.DeliveryMethod.SABR) {
                     throw new IllegalStateException(

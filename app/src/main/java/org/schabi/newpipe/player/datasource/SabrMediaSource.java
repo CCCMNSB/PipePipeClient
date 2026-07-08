@@ -18,12 +18,6 @@ import androidx.media3.exoplayer.upstream.Allocator;
 import org.schabi.newpipe.extractor.localization.Localization;
 import org.schabi.newpipe.extractor.services.youtube.sabr.YoutubeSabrFormat;
 
-/**
- * Tier-2 {@link androidx.media3.exoplayer.source.MediaSource} for SABR. Unlike the v1
- * ProgressiveMediaSource over a byte stream (which could not seek), this exposes a seekable
- * single-period timeline and a {@link SabrMediaPeriod} backed by the chunk framework, so seeking is
- * time-based and lands correctly. The session is created by the resolver and handed in.
- */
 public final class SabrMediaSource extends BaseMediaSource {
     private static final String TAG = "SabrMediaSource";
 

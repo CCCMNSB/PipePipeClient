@@ -29,11 +29,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Tier-2 {@link MediaPeriod} for SABR: exposes the audio and video tracks and backs each selected
- * one with a {@link ChunkSampleStream} over a {@link SabrChunkSource}. Seeking is handled by the
- * chunk streams (time -> chunk index), so it actually lands, unlike the v1 byte-stream source.
- */
 final class SabrMediaPeriod implements MediaPeriod,
         SequenceableLoader.Callback<ChunkSampleStream<SabrChunkSource>> {
     private static final String TAG = "SabrMediaPeriod";

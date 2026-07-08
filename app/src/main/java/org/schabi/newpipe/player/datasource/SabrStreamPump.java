@@ -19,13 +19,6 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.LockSupport;
 
-/**
- * Single consumer of a {@link YoutubeSabrSession}: one daemon thread pumps the server-driven SABR
- * stream and fills the session's (concurrent) segment cache ahead of the play head. The server
- * paces us with policy-only responses once we are far enough ahead. Both the audio and video
- * {@link SabrSegmentDataSource}s only read the cache, so they never fight over the session or block each
- * other on a network round-trip, which is exactly what starved a track in the old on-demand approach.
- */
 final class SabrStreamPump {
     enum State {
         IDLE,
@@ -41,12 +34,8 @@ final class SabrStreamPump {
     private static final long IDLE_POLL_MS = 100;     // server paced us / nothing new this round
     private static final long ERROR_RETRY_MS = 1000;  // transient network error
     private static final int MAX_CONSECUTIVE_IO_ERRORS = 5;
-    // no reads for this long -> playback is gone. MUST stay above READAHEAD_CUSHION_MS: once the
-    // player buffer is full it stops reading us for ~cushion seconds, and killing the pump in that
-    // window left the cache to drain dry -> periodic rebuffering.
+    // Must stay above the readahead cushion because Media3 stops reading while its buffer is full.
     private static final long IDLE_STOP_MS = 90_000;
-    // Fallback margin the buffered edge stays ahead of actual playback when the server does not send
-    // a target. The server-provided target is preferred and clamped below this ceiling.
     private static final long READAHEAD_CUSHION_MS = 10_000;
     private static final long STARTUP_READAHEAD_CUSHION_MS = 6_000;
     private static final long STARTUP_BURST_READAHEAD_CUSHION_MS = 25_000;
@@ -62,18 +51,10 @@ final class SabrStreamPump {
     // Hard byte ceiling on read-ahead so a high-bitrate stream can't OOM the heap. The pump is
     // intentionally tighter than the session's absolute cap so it slows down before eviction churn.
     private static final long MAX_AHEAD_BYTES = 24L * 1024 * 1024;
-    // Keep this much already-played video in the cache so a short backward seek lands on cached
-    // segments instead of a hole (eviction used to drop everything the reader passed, so any rewind
-    // hit an evicted segment the pump never re-fetches -> dead buffer). Bounded, same order as the
-    // forward cushion. Rewinds beyond this still need a session re-request (separate follow-up).
+    // Keep a short rewind cushion in cache; deeper rewinds are refetched by repositioning the session.
     private static final long BACK_BUFFER_MS = 12_000;
-    // Fallback back-buffer used when the cache is already over the byte budget: at high bitrate (4K)
-    // a 30s back-buffer + readahead exceeds MAX_AHEAD_BYTES, and since eviction can't drop segments
-    // within the back-buffer window the cache can't drain -> the pump throttles forever and stalls.
-    // Shrinking the back-buffer when over budget lets eviction free bytes so playback keeps fetching.
+    // Shrink the back-buffer when over budget so eviction can free enough data to keep fetching.
     private static final long MIN_BACK_BUFFER_MS = 2_000;
-    // The back-buffer is sized by BYTES, not a fixed duration: already-played video is usually waste
-    // after a seek, so keep only a small rewind cushion and let deeper rewinds re-fetch.
     private static final long BACK_BUFFER_BYTES = 4L * 1024 * 1024;
 
     private final YoutubeSabrSession session;
@@ -87,17 +68,9 @@ final class SabrStreamPump {
     private volatile IOException networkFailure;
     private volatile long lastReadMs;
     private volatile long lastRequestMs;
-    // Set by a reader blocked on an evicted segment behind the edge (backward seek); the loop
-    // repositions the session onto it next round. Single-slot: the latest rewind target wins.
     private volatile SabrSegmentRequest pendingRefetch;
-    // Set by a reader blocked on a segment far AHEAD of the buffered edge (cold/forward seek:
-    // SponsorBlock skip at start, resume-from-history). The forward pump fills from edge 0 and would
-    // take minutes to reach it, so the loop jumps the session onto it next round. Single-slot.
     private volatile SabrSegmentRequest pendingForwardSeek;
     private volatile long pendingForwardSeekPositionMs = -1;
-    // Level-triggered reader demand: if any DataSource is blocked on a concrete media segment, keep
-    // driving SABR toward the oldest/lowest pending demand until it is cached. This prevents the
-    // forward pump from staying throttled while a reader is already waiting just beyond the edge.
     private final Map<DemandKey, SegmentDemand> activeDemands = new ConcurrentHashMap<>();
     private volatile YoutubeSabrFormat pendingInitialization;
     private volatile long seekModeUntilMs;
@@ -112,7 +85,6 @@ final class SabrStreamPump {
         this.localization = localization;
     }
 
-    /** Start (or restart, if it idled out) the pump thread, and mark the session as actively read. */
     void ensureStarted() {
         lastReadMs = System.currentTimeMillis();
         if (state == State.TERMINAL || (started && !stopped)) {
@@ -132,13 +104,10 @@ final class SabrStreamPump {
         }
     }
 
-    /** Stop the pump thread and release it (called on eviction / playback teardown). */
     void stop() {
         synchronized (this) {
             stopped = true;
             clearCacheOnStop = true;
-            // Don't self-interrupt: stop() is also reached from the pump thread itself via
-            // evict-on-fatal, and setting our own interrupt flag could break a later blocking call.
             if (thread != null && thread != Thread.currentThread()) {
                 thread.interrupt();
             }
@@ -147,7 +116,6 @@ final class SabrStreamPump {
 
     @Nullable
     SabrMediaSegment getCached(@NonNull final SabrSegmentRequest request) {
-        // revive the pump if it idled out: any read means playback is live again.
         ensureStarted();
         return session.getCachedSegment(request);
     }
@@ -168,8 +136,6 @@ final class SabrStreamPump {
         return state.name();
     }
 
-    /** A reader is blocked on an evicted segment behind the buffered edge (backward seek). Ask the
-     * loop to reposition the session onto it so the server re-sends from there. */
     void requestRefetchFrom(@NonNull final SabrSegmentRequest request) {
         activateSeekMode();
         pendingRefetch = request;
@@ -177,9 +143,6 @@ final class SabrStreamPump {
         wake();
     }
 
-    /** A reader is blocked on a segment far ahead of the buffered edge (cold/forward seek, e.g. a
-     * SponsorBlock skip at the start). Ask the loop to jump the session onto it so the server streams
-     * from there instead of crawling forward from the start. */
     void requestForwardSeekTo(@NonNull final SabrSegmentRequest request) {
         activateSeekMode();
         pendingForwardSeek = request;
@@ -213,12 +176,10 @@ final class SabrStreamPump {
         activeDemands.remove(DemandKey.from(request, readerOwner, readerGeneration));
     }
 
-    /** Reposition immediately when Media3 reports a seek outside its buffered sample queue. */
     void requestSeekTo(@NonNull final SabrSegmentRequest request, final boolean backward) {
         requestSeekTo(request, backward, -1);
     }
 
-    /** Reposition immediately when Media3 reports a seek outside its buffered sample queue. */
     void requestSeekTo(@NonNull final SabrSegmentRequest request, final boolean backward,
                        final long positionMs) {
         activateSeekMode();
@@ -252,11 +213,6 @@ final class SabrStreamPump {
         state = State.IDLE;
         try {
             while (!stopped) {
-                // Don't die on completion/idle while a reposition is pending: a backward seek after
-                // playback buffered to the end arrives with isComplete()=true, and breaking here
-                // meant the restarted pump exited before ever processing the refetch -> the reader
-                // waited forever (full buffer on rewind-after-end). prepareForRewind resets the
-                // buffered head, so isComplete() turns false again once the reposition runs.
                 if (pendingRefetch == null && pendingForwardSeek == null
                         && activeDemands.isEmpty() && pendingInitialization == null
                         && (System.currentTimeMillis() - lastReadMs > IDLE_STOP_MS
@@ -264,15 +220,7 @@ final class SabrStreamPump {
                     break;
                 }
                 try {
-                    // Drive off what the player has ACTUALLY read, not the play head: the play head
-                    // freezes while buffering and that deadlocked the pump. readerHead = furthest
-                    // track read; readerTail = slowest track read (safe to evict below).
                     final long readerHeadMs = holder.getReaderHeadMs();
-                    // Evict what both tracks have read past, EVERY round (or a full cache never drains
-                    // and the throttle latches forever -> freeze), keeping BACK_BUFFER_MS behind the
-                    // reader so a short backward seek finds its segments cached. But when the cache is
-                    // already over the byte budget (high bitrate), shrink the back-buffer so eviction
-                    // can actually drain it, otherwise the pump throttles forever and playback stalls.
                     final long backBufferMs = session.getCachedBytes() > MAX_AHEAD_BYTES
                             ? MIN_BACK_BUFFER_MS : targetBackBufferMs();
                     session.setPlayHeadMs(Math.max(0, holder.getReaderTailMs() - backBufferMs));
@@ -290,10 +238,6 @@ final class SabrStreamPump {
                         consecutiveIoErrors = 0;
                         continue;
                     }
-                    // Backward seek beyond the back-buffer: a reader is blocked on an evicted segment
-                    // behind the edge. Reposition the session onto it (prepareForMediaSegment sets
-                    // buffered=up-to-(seg-1) + playerTime=seg start, so the server re-sends from there)
-                    // instead of fetching forward this round. Bypasses the throttle by design.
                     final SabrSegmentRequest refetch = pendingRefetch;
                     if (refetch != null) {
                         pendingRefetch = null;
@@ -307,10 +251,6 @@ final class SabrStreamPump {
                         consecutiveIoErrors = 0;
                         continue;
                     }
-                    // Cold/forward seek (SponsorBlock skip, user seek far ahead): a reader is blocked
-                    // on a segment far ahead of the edge. Jump the session onto it
-                    // (prepareForForwardJump moves the buffered head to the target, so the edge-driven
-                    // pacing follows the new position instead of ping-ponging back to the old span).
                     final SabrSegmentRequest forwardSeek = pendingForwardSeek;
                     if (forwardSeek != null) {
                         final long forwardSeekPositionMs = pendingForwardSeekPositionMs;
@@ -544,9 +484,6 @@ final class SabrStreamPump {
                 && System.currentTimeMillis() - lastRequestMs >= maximumMs;
     }
 
-    /** Back-buffer duration for THIS stream's bitrate, so it holds ~{@link #BACK_BUFFER_BYTES}
-     * regardless of resolution. Clamped to [MIN, MAX]; falls back to the time-based default when the
-     * bitrate is unknown. */
     private long targetBackBufferMs() {
         if (isSeekMode()) {
             return MIN_BACK_BUFFER_MS;

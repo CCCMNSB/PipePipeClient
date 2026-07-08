@@ -35,10 +35,6 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 
-/**
- * Exposes SABR segments through Media3's normal DASH pipeline while keeping the SABR session
- * lifecycle and pump controls in PipePipe's code.
- */
 public final class SabrDashMediaSource extends CompositeMediaSource<Integer> {
     private static final String TAG = "SabrDashMediaSource";
     private static final long SEEK_FORWARD_SYNC_TOLERANCE_US = 2_000_000L;
