@@ -38,6 +38,10 @@ import java.util.concurrent.atomic.AtomicReference;
  * points on the caller side.</p>
  */
 public final class SharedWebViewRuntime {
+    public interface InitializationFailureCallback {
+        void onInitializationFailure(@NonNull Throwable throwable);
+    }
+
     public interface SabrLocalDomCallbacks {
         void onJsInitializationError(@NonNull String error);
 
@@ -69,6 +73,8 @@ public final class SharedWebViewRuntime {
     @Nullable
     private AtomicReference<Throwable> initError;
     @Nullable
+    private InitializationFailureCallback initializationFailureCallback;
+    @Nullable
     private WebView webView;
     private volatile boolean ready;
 
@@ -96,11 +102,27 @@ public final class SharedWebViewRuntime {
     }
 
     public void warmUp() {
+        warmUp((InitializationFailureCallback) null);
+    }
+
+    public void warmUp(@Nullable final InitializationFailureCallback failureCallback) {
+        final Throwable existingFailure;
         synchronized (initLock) {
+            if (failureCallback != null) {
+                initializationFailureCallback = failureCallback;
+            }
             if (ready || initLatch != null) {
+                existingFailure = initError == null ? null : initError.get();
+                if (existingFailure == null) {
+                    return;
+                }
+            } else {
+                startInitializationLocked();
                 return;
             }
-            startInitializationLocked();
+        }
+        if (failureCallback != null) {
+            failureCallback.onInitializationFailure(existingFailure);
         }
     }
 
@@ -230,8 +252,11 @@ public final class SharedWebViewRuntime {
         initLatch = latch;
         initError = error;
         if (!mainHandler.post(() -> createWebView(latch, error))) {
-            error.set(new IllegalStateException("Could not post WebView creation"));
+            final IllegalStateException exception =
+                    new IllegalStateException("Could not post WebView creation");
+            error.set(exception);
             latch.countDown();
+            notifyInitializationFailure(exception);
         }
     }
 
@@ -284,11 +309,15 @@ public final class SharedWebViewRuntime {
                 public void onReceivedError(final WebView view, final WebResourceRequest request,
                                             final WebResourceError webError) {
                     super.onReceivedError(view, request, webError);
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && request.isForMainFrame()
-                            && error.compareAndSet(null, new IllegalStateException(
-                            "WebView runtime main frame error " + webError.getErrorCode()
-                                    + ": " + webError.getDescription()))) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && request.isForMainFrame()) {
+                        final IllegalStateException exception = new IllegalStateException(
+                                "WebView runtime main frame error " + webError.getErrorCode()
+                                        + ": " + webError.getDescription());
+                        if (!error.compareAndSet(null, exception)) {
+                            return;
+                        }
                         latch.countDown();
+                        notifyInitializationFailure(exception);
                     }
                 }
             });
@@ -298,6 +327,17 @@ public final class SharedWebViewRuntime {
         } catch (final Throwable throwable) {
             error.compareAndSet(null, throwable);
             latch.countDown();
+            notifyInitializationFailure(throwable);
+        }
+    }
+
+    private void notifyInitializationFailure(@NonNull final Throwable throwable) {
+        final InitializationFailureCallback callback;
+        synchronized (initLock) {
+            callback = initializationFailureCallback;
+        }
+        if (callback != null) {
+            callback.onInitializationFailure(throwable);
         }
     }
 
