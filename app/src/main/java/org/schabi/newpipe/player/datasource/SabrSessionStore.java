@@ -487,45 +487,22 @@ public final class SabrSessionStore {
 
     private static YoutubeSabrFormat pickAudioFormat(@NonNull final YoutubeSabrInfo info,
                                                      @Nullable final String preferredTrackId) {
-        YoutubeSabrFormat aac = null;
+        if (preferredTrackId == null) {
+            return info.findBestAudioFormat();
+        }
+        YoutubeSabrFormat best = null;
         for (final YoutubeSabrFormat f : info.getFormats()) {
             if (!f.isAudio()) {
                 continue;
             }
-            final String mime = f.getMimeType();
-            if (mime == null || !mime.contains("mp4")) {
+            if (!preferredTrackId.equals(f.getAudioTrackId())) {
                 continue;
             }
-            if (preferredTrackId != null && !preferredTrackId.equals(f.getAudioTrackId())) {
-                continue;
-            }
-            if (aac == null) {
-                aac = f;
-                continue;
-            }
-            final boolean preferForTrack = f.isOriginalAudio() && !aac.isOriginalAudio();
-            final boolean preferForPlain = f.isOriginalAudio() == aac.isOriginalAudio()
-                    && isPlainAudioVariant(f) && !isPlainAudioVariant(aac);
-            final boolean preferForDrc = f.isOriginalAudio() == aac.isOriginalAudio()
-                    && isPlainAudioVariant(f) == isPlainAudioVariant(aac)
-                    && !f.isDrc() && aac.isDrc();
-            final boolean preferForBitrate = f.isOriginalAudio() == aac.isOriginalAudio()
-                    && isPlainAudioVariant(f) == isPlainAudioVariant(aac)
-                    && f.isDrc() == aac.isDrc()
-                    && f.getBitrate() > aac.getBitrate();
-            if (preferForTrack || preferForPlain || preferForDrc || preferForBitrate) {
-                aac = f;
+            if (best == null || f.getBitrate() > best.getBitrate()) {
+                best = f;
             }
         }
-        if (aac == null && preferredTrackId != null) {
-            return pickAudioFormat(info, null);
-        }
-        return aac != null ? aac : info.findBestAudioFormat();
-    }
-
-    private static boolean isPlainAudioVariant(@NonNull final YoutubeSabrFormat format) {
-        final String xtags = format.getXtags();
-        return xtags == null || xtags.isEmpty();
+        return best != null ? best : info.findBestAudioFormat();
     }
 
     private static YoutubeSabrFormat pickVideoFormat(@NonNull final YoutubeSabrInfo info,
