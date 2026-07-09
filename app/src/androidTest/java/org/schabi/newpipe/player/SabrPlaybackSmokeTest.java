@@ -12,6 +12,7 @@ import android.os.Bundle;
 import android.view.Surface;
 
 import androidx.media3.common.C;
+import androidx.media3.common.MediaItem;
 import androidx.media3.common.PlaybackException;
 import androidx.media3.common.Player;
 import androidx.media3.datasource.DataSpec;
@@ -49,6 +50,7 @@ import org.schabi.newpipe.extractor.stream.AudioStream;
 import org.schabi.newpipe.extractor.stream.DeliveryMethod;
 import org.schabi.newpipe.extractor.stream.StreamInfo;
 import org.schabi.newpipe.extractor.stream.VideoStream;
+import org.schabi.newpipe.player.datasource.SabrDashMediaSource;
 import org.schabi.newpipe.player.datasource.SabrSegmentDataSource;
 import org.schabi.newpipe.player.helper.LegacySubtitleRenderersFactory;
 import org.schabi.newpipe.player.helper.LoadController;
@@ -187,6 +189,25 @@ public final class SabrPlaybackSmokeTest {
                     requestSummary.contains("playerTimeMs=300000"));
             assertTrue("Initial SABR request did not report target time: " + requestSummary,
                     requestSummary.contains("topPlayerTimeMs=300000"));
+        }
+    }
+
+    @Test
+    public void initializationPrefetchMissingUrlDoesNotFailSourceCreation() throws Exception {
+        final YoutubeSabrFormat audioFormat = smokeFormat(
+                SMOKE_AUDIO_ITAG, true, null, -1, -1);
+        final YoutubeSabrFormat videoFormat = smokeFormat(
+                SMOKE_VIDEO_ITAG, false, null, -1, -1);
+        try (SabrSmokeHarness harness = SabrSmokeHarness.create(audioFormat, videoFormat)) {
+            new SabrDashMediaSource(new MediaItem.Builder()
+                    .setUri(Uri.parse("sabr://smoke-video"))
+                    .build(), harness.holder, new Localization("en", "US"));
+
+            final String trace = harness.holder.session.getDiagnosticTrace();
+            assertTrue("Missing init URL did not fall back for audio: " + trace,
+                    trace.contains("initialization_prefetch_skip itag=" + SMOKE_AUDIO_ITAG));
+            assertTrue("Missing init URL did not fall back for video: " + trace,
+                    trace.contains("initialization_prefetch_skip itag=" + SMOKE_VIDEO_ITAG));
         }
     }
 
@@ -1118,6 +1139,15 @@ public final class SabrPlaybackSmokeTest {
 
     private static YoutubeSabrFormat smokeFormat(final int itag, final boolean audio)
             throws Exception {
+        return smokeFormat(itag, audio, "https://media.test/" + itag, -1L, -1L);
+    }
+
+    private static YoutubeSabrFormat smokeFormat(final int itag,
+                                                 final boolean audio,
+                                                 final String initializationUrl,
+                                                 final long initRangeStart,
+                                                 final long initRangeEnd)
+            throws Exception {
         final Constructor<YoutubeSabrFormat> constructor =
                 YoutubeSabrFormat.class.getDeclaredConstructor(int.class, long.class,
                         String.class, String.class, String.class, String.class, boolean.class,
@@ -1140,9 +1170,9 @@ public final class SabrPlaybackSmokeTest {
                 audio ? 128_000 : 2_000_000,
                 100_000L,
                 300_000L,
-                "https://media.test/" + itag,
-                -1L,
-                -1L);
+                initializationUrl,
+                initRangeStart,
+                initRangeEnd);
     }
 
     private static YoutubeSabrInfo smokeInfo(final YoutubeSabrFormat audioFormat,
@@ -1487,13 +1517,18 @@ public final class SabrPlaybackSmokeTest {
         }
 
         private static SabrSmokeHarness create() throws Exception {
+            return create(smokeFormat(SMOKE_AUDIO_ITAG, true),
+                    smokeFormat(SMOKE_VIDEO_ITAG, false));
+        }
+
+        private static SabrSmokeHarness create(final YoutubeSabrFormat audioFormat,
+                                               final YoutubeSabrFormat videoFormat)
+                throws Exception {
             final Downloader previousDownloader = NewPipe.getDownloader();
             final Localization previousLocalization = NewPipe.getPreferredLocalization();
             final ContentCountry previousContentCountry = NewPipe.getPreferredContentCountry();
             final FakeSabrDownloader downloader = new FakeSabrDownloader();
             NewPipe.init(downloader, Localization.DEFAULT, ContentCountry.DEFAULT);
-            final YoutubeSabrFormat audioFormat = smokeFormat(SMOKE_AUDIO_ITAG, true);
-            final YoutubeSabrFormat videoFormat = smokeFormat(SMOKE_VIDEO_ITAG, false);
             final YoutubeSabrInfo info = smokeInfo(audioFormat, videoFormat);
             final YoutubeSabrSession session =
                     new YoutubeSabrSession(info, audioFormat, videoFormat);

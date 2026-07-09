@@ -77,8 +77,15 @@ public final class SabrDashMediaSource extends CompositeMediaSource<Integer> {
         if (holder.getInitializationData(format.getItag()) != null) {
             return;
         }
-        final byte[] data = holder.session.fetchInitializationDataFallback(format, localization);
-        holder.setInitializationData(format.getItag(), data);
+        try {
+            final byte[] data = holder.session.fetchInitializationDataFallback(format, localization);
+            holder.setInitializationData(format.getItag(), data);
+        } catch (final IOException e) {
+            holder.session.addDiagnosticEvent("initialization_prefetch_skip itag="
+                    + format.getItag()
+                    + " type=" + e.getClass().getSimpleName()
+                    + " message=" + e.getMessage());
+        }
     }
 
     @NonNull
