@@ -125,7 +125,7 @@ internal class SabrSegmentWriter(
             cachePendingMedia(target, sequence, segment.data, "waiting for sequence ${target.nextWriteSequence}")
             return
         }
-        writeMediaBytes(target, output, segment.data)
+        writeMediaSegmentBytes(target, output, segment)
         flushPendingMedia(target, output)
     }
 
@@ -163,6 +163,26 @@ internal class SabrSegmentWriter(
         writeToStorage(output, data)
         target.nextWriteSequence++
         onBytesWritten(target, data.size.toLong())
+    }
+
+    private fun writeMediaSegmentBytes(
+        target: SabrDownloadTarget,
+        output: OutputStream,
+        segment: SabrMediaSegment,
+    ) {
+        try {
+            segment.openStream().use { input ->
+                input.copyTo(output)
+            }
+        } catch (error: IOException) {
+            throw SabrDownloadException(
+                SabrDownloadException.Reason.STORAGE,
+                "SABR download failed: could not write temporary media",
+                error,
+            )
+        }
+        target.nextWriteSequence++
+        onBytesWritten(target, segment.length.toLong())
     }
 
     private fun writeToStorage(output: OutputStream, data: ByteArray) {

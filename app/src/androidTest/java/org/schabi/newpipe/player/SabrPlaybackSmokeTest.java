@@ -41,6 +41,7 @@ import org.schabi.newpipe.extractor.NewPipe;
 import org.schabi.newpipe.extractor.ServiceList;
 import org.schabi.newpipe.extractor.localization.ContentCountry;
 import org.schabi.newpipe.extractor.localization.Localization;
+import org.schabi.newpipe.extractor.services.youtube.sabr.SabrMediaSegment;
 import org.schabi.newpipe.extractor.services.youtube.sabr.SabrRequestDumper;
 import org.schabi.newpipe.extractor.services.youtube.sabr.SabrResponseDecoder;
 import org.schabi.newpipe.extractor.services.youtube.sabr.SabrSegmentRequest;
@@ -63,6 +64,7 @@ import org.schabi.newpipe.player.datasource.SabrSessionStore;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Field;
@@ -599,10 +601,10 @@ public final class SabrPlaybackSmokeTest {
     }
 
     @Test
-    public void generatedLargeMediaPartReproducesSabrHeapPressure() throws Exception {
+    public void generatedLargeMediaPartStaysOffHeap() throws Exception {
         final Bundle arguments = InstrumentationRegistry.getArguments();
         final String mediaBytesArgument = arguments.getString("sabrStressMediaBytes");
-        assumeTrue("Set sabrStressMediaBytes to run the SABR heap pressure reproducer",
+        assumeTrue("Set sabrStressMediaBytes to run the SABR heap pressure regression test",
                 mediaBytesArgument != null);
         final int mediaBytes = Integer.parseInt(mediaBytesArgument);
         try (SabrSmokeHarness harness = SabrSmokeHarness.create()) {
@@ -611,40 +613,28 @@ public final class SabrPlaybackSmokeTest {
 
             final SabrSegmentRequest request = SabrSegmentRequest.media(harness.videoFormat, 1);
             final long beforeUsed = usedHeapBytes();
-            try {
-                harness.openMediaSegment(request, 30_000);
-            } catch (final AssertionError e) {
-                final String trace = harness.holder.session.getDiagnosticTrace();
-                final String failure = messageChain(e);
-                System.out.println("SABR_OOM_REPRO reproduced=true mediaBytes=" + mediaBytes
-                        + " beforeUsed=" + beforeUsed
-                        + " afterUsed=" + usedHeapBytes()
-                        + " trace=" + trace
-                        + " failure=" + failure);
-                assertTrue("Large SABR media part failed for a non-memory reason: " + trace,
-                        trace.contains("SABR memory failure")
-                                || failure.contains("OutOfMemoryError")
-                                || failure.contains("SABR memory failure"));
-                return;
-            }
+            harness.openMediaSegment(request, 30_000);
 
             final long peakCached = harness.holder.session.getPeakCachedBytes();
-            System.out.println("SABR_OOM_REPRO reproduced=false mediaBytes=" + mediaBytes
+            final SabrMediaSegment segment = harness.holder.session.getCachedSegment(request);
+            assertNotNull("Large SABR media segment was not cached", segment);
+            System.out.println("SABR_OOM_REGRESSION mediaBytes=" + mediaBytes
                     + " beforeUsed=" + beforeUsed
                     + " afterUsed=" + usedHeapBytes()
                     + " peakCachedBytes=" + peakCached
+                    + " diskBacked=" + segment.isDiskBacked()
                     + " trace=" + harness.holder.session.getDiagnosticTrace());
-            throw new AssertionError("Large SABR media part did not reproduce heap pressure: "
-                    + "mediaBytes=" + mediaBytes + " peakCachedBytes=" + peakCached);
+            assertEquals("Large SABR segment cache accounting changed", mediaBytes, peakCached);
+            assertTrue("Large SABR media segment must be disk-backed", segment.isDiskBacked());
         }
     }
 
     @Test
-    public void generatedSabrCachePressureReproducesAccessibilityAllocationOom()
+    public void generatedSabrCachePressureStaysOffHeap()
             throws Exception {
         final Bundle arguments = InstrumentationRegistry.getArguments();
         final String segmentBytesArgument = arguments.getString("sabrStressSegmentBytes");
-        assumeTrue("Set sabrStressSegmentBytes to run the accessibility OOM reproducer",
+        assumeTrue("Set sabrStressSegmentBytes to run the accessibility OOM regression test",
                 segmentBytesArgument != null);
         final int segmentBytes = Integer.parseInt(segmentBytesArgument);
         final int segmentCount = Integer.parseInt(arguments.getString(
@@ -659,35 +649,37 @@ public final class SabrPlaybackSmokeTest {
             final long beforeUsed = usedHeapBytes();
             for (int i = 1; i <= segmentCount; i++) {
                 harness.holder.session.pumpOnceStreaming(new Localization("en", "US"));
-                System.out.println("SABR_ACCESSIBILITY_OOM cachedSegment=" + i
+                final SabrMediaSegment segment = harness.holder.session.getCachedSegment(
+                        SabrSegmentRequest.media(harness.videoFormat, i));
+                assertNotNull("Generated SABR segment was not cached: " + i, segment);
+                assertTrue("Generated SABR media segment must be disk-backed: " + i,
+                        segment.isDiskBacked());
+                System.out.println("SABR_ACCESSIBILITY_OOM_REGRESSION cachedSegment=" + i
                         + " used=" + usedHeapBytes()
                         + " peakCachedBytes=" + harness.holder.session.getPeakCachedBytes());
             }
 
-            final AtomicReference<Throwable> failure = new AtomicReference<>();
+            final AtomicReference<Throwable> allocationFailure = new AtomicReference<>();
             InstrumentationRegistry.getInstrumentation().runOnMainSync(() -> {
-                final List<AccessibilityEvent> retained = new ArrayList<>();
                 try {
-                    while (true) {
-                        retained.add(AccessibilityEvent.obtain());
-                    }
+                    AccessibilityEvent.obtain().recycle();
                 } catch (final Throwable e) {
-                    failure.set(e);
+                    allocationFailure.set(e);
                 }
             });
 
-            final Throwable thrown = failure.get();
-            final String failureChain = thrown == null ? "" : messageChain(thrown);
-            System.out.println("SABR_ACCESSIBILITY_OOM beforeUsed=" + beforeUsed
+            final Throwable thrown = allocationFailure.get();
+            final long expectedCachedBytes = (long) segmentBytes * segmentCount;
+            System.out.println("SABR_ACCESSIBILITY_OOM_REGRESSION beforeUsed=" + beforeUsed
                     + " afterUsed=" + usedHeapBytes()
                     + " segmentBytes=" + segmentBytes
                     + " segmentCount=" + segmentCount
                     + " peakCachedBytes=" + harness.holder.session.getPeakCachedBytes()
-                    + " failure=" + failureChain);
-            assertNotNull("Accessibility allocation did not fail after SABR cache pressure",
+                    + " allocationFailure=" + (thrown == null ? "" : messageChain(thrown)));
+            assertNull("Accessibility small allocation failed after SABR cache pressure",
                     thrown);
-            assertTrue("Expected accessibility OOM after SABR cache pressure: " + failureChain,
-                    failureChain.contains("OutOfMemoryError"));
+            assertEquals("SABR cache accounting did not include generated media",
+                    expectedCachedBytes, harness.holder.session.getPeakCachedBytes());
         }
     }
 
@@ -1646,8 +1638,11 @@ public final class SabrPlaybackSmokeTest {
             final FakeSabrDownloader downloader = new FakeSabrDownloader();
             NewPipe.init(downloader, Localization.DEFAULT, ContentCountry.DEFAULT);
             final YoutubeSabrInfo info = smokeInfo(audioFormat, videoFormat);
+            final File spoolDirectory = new File(
+                    InstrumentationRegistry.getInstrumentation().getTargetContext().getCacheDir(),
+                    "sabr-smoke-" + System.nanoTime());
             final YoutubeSabrSession session =
-                    new YoutubeSabrSession(info, audioFormat, videoFormat);
+                    new YoutubeSabrSession(info, audioFormat, videoFormat, null, spoolDirectory);
             session.getStreamState().setVideoOnlyRequestMode();
             final Constructor<SabrSessionStore.Holder> constructor =
                     SabrSessionStore.Holder.class.getDeclaredConstructor(Context.class,

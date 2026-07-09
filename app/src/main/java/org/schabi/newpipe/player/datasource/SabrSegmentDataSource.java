@@ -16,6 +16,7 @@ import org.schabi.newpipe.extractor.services.youtube.sabr.SabrSegmentRequest;
 import org.schabi.newpipe.extractor.services.youtube.sabr.YoutubeSabrFormat;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.List;
 import java.util.Map;
 
@@ -38,6 +39,8 @@ public final class SabrSegmentDataSource implements DataSource {
     private Uri uri;
     @Nullable
     private byte[] data;
+    @Nullable
+    private InputStream dataStream;
     private long bytesRemaining;
     private int pos;
     private boolean opened;
@@ -74,33 +77,52 @@ public final class SabrSegmentDataSource implements DataSource {
     public long open(final DataSpec dataSpec) throws IOException {
         this.uri = dataSpec.uri;
         this.canceled = false;
+        closeDataStream();
+        this.data = null;
         this.pos = (int) Math.max(0, dataSpec.position);
         final SabrSegmentRequest request = requestFromUri(dataSpec.uri);
         final YoutubeSabrFormat format = request.getFormat();
+        final long availableRemaining;
+        final int openedBytes;
         Log.d(TAG, "open video=" + holder.videoId
                 + " itag=" + format.getItag()
                 + " uri=" + dataSpec.uri
                 + " prependInit=" + prependInit);
         if (request.isInitializationSegment()) {
             this.data = getInitializationData(format);
+            availableRemaining = Math.max(0, data.length - pos);
+            openedBytes = data.length;
         } else if (prependInit) {
             final byte[] init = getInitializationData(format);
-            final byte[] media = awaitSegment(request);
+            final SabrMediaSegment segment = awaitSegment(request);
+            final byte[] media = segment == null ? new byte[0] : segment.getData();
             final byte[] both = new byte[init.length + media.length];
             System.arraycopy(init, 0, both, 0, init.length);
             System.arraycopy(media, 0, both, init.length, media.length);
             this.data = both;
+            availableRemaining = Math.max(0, data.length - pos);
+            openedBytes = data.length;
         } else {
-            this.data = awaitSegment(request);
+            final SabrMediaSegment segment = awaitSegment(request);
+            if (segment == null) {
+                this.data = new byte[0];
+                availableRemaining = 0;
+                openedBytes = 0;
+            } else {
+                this.dataStream = segment.openStream();
+                final long skipped = skipFully(dataStream, Math.max(0, dataSpec.position));
+                this.pos = (int) Math.min(Integer.MAX_VALUE, skipped);
+                availableRemaining = Math.max(0, segment.getLength() - skipped);
+                openedBytes = segment.getLength();
+            }
         }
         this.opened = true;
-        final int remaining = Math.max(0, data.length - pos);
         this.bytesRemaining = dataSpec.length == C.LENGTH_UNSET
-                ? remaining : Math.min(dataSpec.length, remaining);
+                ? availableRemaining : Math.min(dataSpec.length, availableRemaining);
         Log.d(TAG, "opened video=" + holder.videoId
                 + " itag=" + format.getItag()
-                + " bytes=" + data.length
-                + " remaining=" + remaining);
+                + " bytes=" + openedBytes
+                + " remaining=" + availableRemaining);
         return bytesRemaining;
     }
 
@@ -117,22 +139,41 @@ public final class SabrSegmentDataSource implements DataSource {
             holder.setInitializationData(itag, data);
             return data;
         }
-        return awaitSegment(SabrSegmentRequest.initialization(format));
+        final SabrMediaSegment loadedSegment =
+                awaitSegment(SabrSegmentRequest.initialization(format));
+        return loadedSegment == null ? new byte[0] : loadedSegment.getData();
     }
 
     @Override
-    public int read(final byte[] target, final int offset, final int length) {
+    public int read(final byte[] target, final int offset, final int length) throws IOException {
         if (length == 0) {
             return 0;
         }
-        if (data == null || pos >= data.length || bytesRemaining <= 0) {
+        if (bytesRemaining <= 0) {
             return C.RESULT_END_OF_INPUT;
         }
-        final int toCopy = (int) Math.min(Math.min(length, data.length - pos), bytesRemaining);
-        System.arraycopy(data, pos, target, offset, toCopy);
-        pos += toCopy;
-        bytesRemaining -= toCopy;
-        return toCopy;
+        if (data != null) {
+            if (pos >= data.length) {
+                return C.RESULT_END_OF_INPUT;
+            }
+            final int toCopy = (int) Math.min(Math.min(length, data.length - pos), bytesRemaining);
+            System.arraycopy(data, pos, target, offset, toCopy);
+            pos += toCopy;
+            bytesRemaining -= toCopy;
+            return toCopy;
+        }
+        if (dataStream == null) {
+            return C.RESULT_END_OF_INPUT;
+        }
+        final int toRead = (int) Math.min(length, bytesRemaining);
+        final int read = dataStream.read(target, offset, toRead);
+        if (read < 0) {
+            bytesRemaining = 0;
+            return C.RESULT_END_OF_INPUT;
+        }
+        pos = (int) Math.min(Integer.MAX_VALUE, (long) pos + read);
+        bytesRemaining -= read;
+        return read;
     }
 
     private SabrSegmentRequest requestFromUri(final Uri u) throws IOException {
@@ -174,7 +215,8 @@ public final class SabrSegmentDataSource implements DataSource {
         throw new SabrLogicException("Unknown SABR segment itag=" + itag + " uri=" + u);
     }
 
-    private byte[] awaitSegment(final SabrSegmentRequest request) throws IOException {
+    @Nullable
+    private SabrMediaSegment awaitSegment(final SabrSegmentRequest request) throws IOException {
         final YoutubeSabrFormat format = request.getFormat();
         holder.throwIfTerminal();
         if (holder.isInvalidated()) {
@@ -201,7 +243,7 @@ public final class SabrSegmentDataSource implements DataSource {
                         + " seq=" + request.getSequenceNumber());
                 holder.session.addDiagnosticEvent("beyond_end itag=" + format.getItag()
                         + " seq=" + request.getSequenceNumber());
-                return new byte[0];
+                return null;
             }
             final IOException networkFailure = pump.takeNetworkFailure();
             if (networkFailure != null) {
@@ -228,13 +270,14 @@ public final class SabrSegmentDataSource implements DataSource {
                         + " itag=" + format.getItag()
                         + " init=" + request.isInitializationSegment()
                         + " seq=" + request.getSequenceNumber()
-                        + " bytes=" + segment.getData().length);
+                        + " bytes=" + segment.getLength()
+                        + " disk=" + segment.isDiskBacked());
                 if (!segment.getHeader().isInitSegment()) {
                     holder.setReaderPositionMs(readerOwner,
                             holder.getReaderGeneration(readerOwner), format.getItag(),
                             segment.getHeader().getStartMs() + segment.getHeader().getDurationMs());
                 }
-                return segment.getData();
+                return segment;
             }
             if (holder.session.isBeyondEnd(request)) {
                 Log.d(TAG, "beyond end video=" + holder.videoId
@@ -242,7 +285,7 @@ public final class SabrSegmentDataSource implements DataSource {
                         + " seq=" + request.getSequenceNumber());
                 holder.session.addDiagnosticEvent("beyond_end itag=" + format.getItag()
                         + " seq=" + request.getSequenceNumber());
-                return new byte[0];
+                return null;
             }
             if (!request.isInitializationSegment()) {
                 pump.requestSegmentDemand(request, readerOwner, readerGeneration);
@@ -341,6 +384,31 @@ public final class SabrSegmentDataSource implements DataSource {
                 + ", itag=" + format.getItag() + ", " + holder.getInvalidationDetails());
     }
 
+    private static long skipFully(final InputStream input, final long requested) throws IOException {
+        long remaining = requested;
+        final byte[] buffer = new byte[8192];
+        while (remaining > 0) {
+            final long skipped = input.skip(remaining);
+            if (skipped > 0) {
+                remaining -= skipped;
+                continue;
+            }
+            final int read = input.read(buffer, 0, (int) Math.min(buffer.length, remaining));
+            if (read < 0) {
+                break;
+            }
+            remaining -= read;
+        }
+        return requested - remaining;
+    }
+
+    private void closeDataStream() throws IOException {
+        if (dataStream != null) {
+            dataStream.close();
+            dataStream = null;
+        }
+    }
+
     @Nullable
     @Override
     public Uri getUri() {
@@ -351,6 +419,11 @@ public final class SabrSegmentDataSource implements DataSource {
     public void close() {
         canceled = true;
         data = null;
+        try {
+            closeDataStream();
+        } catch (final IOException e) {
+            Log.w(TAG, "Could not close SABR segment stream", e);
+        }
         opened = false;
     }
 }

@@ -16,6 +16,7 @@ import org.schabi.newpipe.extractor.services.youtube.sabr.YoutubeSabrFormat;
 import org.schabi.newpipe.extractor.services.youtube.sabr.YoutubeSabrInfo;
 import org.schabi.newpipe.extractor.services.youtube.sabr.YoutubeSabrSession;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.IdentityHashMap;
@@ -453,8 +454,11 @@ public final class SabrSessionStore {
                 throw new IOException("SABR: could not select audio/video formats for " + videoId);
             }
             final LocalDomPoTokenProvider provider = provider(context);
+            final File spoolDirectory = new File(context.getApplicationContext().getCacheDir(),
+                    "sabr-segments/" + videoId + '-' + System.nanoTime());
             final YoutubeSabrSession session =
-                    new YoutubeSabrSession(info, audioFormat, videoFormat, provider);
+                    new YoutubeSabrSession(info, audioFormat, videoFormat, provider,
+                            spoolDirectory);
             attachPoToken(videoId, info, provider, session);
             final Holder holder = new Holder(context.getApplicationContext(), videoId, info,
                     session, audioFormat, videoFormat);
