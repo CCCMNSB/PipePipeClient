@@ -232,6 +232,7 @@ final class SabrStreamPump {
                         state = State.REPOSITIONING;
                         session.addDiagnosticEvent("pump_initialization itag="
                                 + initialization.getItag());
+                        prepareInitialRequestPosition();
                         session.prepareForInitialization(initialization);
                         pumpOnceStreaming();
                         state = State.IDLE;
@@ -500,6 +501,21 @@ final class SabrStreamPump {
 
     private void activateSeekMode() {
         seekModeUntilMs = System.currentTimeMillis() + SEEK_MODE_MS;
+    }
+
+    private void prepareInitialRequestPosition() {
+        if (session.getRequestNumber() != 0) {
+            return;
+        }
+        final long playerTimeMs = holder.getPlayerTimeMs();
+        if (playerTimeMs <= 1_000) {
+            return;
+        }
+        session.addDiagnosticEvent("pump_initialization_target itag="
+                + holder.videoFormat.getItag()
+                + " playerTimeMs=" + playerTimeMs);
+        session.getStreamState().setPlayerTimeMs(playerTimeMs);
+        session.getStreamState().setSelectVideoFormatBeforeAudio(true);
     }
 
     private boolean isSeekMode() {

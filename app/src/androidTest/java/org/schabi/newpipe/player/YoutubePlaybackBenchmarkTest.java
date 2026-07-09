@@ -89,6 +89,9 @@ public final class YoutubePlaybackBenchmarkTest {
         final long startPositionMs = Long.parseLong(args.getString("startPositionMs", "-1"));
         assertTrue("startPositionMs must be unset or non-negative: " + startPositionMs,
                 startPositionMs >= -1);
+        final long seekTargetMs = Long.parseLong(args.getString("seekTargetMs", "-1"));
+        assertTrue("seekTargetMs must be unset or non-negative: " + seekTargetMs,
+                seekTargetMs >= -1);
         final int maxHeight = positive(args.getString("maxVideoHeight", "1080"),
                 "maxVideoHeight");
         final String targetCodec = args.getString("targetCodec", "avc")
@@ -109,6 +112,8 @@ public final class YoutubePlaybackBenchmarkTest {
         final List<Path> paths = filterPaths(Arrays.asList(
                 new Path("sabr", "mweb", DeliveryMethod.SABR),
                 new Path("hls", "web_safari", DeliveryMethod.HLS),
+                new Path("tv_downgraded_generated_dash", "tv_downgraded",
+                        DeliveryMethod.PROGRESSIVE_HTTP),
                 new Path("android_vr_generated_dash", "android_vr",
                         DeliveryMethod.PROGRESSIVE_HTTP)), pathFilter);
         assertTrue("No benchmark paths selected by paths=" + pathFilter, !paths.isEmpty());
@@ -160,7 +165,8 @@ public final class YoutubePlaybackBenchmarkTest {
             for (final Path path : roundOrder) {
                 final boolean warmup = round < 0;
                 final Result result = runTrial(context, path, extractions.get(path).info,
-                        round, warmup, playSeconds, startPositionMs, maxHeight, targetCodec);
+                        round, warmup, playSeconds, startPositionMs, seekTargetMs,
+                        maxHeight, targetCodec);
                 emit("PIPEPIPE_BENCHMARK_RESULT", result.toJson());
                 if (!warmup) {
                     measured.add(result);
@@ -176,6 +182,7 @@ public final class YoutubePlaybackBenchmarkTest {
     private static Result runTrial(final Context context, final Path path, final StreamInfo info,
                                    final int round, final boolean warmup, final int playSeconds,
                                    final long startPositionMs,
+                                   final long seekTargetMs,
                                    final int maxHeight, final String targetCodec) throws Exception {
         NewPipe.setYoutubePlayerClient(path.client);
         SabrSessionStore.evict(info.getId());
@@ -317,7 +324,8 @@ public final class YoutubePlaybackBenchmarkTest {
                 }
             } else {
                 final long duration = duration(playerRef.get());
-                final long target = duration == C.TIME_UNSET ? 30_000
+                final long target = seekTargetMs >= 0 ? seekTargetMs
+                        : duration == C.TIME_UNSET ? 30_000
                         : Math.max(1_000, Math.min(30_000, duration / 2));
                 countRebuffers.set(false);
                 final long linearBuffer = bufferingStartNs.getAndSet(0);

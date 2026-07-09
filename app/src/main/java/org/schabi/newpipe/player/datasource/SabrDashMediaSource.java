@@ -58,6 +58,8 @@ public final class SabrDashMediaSource extends CompositeMediaSource<Integer> {
         this.playbackState.setReaderOwner(this);
         final long durationMs = streamDurationMs(holder);
         this.durationUs = durationMs > 0 ? durationMs * 1000L : C.TIME_UNSET;
+        preloadInitialization(holder.videoFormat);
+        preloadInitialization(holder.audioFormat);
         final DataSource.Factory sabrDataSourceFactory =
                 () -> new SabrSegmentDataSource(holder, playbackState.getReaderOwner(),
                         localization, /* prependInit= */ false);
@@ -69,6 +71,21 @@ public final class SabrDashMediaSource extends CompositeMediaSource<Integer> {
         Log.d(TAG, "create source video=" + holder.videoId
                 + " videoItag=" + holder.videoFormat.getItag()
                 + " audioItag=" + holder.audioFormat.getItag());
+    }
+
+    private void preloadInitialization(final YoutubeSabrFormat format) throws IOException {
+        if (holder.getInitializationData(format.getItag()) != null) {
+            return;
+        }
+        try {
+            final byte[] data = holder.session.fetchInitializationDataFallback(format, localization);
+            holder.setInitializationData(format.getItag(), data);
+        } catch (final IOException e) {
+            holder.session.addDiagnosticEvent("initialization_prefetch_skip itag="
+                    + format.getItag()
+                    + " type=" + e.getClass().getSimpleName()
+                    + " message=" + e.getMessage());
+        }
     }
 
     @NonNull
@@ -93,6 +110,9 @@ public final class SabrDashMediaSource extends CompositeMediaSource<Integer> {
     @Override
     public MediaPeriod createPeriod(final MediaPeriodId id, final Allocator allocator,
                                     final long startPositionUs) {
+        if (startPositionUs > 0) {
+            holder.setPlayerTimeMs(startPositionUs / 1000L);
+        }
         final MediaPeriod child = childSource.createPeriod(id, allocator, startPositionUs);
         final SabrDashMediaPeriod period = new SabrDashMediaPeriod(child);
         playbackState.setReaderOwner(period);
