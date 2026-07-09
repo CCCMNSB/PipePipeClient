@@ -425,7 +425,9 @@ final class SabrStreamPump {
 
     private int pumpOnceStreaming() throws IOException, ExtractionException {
         try {
-            return session.pumpOnceStreaming(localization);
+            final int segmentCount = session.pumpOnceStreaming(localization);
+            holder.recordDiagnosticsThrottled("pump segments=" + segmentCount);
+            return segmentCount;
         } finally {
             lastRequestMs = System.currentTimeMillis();
         }
@@ -434,7 +436,12 @@ final class SabrStreamPump {
     private int pumpOnceStreamingUntilCached(@NonNull final SabrSegmentRequest request)
             throws IOException, ExtractionException {
         try {
-            return session.pumpOnceStreamingUntilCached(localization, request);
+            final int segmentCount = session.pumpOnceStreamingUntilCached(localization, request);
+            holder.recordDiagnosticsThrottled("pump_until_cached itag="
+                    + request.getFormat().getItag()
+                    + " seq=" + request.getSequenceNumber()
+                    + " segments=" + segmentCount);
+            return segmentCount;
         } finally {
             lastRequestMs = System.currentTimeMillis();
         }

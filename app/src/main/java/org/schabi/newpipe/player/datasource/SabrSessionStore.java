@@ -55,6 +55,7 @@ public final class SabrSessionStore {
     }
 
     public static final class Holder {
+        @NonNull private final Context appContext;
         @NonNull public final String videoId;
         @NonNull public final YoutubeSabrInfo info;
         @NonNull public final YoutubeSabrSession session;
@@ -77,12 +78,16 @@ public final class SabrSessionStore {
         private volatile boolean invalidated;
         private volatile String stopReason;
         private volatile SabrLogicException terminalFailure;
+        private long lastDiagnosticsAtMs;
+        private long lastDiagnosticsPeakCachedBytes;
 
-        Holder(@NonNull final String videoId,
+        Holder(@NonNull final Context appContext,
+               @NonNull final String videoId,
                @NonNull final YoutubeSabrInfo info,
                @NonNull final YoutubeSabrSession session,
                @NonNull final YoutubeSabrFormat audioFormat,
                @NonNull final YoutubeSabrFormat videoFormat) {
+            this.appContext = appContext.getApplicationContext();
             this.videoId = videoId;
             this.info = info;
             this.session = session;
@@ -181,6 +186,7 @@ public final class SabrSessionStore {
             final long previousPlayerTimeMs = playerTimeMs;
             final boolean backward = positionMs < previousPlayerTimeMs;
             setPlayerTimeMs(positionMs);
+            recordDiagnostics("seek positionMs=" + positionMs + " backward=" + backward);
             anchorReaderPositionMs(positionMs);
             session.getStreamState().setSelectVideoFormatBeforeAudio(positionMs > 1_000);
             if (positionMs <= 1_000 && previousPlayerTimeMs <= 1_000) {
@@ -308,6 +314,7 @@ public final class SabrSessionStore {
 
         void failTerminal(@NonNull final SabrLogicException failure) {
             terminalFailure = failure;
+            recordDiagnostics("terminal_failure message=" + failure.getMessage());
             evict(videoId, this, "terminal_failure message=" + failure.getMessage());
         }
 
@@ -321,6 +328,7 @@ public final class SabrSessionStore {
             Log.w(TAG, "stop video=" + videoId + " reason=" + reason
                     + " refs=" + sourceReferences.get() + " activeTracks=" + hasActiveTracks()
                     + " pump=" + (pump == null ? "none" : pump.getStateName()));
+            recordDiagnostics("stop reason=" + reason);
             stopReason = reason;
             session.addDiagnosticEvent("session_stop reason=" + reason
                     + " refs=" + sourceReferences.get() + " activeTracks=" + hasActiveTracks());
@@ -344,12 +352,28 @@ public final class SabrSessionStore {
         boolean isBeyondEnd(@NonNull final SabrSegmentRequest request) {
             return session.isBeyondEnd(request);
         }
+
+        void recordDiagnostics(@NonNull final String event) {
+            SabrPlaybackDiagnostics.record(appContext, this, event);
+            lastDiagnosticsAtMs = System.currentTimeMillis();
+            lastDiagnosticsPeakCachedBytes = session.getPeakCachedBytes();
+        }
+
+        void recordDiagnosticsThrottled(@NonNull final String event) {
+            final long now = System.currentTimeMillis();
+            final long peakCachedBytes = session.getPeakCachedBytes();
+            if (now - lastDiagnosticsAtMs >= 5_000
+                    || peakCachedBytes != lastDiagnosticsPeakCachedBytes) {
+                recordDiagnostics(event);
+            }
+        }
     }
 
     public static void updatePlayerTime(@NonNull final String videoId, final long playerTimeMs) {
         final Holder holder = SESSIONS.get(videoId);
         if (holder != null && playerTimeMs >= 0) {
             holder.setPlayerTimeMs(playerTimeMs);
+            holder.recordDiagnosticsThrottled("progress");
         }
     }
 
@@ -408,6 +432,7 @@ public final class SabrSessionStore {
             if (current != null) {
                 if (sessionMatchesItag(current, preferredVideoItag)
                         && sessionMatchesAudioTrack(current, preferredAudioTrackId)) {
+                    current.recordDiagnosticsThrottled("session_reuse");
                     return current;
                 }
                 // A SABR session is locked to its selected formats.
@@ -431,11 +456,13 @@ public final class SabrSessionStore {
             final YoutubeSabrSession session =
                     new YoutubeSabrSession(info, audioFormat, videoFormat, provider);
             attachPoToken(videoId, info, provider, session);
-            final Holder holder = new Holder(videoId, info, session, audioFormat, videoFormat);
+            final Holder holder = new Holder(context.getApplicationContext(), videoId, info,
+                    session, audioFormat, videoFormat);
             SESSIONS.put(videoId, holder);
             ORDER.remove(videoId);
             ORDER.addLast(videoId);
             trimSessions(videoId);
+            holder.recordDiagnostics("session_create");
             return holder;
         }
     }
