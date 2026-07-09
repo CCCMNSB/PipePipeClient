@@ -38,6 +38,7 @@ import java.util.List;
 public final class SabrDashMediaSource extends CompositeMediaSource<Integer> {
     private static final String TAG = "SabrDashMediaSource";
     private static final long SEEK_FORWARD_SYNC_TOLERANCE_US = 2_000_000L;
+    private static final long START_POSITION_FORWARD_SNAP_US = 500_000L;
     private static final long END_SEEK_BACKOFF_US = 1_000L;
 
     private final MediaItem mediaItem;
@@ -302,7 +303,11 @@ public final class SabrDashMediaSource extends CompositeMediaSource<Integer> {
                                  final long positionUs) {
             playbackState.setReaderOwner(this);
             final boolean hasActiveTracks = updateActiveTracks(selections);
-            final long normalizedPositionUs = normalizeSeekPositionUs(positionUs);
+            // Initial mid-starts near the next video boundary are cheaper if SABR starts on that
+            // boundary; keep regular seeks on Media3's requested position/tolerance path.
+            final long normalizedPositionUs = initialPositionApplied || !hasActiveTracks
+                    ? normalizeSeekPositionUs(positionUs)
+                    : normalizeInitialStartPositionUs(positionUs);
             applyInitialStartPosition(normalizedPositionUs, hasActiveTracks);
             return child.selectTracks(selections, mayRetainStreamFlags, streams, streamResetFlags,
                     normalizedPositionUs);
@@ -388,9 +393,23 @@ public final class SabrDashMediaSource extends CompositeMediaSource<Integer> {
             return Math.max(0, durationUs - END_SEEK_BACKOFF_US);
         }
 
+        private long normalizeInitialStartPositionUs(final long positionUs) {
+            return snapForwardToNearSegmentBoundary(normalizeSeekPositionUs(positionUs),
+                    START_POSITION_FORWARD_SNAP_US);
+        }
+
         private long adjustSeekForwardToNearSegmentBoundary(final long positionUs,
                                                            final SeekParameters seekParameters) {
             if (seekParameters.toleranceAfterUs <= 0) {
+                return positionUs;
+            }
+            return snapForwardToNearSegmentBoundary(positionUs, Math.min(
+                    SEEK_FORWARD_SYNC_TOLERANCE_US, seekParameters.toleranceAfterUs));
+        }
+
+        private long snapForwardToNearSegmentBoundary(final long positionUs,
+                                                      final long toleranceUs) {
+            if (toleranceUs <= 0) {
                 return positionUs;
             }
             final long positionMs = Math.max(0, positionUs / 1000L);
@@ -399,11 +418,9 @@ public final class SabrDashMediaSource extends CompositeMediaSource<Integer> {
             final long nextStartMs = holder.session.getStreamState()
                     .getSegmentStartMs(holder.videoFormat, currentSequence + 1);
             final long nextStartUs = nextStartMs * 1000L;
-            final long toleranceUs = Math.min(SEEK_FORWARD_SYNC_TOLERANCE_US,
-                    seekParameters.toleranceAfterUs);
             if (nextStartUs > positionUs
                     && nextStartUs - positionUs <= toleranceUs) {
-                return normalizeSeekPositionUs(nextStartUs);
+                return nextStartUs;
             }
             return positionUs;
         }

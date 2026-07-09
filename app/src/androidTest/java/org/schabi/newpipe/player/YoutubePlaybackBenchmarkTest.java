@@ -683,6 +683,7 @@ public final class YoutubePlaybackBenchmarkTest {
                     .put("seekSabrDiscardsBefore",new JSONArray(seekTrace.sabrDiscardsBefore))
                     .put("seekSabrSegments",new JSONArray(seekTrace.sabrSegments))
                     .put("seekSabrDiscards",new JSONArray(seekTrace.sabrDiscards))
+                    .put("seekSabrResponses",new JSONArray(seekTrace.sabrResponses))
                     .put("seekTransfers",new JSONArray(seekTrace.transfers));
         }
     }
@@ -812,12 +813,12 @@ public final class YoutubePlaybackBenchmarkTest {
                 -1, -1, -1, Collections.emptyList(), Collections.emptyList(),
                 Collections.emptyList(),
                 SeekCacheSnapshot.EMPTY, SeekCacheSnapshot.EMPTY,
-                Collections.emptyList(), Collections.emptyList());
+                Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
         private final long networkBytes, sabrResponseBytes, sabrMediaPayloadBytes,
                 sabrControlPayloadBytes, sabrUmpOverheadBytes, sabrDiscardedBytes,
                 sabrRequestCount, sabrCachedBytesDelta;
         private final List<String> sabrSegments, sabrDiscards, transfers,
-                sabrSegmentsBefore, sabrDiscardsBefore;
+                sabrSegmentsBefore, sabrDiscardsBefore, sabrResponses;
         private final SeekCacheSnapshot sabrCacheBefore, sabrCacheAfter;
 
         private SeekTrace(final long networkBytes,
@@ -834,7 +835,8 @@ public final class YoutubePlaybackBenchmarkTest {
                           final SeekCacheSnapshot sabrCacheBefore,
                           final SeekCacheSnapshot sabrCacheAfter,
                           final List<String> sabrSegmentsBefore,
-                          final List<String> sabrDiscardsBefore) {
+                          final List<String> sabrDiscardsBefore,
+                          final List<String> sabrResponses) {
             this.networkBytes = networkBytes;
             this.sabrResponseBytes = sabrResponseBytes;
             this.sabrMediaPayloadBytes = sabrMediaPayloadBytes;
@@ -850,6 +852,7 @@ public final class YoutubePlaybackBenchmarkTest {
             this.sabrCacheAfter = sabrCacheAfter;
             this.sabrSegmentsBefore = sabrSegmentsBefore;
             this.sabrDiscardsBefore = sabrDiscardsBefore;
+            this.sabrResponses = sabrResponses;
         }
 
         private static SeekTrace fromNetwork(final long networkBytes,
@@ -858,7 +861,7 @@ public final class YoutubePlaybackBenchmarkTest {
                     Collections.emptyList(), Collections.emptyList(),
                     transfers,
                     SeekCacheSnapshot.EMPTY, SeekCacheSnapshot.EMPTY,
-                    Collections.emptyList(), Collections.emptyList());
+                    Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
         }
 
         private static SeekTrace fromSabr(
@@ -882,7 +885,8 @@ public final class YoutubePlaybackBenchmarkTest {
                     delta(after.getSegments(), before.getSegments().size()),
                     delta(after.getDiscards(), before.getDiscards().size()),
                     Collections.emptyList(), cacheBefore, cacheAfter,
-                    tail(before.getSegments(), 24), tail(before.getDiscards(), 24));
+                    tail(before.getSegments(), 24), tail(before.getDiscards(), 24),
+                    delta(after.getResponses(), before.getResponses().size()));
         }
 
         private static SeekTrace fromSabrStartup(final SabrSessionStore.Holder holder,
@@ -906,7 +910,8 @@ public final class YoutubePlaybackBenchmarkTest {
                     SeekCacheSnapshot.EMPTY,
                     SeekCacheSnapshot.fromSabr(holder, startPositionMs),
                     Collections.emptyList(),
-                    Collections.emptyList());
+                    Collections.emptyList(),
+                    new ArrayList<>(after.getResponses()));
         }
 
         private static List<String> delta(final List<String> values, final int start) {
