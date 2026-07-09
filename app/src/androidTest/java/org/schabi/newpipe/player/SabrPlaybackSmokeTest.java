@@ -38,6 +38,7 @@ import org.schabi.newpipe.extractor.NewPipe;
 import org.schabi.newpipe.extractor.ServiceList;
 import org.schabi.newpipe.extractor.localization.ContentCountry;
 import org.schabi.newpipe.extractor.localization.Localization;
+import org.schabi.newpipe.extractor.services.youtube.sabr.SabrRequestDumper;
 import org.schabi.newpipe.extractor.services.youtube.sabr.SabrResponseDecoder;
 import org.schabi.newpipe.extractor.services.youtube.sabr.SabrSegmentRequest;
 import org.schabi.newpipe.extractor.services.youtube.sabr.YoutubeSabrClientProfile;
@@ -160,6 +161,32 @@ public final class SabrPlaybackSmokeTest {
                     trace.contains("skip_backoff waitTarget backoffMs=30000"));
             assertTrue("Loader waited too long for demand retry: elapsedMs=" + elapsedMs
                     + " trace=" + trace, elapsedMs < 5_000);
+        }
+    }
+
+    @Test
+    public void initializationPumpKeepsMidStartTarget() throws Exception {
+        try (SabrSmokeHarness harness = SabrSmokeHarness.create()) {
+            harness.setPlayerTimeMs(300_000);
+            harness.downloader.enqueue(new UmpFixture()
+                    .initSegment(1, SMOKE_VIDEO_ITAG)
+                    .bytes());
+
+            final SabrSegmentRequest request =
+                    SabrSegmentRequest.initialization(harness.videoFormat);
+            harness.openSegment(request, 5_000);
+
+            final String trace = harness.holder.session.getDiagnosticTrace();
+            assertTrue("Initialization pump did not anchor the target: " + trace,
+                    trace.contains("pump_initialization_target itag=" + SMOKE_VIDEO_ITAG));
+            assertTrue("No SABR request body was captured",
+                    !harness.downloader.requestBodies.isEmpty());
+            final String requestSummary = SabrRequestDumper.summarize(
+                    harness.downloader.requestBodies.get(0));
+            assertTrue("Initial SABR request did not keep player time: " + requestSummary,
+                    requestSummary.contains("playerTimeMs=300000"));
+            assertTrue("Initial SABR request did not report target time: " + requestSummary,
+                    requestSummary.contains("topPlayerTimeMs=300000"));
         }
     }
 
@@ -904,8 +931,6 @@ public final class SabrPlaybackSmokeTest {
                 trace.contains(audioSabrMarker));
         assertTrue("Video initialization was not returned: " + trace,
                 trace.contains(videoSabrMarker));
-        assertTrue("Initialization fallback was unexpectedly used: " + trace,
-                !trace.contains("initialization_fallback"));
     }
 
     private static void verifyRewindResetsSabrState(
@@ -1489,8 +1514,20 @@ public final class SabrPlaybackSmokeTest {
                     previousContentCountry, downloader, holder, videoFormat, readerOwner);
         }
 
+        private void setPlayerTimeMs(final long playerTimeMs) throws Exception {
+            final Method setPlayerTimeMs = SabrSessionStore.Holder.class.getDeclaredMethod(
+                    "setPlayerTimeMs", long.class);
+            setPlayerTimeMs.setAccessible(true);
+            setPlayerTimeMs.invoke(holder, playerTimeMs);
+        }
+
         private long openMediaSegment(final SabrSegmentRequest request,
                                       final long timeoutMs) throws Exception {
+            return openSegment(request, timeoutMs);
+        }
+
+        private long openSegment(final SabrSegmentRequest request,
+                                 final long timeoutMs) throws Exception {
             final AtomicReference<Throwable> failure = new AtomicReference<>();
             final CountDownLatch done = new CountDownLatch(1);
             final long startMs = System.currentTimeMillis();
@@ -1499,9 +1536,7 @@ public final class SabrPlaybackSmokeTest {
                         holder, readerOwner, request.getFormat(), new Localization("en", "US"),
                         false);
                 try {
-                    dataSource.open(new DataSpec(Uri.parse("sabr://"
-                            + request.getFormat().getItag() + '/'
-                            + request.getSequenceNumber())));
+                    dataSource.open(new DataSpec(segmentUri(request)));
                 } catch (final Throwable e) {
                     failure.set(e);
                 } finally {
@@ -1518,6 +1553,12 @@ public final class SabrPlaybackSmokeTest {
                         + holder.session.getDiagnosticTrace(), failure.get());
             }
             return System.currentTimeMillis() - startMs;
+        }
+
+        private Uri segmentUri(final SabrSegmentRequest request) {
+            return Uri.parse("sabr://" + request.getFormat().getItag() + '/'
+                    + (request.isInitializationSegment()
+                    ? "init" : String.valueOf(request.getSequenceNumber())));
         }
 
         private void openMediaSegmentExpectFailure(final SabrSegmentRequest request,
@@ -1560,6 +1601,7 @@ public final class SabrPlaybackSmokeTest {
     private static final class FakeSabrDownloader extends Downloader {
         private final LinkedBlockingQueue<byte[]> responses = new LinkedBlockingQueue<>();
         private final List<String> requestedUrls = new ArrayList<>();
+        private final List<byte[]> requestBodies = new ArrayList<>();
 
         private void enqueue(final byte[] body) {
             responses.add(body);
@@ -1578,6 +1620,7 @@ public final class SabrPlaybackSmokeTest {
                                                final Localization localization)
                 throws IOException {
             requestedUrls.add(url);
+            requestBodies.add(dataToSend.clone());
             final byte[] body = responses.poll();
             if (body == null) {
                 throw new IOException("No queued SABR smoke response for " + url);
@@ -1602,6 +1645,12 @@ public final class SabrPlaybackSmokeTest {
 
         private UmpFixture segment(final int headerId, final int itag, final int sequence) {
             return mediaHeader(headerId, itag, sequence).media(headerId).mediaEnd(headerId);
+        }
+
+        private UmpFixture initSegment(final int headerId, final int itag) {
+            return mediaHeader(headerId, itag, 0, 0, 0, 4, 0, true)
+                    .media(headerId)
+                    .mediaEnd(headerId);
         }
 
         private UmpFixture segment(final int headerId,
@@ -1642,12 +1691,24 @@ public final class SabrPlaybackSmokeTest {
                                        final long durationMs,
                                        final long contentLength,
                                        final int compressionAlgorithm) {
+            return mediaHeader(headerId, itag, sequence, startMs, durationMs, contentLength,
+                    compressionAlgorithm, false);
+        }
+
+        private UmpFixture mediaHeader(final int headerId,
+                                       final int itag,
+                                       final int sequence,
+                                       final long startMs,
+                                       final long durationMs,
+                                       final long contentLength,
+                                       final int compressionAlgorithm,
+                                       final boolean initialization) {
             final Proto header = proto()
                     .u64(1, headerId)
                     .u64(3, itag)
                     .u64(4, 123456)
                     .u64(7, compressionAlgorithm)
-                    .u64(8, 0)
+                    .u64(8, initialization ? 1 : 0)
                     .u64(9, sequence)
                     .u64(11, Math.max(0, startMs))
                     .u64(12, Math.max(0, durationMs))

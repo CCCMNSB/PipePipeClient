@@ -207,7 +207,11 @@ public final class SabrSegmentDataSource implements DataSource {
             if (networkFailure != null) {
                 throw networkFailure;
             }
-            pump.ensureStarted();
+            if (request.isInitializationSegment()) {
+                pump.requestInitialization(format);
+            } else {
+                pump.ensureStarted();
+            }
             final SabrMediaSegment segment;
             if (request.isInitializationSegment()) {
                 segment = pump.getCached(request);
