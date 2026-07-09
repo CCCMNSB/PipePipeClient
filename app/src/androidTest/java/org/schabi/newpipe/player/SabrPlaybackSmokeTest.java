@@ -4,6 +4,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assume.assumeTrue;
 
 import android.content.Context;
 import android.graphics.SurfaceTexture;
@@ -62,6 +63,7 @@ import org.schabi.newpipe.player.datasource.SabrSessionStore;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.lang.reflect.Field;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
@@ -593,6 +595,47 @@ public final class SabrPlaybackSmokeTest {
                                 4, 99)
                         .media(2)
                         .mediaEnd(2));
+    }
+
+    @Test
+    public void generatedLargeMediaPartReproducesSabrHeapPressure() throws Exception {
+        final Bundle arguments = InstrumentationRegistry.getArguments();
+        final String mediaBytesArgument = arguments.getString("sabrStressMediaBytes");
+        assumeTrue("Set sabrStressMediaBytes to run the SABR heap pressure reproducer",
+                mediaBytesArgument != null);
+        final int mediaBytes = Integer.parseInt(mediaBytesArgument);
+        try (SabrSmokeHarness harness = SabrSmokeHarness.create()) {
+            harness.downloader.enqueue(new GeneratedLargeMediaResponse(
+                    2, SMOKE_VIDEO_ITAG, 1, 0, 5_000, mediaBytes));
+
+            final SabrSegmentRequest request = SabrSegmentRequest.media(harness.videoFormat, 1);
+            final long beforeUsed = usedHeapBytes();
+            try {
+                harness.openMediaSegment(request, 30_000);
+            } catch (final AssertionError e) {
+                final String trace = harness.holder.session.getDiagnosticTrace();
+                final String failure = messageChain(e);
+                System.out.println("SABR_OOM_REPRO reproduced=true mediaBytes=" + mediaBytes
+                        + " beforeUsed=" + beforeUsed
+                        + " afterUsed=" + usedHeapBytes()
+                        + " trace=" + trace
+                        + " failure=" + failure);
+                assertTrue("Large SABR media part failed for a non-memory reason: " + trace,
+                        trace.contains("SABR memory failure")
+                                || failure.contains("OutOfMemoryError")
+                                || failure.contains("SABR memory failure"));
+                return;
+            }
+
+            final long peakCached = harness.holder.session.getPeakCachedBytes();
+            System.out.println("SABR_OOM_REPRO reproduced=false mediaBytes=" + mediaBytes
+                    + " beforeUsed=" + beforeUsed
+                    + " afterUsed=" + usedHeapBytes()
+                    + " peakCachedBytes=" + peakCached
+                    + " trace=" + harness.holder.session.getDiagnosticTrace());
+            throw new AssertionError("Large SABR media part did not reproduce heap pressure: "
+                    + "mediaBytes=" + mediaBytes + " peakCachedBytes=" + peakCached);
+        }
     }
 
     @Test
@@ -1137,6 +1180,26 @@ public final class SabrPlaybackSmokeTest {
         return trace;
     }
 
+    private static long usedHeapBytes() {
+        final Runtime runtime = Runtime.getRuntime();
+        return runtime.totalMemory() - runtime.freeMemory();
+    }
+
+    private static String messageChain(final Throwable throwable) {
+        final StringBuilder builder = new StringBuilder();
+        Throwable current = throwable;
+        while (current != null) {
+            if (builder.length() > 0) {
+                builder.append(" | ");
+            }
+            builder.append(current.getClass().getSimpleName())
+                    .append(':')
+                    .append(current.getMessage());
+            current = current.getCause();
+        }
+        return builder.toString();
+    }
+
     private static YoutubeSabrFormat smokeFormat(final int itag, final boolean audio)
             throws Exception {
         return smokeFormat(itag, audio, "https://media.test/" + itag, -1L, -1L);
@@ -1534,11 +1597,12 @@ public final class SabrPlaybackSmokeTest {
                     new YoutubeSabrSession(info, audioFormat, videoFormat);
             session.getStreamState().setVideoOnlyRequestMode();
             final Constructor<SabrSessionStore.Holder> constructor =
-                    SabrSessionStore.Holder.class.getDeclaredConstructor(String.class,
-                            YoutubeSabrInfo.class, YoutubeSabrSession.class,
+                    SabrSessionStore.Holder.class.getDeclaredConstructor(Context.class,
+                            String.class, YoutubeSabrInfo.class, YoutubeSabrSession.class,
                             YoutubeSabrFormat.class, YoutubeSabrFormat.class);
             constructor.setAccessible(true);
             final SabrSessionStore.Holder holder = constructor.newInstance(
+                    InstrumentationRegistry.getInstrumentation().getTargetContext(),
                     "smoke-video", info, session, audioFormat, videoFormat);
             final Object readerOwner = new Object();
             final Method setActiveTracks = SabrSessionStore.Holder.class.getDeclaredMethod(
@@ -1634,11 +1698,16 @@ public final class SabrPlaybackSmokeTest {
     }
 
     private static final class FakeSabrDownloader extends Downloader {
-        private final LinkedBlockingQueue<byte[]> responses = new LinkedBlockingQueue<>();
+        private final LinkedBlockingQueue<QueuedStreamingBody> responses =
+                new LinkedBlockingQueue<>();
         private final List<String> requestedUrls = new ArrayList<>();
         private final List<byte[]> requestBodies = new ArrayList<>();
 
         private void enqueue(final byte[] body) {
+            responses.add(() -> new ByteArrayInputStream(body));
+        }
+
+        private void enqueue(final QueuedStreamingBody body) {
             responses.add(body);
         }
 
@@ -1656,14 +1725,14 @@ public final class SabrPlaybackSmokeTest {
                 throws IOException {
             requestedUrls.add(url);
             requestBodies.add(dataToSend.clone());
-            final byte[] body = responses.poll();
+            final QueuedStreamingBody body = responses.poll();
             if (body == null) {
                 throw new IOException("No queued SABR smoke response for " + url);
             }
             final Map<String, List<String>> responseHeaders = new HashMap<>();
             responseHeaders.put("Content-Type",
                     Collections.singletonList("application/vnd.yt-ump"));
-            return new StreamingResponse(200, responseHeaders, new ByteArrayInputStream(body));
+            return new StreamingResponse(200, responseHeaders, body.open());
         }
 
         @Override
@@ -1672,6 +1741,146 @@ public final class SabrPlaybackSmokeTest {
                 throws IOException, ReCaptchaException {
             throw new IOException("Unexpected async request in SABR smoke: "
                     + request.httpMethod() + " " + request.url());
+        }
+    }
+
+    @FunctionalInterface
+    private interface QueuedStreamingBody {
+        InputStream open() throws IOException;
+    }
+
+    private static final class GeneratedLargeMediaResponse implements QueuedStreamingBody {
+        private final int headerId;
+        private final int itag;
+        private final int sequence;
+        private final long startMs;
+        private final long durationMs;
+        private final int mediaBytes;
+
+        private GeneratedLargeMediaResponse(final int headerId,
+                                            final int itag,
+                                            final int sequence,
+                                            final long startMs,
+                                            final long durationMs,
+                                            final int mediaBytes) {
+            this.headerId = headerId;
+            this.itag = itag;
+            this.sequence = sequence;
+            this.startMs = startMs;
+            this.durationMs = durationMs;
+            this.mediaBytes = mediaBytes;
+        }
+
+        @Override
+        public InputStream open() {
+            final byte[] mediaHeader = proto()
+                    .u64(1, headerId)
+                    .u64(3, itag)
+                    .u64(4, 123456)
+                    .u64(7, 0)
+                    .u64(8, 0)
+                    .u64(9, sequence)
+                    .u64(11, Math.max(0, startMs))
+                    .u64(12, Math.max(0, durationMs))
+                    .u64(14, Math.max(0, mediaBytes))
+                    .bytes();
+            final byte[] headerPartPrefix = umpPartPrefix(
+                    SabrResponseDecoder.MEDIA_HEADER, mediaHeader.length);
+            final byte[] mediaPartPrefix = umpPartPrefix(
+                    SabrResponseDecoder.MEDIA, mediaBytes + 1);
+            final byte[] mediaEndPart = new UmpFixture().mediaEnd(headerId).bytes();
+            return new GeneratedLargeMediaInputStream(
+                    headerPartPrefix, mediaHeader, mediaPartPrefix,
+                    (byte) headerId, mediaBytes, mediaEndPart);
+        }
+    }
+
+    private static final class GeneratedLargeMediaInputStream extends InputStream {
+        private final byte[] headerPartPrefix;
+        private final byte[] mediaHeader;
+        private final byte[] mediaPartPrefix;
+        private final byte headerId;
+        private final int mediaBytes;
+        private final byte[] mediaEndPart;
+        private int phase;
+        private int offset;
+        private int generatedMediaBytes;
+        private boolean mediaHeaderIdSent;
+
+        private GeneratedLargeMediaInputStream(final byte[] headerPartPrefix,
+                                               final byte[] mediaHeader,
+                                               final byte[] mediaPartPrefix,
+                                               final byte headerId,
+                                               final int mediaBytes,
+                                               final byte[] mediaEndPart) {
+            this.headerPartPrefix = headerPartPrefix;
+            this.mediaHeader = mediaHeader;
+            this.mediaPartPrefix = mediaPartPrefix;
+            this.headerId = headerId;
+            this.mediaBytes = mediaBytes;
+            this.mediaEndPart = mediaEndPart;
+        }
+
+        @Override
+        public int read() {
+            final byte[] one = new byte[1];
+            final int read = read(one, 0, 1);
+            return read < 0 ? -1 : one[0] & 0xff;
+        }
+
+        @Override
+        public int read(final byte[] buffer, final int off, final int len) {
+            if (len <= 0) {
+                return 0;
+            }
+            int written = 0;
+            while (written < len) {
+                final int value = nextByte();
+                if (value < 0) {
+                    return written == 0 ? -1 : written;
+                }
+                buffer[off + written] = (byte) value;
+                written++;
+            }
+            return written;
+        }
+
+        private int nextByte() {
+            while (true) {
+                switch (phase) {
+                    case 0:
+                        return byteFrom(headerPartPrefix);
+                    case 1:
+                        return byteFrom(mediaHeader);
+                    case 2:
+                        return byteFrom(mediaPartPrefix);
+                    case 3:
+                        if (!mediaHeaderIdSent) {
+                            mediaHeaderIdSent = true;
+                            return headerId & 0xff;
+                        }
+                        if (generatedMediaBytes < mediaBytes) {
+                            generatedMediaBytes++;
+                            return 0;
+                        }
+                        phase++;
+                        offset = 0;
+                        break;
+                    case 4:
+                        return byteFrom(mediaEndPart);
+                    default:
+                        return -1;
+                }
+            }
+        }
+
+        private int byteFrom(final byte[] bytes) {
+            if (offset < bytes.length) {
+                return bytes[offset++] & 0xff;
+            }
+            phase++;
+            offset = 0;
+            return nextByte();
         }
     }
 
@@ -1818,6 +2027,28 @@ public final class SabrPlaybackSmokeTest {
             remaining >>>= 7;
         }
         output.write((int) remaining);
+    }
+
+    private static byte[] umpPartPrefix(final int type, final int size) {
+        final ByteArrayOutputStream output = new ByteArrayOutputStream();
+        writeUmpInt(output, type);
+        writeUmpInt(output, size);
+        return output.toByteArray();
+    }
+
+    private static void writeUmpInt(final ByteArrayOutputStream output, final int value) {
+        if (value < 0) {
+            throw new IllegalArgumentException("UMP integer must be non-negative");
+        }
+        if (value < 128) {
+            output.write(value);
+            return;
+        }
+        output.write(240);
+        output.write(value & 0xff);
+        output.write((value >>> 8) & 0xff);
+        output.write((value >>> 16) & 0xff);
+        output.write((value >>> 24) & 0xff);
     }
 
     private static final class BoundedQualityResolver implements QualityResolver {
