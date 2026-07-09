@@ -11,6 +11,7 @@ import android.graphics.SurfaceTexture;
 import android.net.Uri;
 import android.os.Bundle;
 import android.view.Surface;
+import android.view.accessibility.AccessibilityEvent;
 
 import androidx.media3.common.C;
 import androidx.media3.common.MediaItem;
@@ -635,6 +636,58 @@ public final class SabrPlaybackSmokeTest {
                     + " trace=" + harness.holder.session.getDiagnosticTrace());
             throw new AssertionError("Large SABR media part did not reproduce heap pressure: "
                     + "mediaBytes=" + mediaBytes + " peakCachedBytes=" + peakCached);
+        }
+    }
+
+    @Test
+    public void generatedSabrCachePressureReproducesAccessibilityAllocationOom()
+            throws Exception {
+        final Bundle arguments = InstrumentationRegistry.getArguments();
+        final String segmentBytesArgument = arguments.getString("sabrStressSegmentBytes");
+        assumeTrue("Set sabrStressSegmentBytes to run the accessibility OOM reproducer",
+                segmentBytesArgument != null);
+        final int segmentBytes = Integer.parseInt(segmentBytesArgument);
+        final int segmentCount = Integer.parseInt(arguments.getString(
+                "sabrStressSegmentCount", "7"));
+        try (SabrSmokeHarness harness = SabrSmokeHarness.create()) {
+            for (int i = 1; i <= segmentCount; i++) {
+                harness.downloader.enqueue(new GeneratedLargeMediaResponse(
+                        i, SMOKE_VIDEO_ITAG, i, (i - 1L) * 5_000L, 5_000L,
+                        segmentBytes));
+            }
+
+            final long beforeUsed = usedHeapBytes();
+            for (int i = 1; i <= segmentCount; i++) {
+                harness.holder.session.pumpOnceStreaming(new Localization("en", "US"));
+                System.out.println("SABR_ACCESSIBILITY_OOM cachedSegment=" + i
+                        + " used=" + usedHeapBytes()
+                        + " peakCachedBytes=" + harness.holder.session.getPeakCachedBytes());
+            }
+
+            final AtomicReference<Throwable> failure = new AtomicReference<>();
+            InstrumentationRegistry.getInstrumentation().runOnMainSync(() -> {
+                final List<AccessibilityEvent> retained = new ArrayList<>();
+                try {
+                    while (true) {
+                        retained.add(AccessibilityEvent.obtain());
+                    }
+                } catch (final Throwable e) {
+                    failure.set(e);
+                }
+            });
+
+            final Throwable thrown = failure.get();
+            final String failureChain = thrown == null ? "" : messageChain(thrown);
+            System.out.println("SABR_ACCESSIBILITY_OOM beforeUsed=" + beforeUsed
+                    + " afterUsed=" + usedHeapBytes()
+                    + " segmentBytes=" + segmentBytes
+                    + " segmentCount=" + segmentCount
+                    + " peakCachedBytes=" + harness.holder.session.getPeakCachedBytes()
+                    + " failure=" + failureChain);
+            assertNotNull("Accessibility allocation did not fail after SABR cache pressure",
+                    thrown);
+            assertTrue("Expected accessibility OOM after SABR cache pressure: " + failureChain,
+                    failureChain.contains("OutOfMemoryError"));
         }
     }
 
