@@ -14,7 +14,9 @@ import androidx.media3.exoplayer.source.SingleSampleMediaSource;
 
 import org.schabi.newpipe.extractor.MediaFormat;
 import org.schabi.newpipe.extractor.stream.AudioStream;
+import org.schabi.newpipe.extractor.stream.DeliveryMethod;
 import org.schabi.newpipe.extractor.stream.StreamInfo;
+import org.schabi.newpipe.extractor.stream.StreamType;
 import org.schabi.newpipe.extractor.stream.SubtitlesStream;
 import org.schabi.newpipe.extractor.stream.VideoStream;
 import org.schabi.newpipe.player.datasource.SabrSessionStore;
@@ -80,6 +82,13 @@ public class VideoPlaybackResolver implements PlaybackResolver {
 
         removeTorrentStreams(videoStreams);
         removeTorrentStreams(videoOnlyStreams);
+
+        if (info.getStreamType() == StreamType.POST_LIVE_STREAM
+                && videoStreams.stream()
+                .anyMatch(stream -> stream.getDeliveryMethod() == DeliveryMethod.HLS)) {
+            videoStreams.removeIf(stream -> stream.getDeliveryMethod() != DeliveryMethod.HLS);
+            videoOnlyStreams.clear();
+        }
 
         // Create video stream source
         List<VideoStream> videos = ListHelper.getSortedStreamVideosList(context,
