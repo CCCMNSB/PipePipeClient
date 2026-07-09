@@ -13,7 +13,6 @@ import androidx.preference.PreferenceManager;
 import androidx.preference.SwitchPreferenceCompat;
 
 import org.schabi.newpipe.R;
-import org.schabi.newpipe.extractor.NewPipe;
 import org.schabi.newpipe.util.DeviceUtils;
 import org.schabi.newpipe.util.NavigationHelper;
 import org.schabi.newpipe.util.PicassoHelper;
@@ -67,6 +66,19 @@ public class AdvancedSettingsFragment extends BasePreferenceFragment implements 
                     return true;
                 });
 
+        findPreference(getString(R.string.youtube_player_client_key))
+                .setOnPreferenceChangeListener((preference, newValue) -> {
+                    defaultPreferences.edit()
+                            .putString(getString(R.string.youtube_player_client_key),
+                                    (String) newValue)
+                            .commit();
+                    final Activity activity = getActivity();
+                    if (activity != null) {
+                        NavigationHelper.restartApp(activity);
+                    }
+                    return true;
+                });
+
         if (DeviceUtils.isTv(getContext())) {
             findPreference(getString(R.string.use_old_search_filter_key)).setVisible(false);
         }
@@ -110,8 +122,6 @@ public class AdvancedSettingsFragment extends BasePreferenceFragment implements 
             ServiceHelper.initServices(this.getContext());
         } else if (key.equals(getString(R.string.auto_translated_subtitles_language_key))) {
             ServiceHelper.initServices(this.getContext());
-        } else if (key.equals(getString(R.string.youtube_player_client_key))) {
-            NewPipe.setYoutubePlayerClient(sharedPreferences.getString(key, "mweb"));
         }
     }
 
@@ -152,19 +162,34 @@ public class AdvancedSettingsFragment extends BasePreferenceFragment implements 
         final String[] values = getResources().getStringArray(
                 R.array.youtube_player_client_values);
         if (loggedIn) {
-            preference.setEntries(new CharSequence[]{entries[0], entries[1], entries[2], entries[5]});
-            preference.setEntryValues(new CharSequence[]{values[0], values[1], values[2], values[5]});
+            preference.setEntries(new CharSequence[]{entries[3], entries[0]});
+            preference.setEntryValues(new CharSequence[]{values[3], values[0]});
             final String selected = preference.getValue();
-            if ("android_vr".equals(selected) || "tv_simply".equals(selected)) {
+            if (!isYoutubePlayerClientAllowed(selected, values[3], values[0])) {
                 preference.setValue("tv_downgraded");
                 defaultPreferences.edit().putString(
                         getString(R.string.youtube_player_client_key), "tv_downgraded").apply();
-                NewPipe.setYoutubePlayerClient("tv_downgraded");
             }
         } else {
-            preference.setEntries(entries);
-            preference.setEntryValues(values);
+            preference.setEntries(new CharSequence[]{entries[0], entries[1], entries[2]});
+            preference.setEntryValues(new CharSequence[]{values[0], values[1], values[2]});
+            if (!isYoutubePlayerClientAllowed(preference.getValue(),
+                    values[0], values[1], values[2])) {
+                preference.setValue("mweb");
+                defaultPreferences.edit().putString(
+                        getString(R.string.youtube_player_client_key), "mweb").apply();
+            }
         }
+    }
+
+    private boolean isYoutubePlayerClientAllowed(final String selected,
+                                                final String... allowedValues) {
+        for (final String value : allowedValues) {
+            if (value.equals(selected)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override

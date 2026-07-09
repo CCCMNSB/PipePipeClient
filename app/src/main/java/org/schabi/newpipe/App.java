@@ -150,8 +150,9 @@ public class App extends MultiDexApplication {
             youtubePlayerClient = defaultYoutubePlayerClient;
             prefs.edit().putString(youtubePlayerClientKey, youtubePlayerClient).apply();
         }
-        if (hasYouTubeLogin && ("android_vr".equals(youtubePlayerClient)
-                || "tv_simply".equals(youtubePlayerClient))) {
+        if ((hasYouTubeLogin && !"tv_downgraded".equals(youtubePlayerClient)
+                && !"mweb".equals(youtubePlayerClient))
+                || (!hasYouTubeLogin && "tv_downgraded".equals(youtubePlayerClient))) {
             youtubePlayerClient = defaultYoutubePlayerClient;
             prefs.edit().putString(youtubePlayerClientKey, youtubePlayerClient).apply();
         }
