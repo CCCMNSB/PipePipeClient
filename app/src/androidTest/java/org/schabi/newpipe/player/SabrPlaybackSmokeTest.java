@@ -7,12 +7,14 @@ import static org.junit.Assert.assertTrue;
 
 import android.content.Context;
 import android.graphics.SurfaceTexture;
+import android.net.Uri;
 import android.os.Bundle;
 import android.view.Surface;
 
 import androidx.media3.common.C;
 import androidx.media3.common.PlaybackException;
 import androidx.media3.common.Player;
+import androidx.media3.datasource.DataSpec;
 import androidx.media3.exoplayer.ExoPlayer;
 import androidx.media3.exoplayer.analytics.AnalyticsListener;
 import androidx.media3.exoplayer.source.MediaSource;
@@ -26,15 +28,27 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.schabi.newpipe.App;
 import org.schabi.newpipe.DownloaderImpl;
+import org.schabi.newpipe.extractor.downloader.CancellableCall;
+import org.schabi.newpipe.extractor.downloader.Downloader;
+import org.schabi.newpipe.extractor.downloader.Request;
+import org.schabi.newpipe.extractor.downloader.Response;
+import org.schabi.newpipe.extractor.downloader.StreamingResponse;
+import org.schabi.newpipe.extractor.exceptions.ReCaptchaException;
 import org.schabi.newpipe.extractor.NewPipe;
 import org.schabi.newpipe.extractor.ServiceList;
+import org.schabi.newpipe.extractor.localization.ContentCountry;
 import org.schabi.newpipe.extractor.localization.Localization;
+import org.schabi.newpipe.extractor.services.youtube.sabr.SabrResponseDecoder;
 import org.schabi.newpipe.extractor.services.youtube.sabr.SabrSegmentRequest;
+import org.schabi.newpipe.extractor.services.youtube.sabr.YoutubeSabrClientProfile;
 import org.schabi.newpipe.extractor.services.youtube.sabr.YoutubeSabrFormat;
+import org.schabi.newpipe.extractor.services.youtube.sabr.YoutubeSabrInfo;
+import org.schabi.newpipe.extractor.services.youtube.sabr.YoutubeSabrSession;
 import org.schabi.newpipe.extractor.stream.AudioStream;
 import org.schabi.newpipe.extractor.stream.DeliveryMethod;
 import org.schabi.newpipe.extractor.stream.StreamInfo;
 import org.schabi.newpipe.extractor.stream.VideoStream;
+import org.schabi.newpipe.player.datasource.SabrSegmentDataSource;
 import org.schabi.newpipe.player.helper.LegacySubtitleRenderersFactory;
 import org.schabi.newpipe.player.helper.LoadController;
 import org.schabi.newpipe.player.helper.PlayerDataSource;
@@ -42,12 +56,20 @@ import org.schabi.newpipe.player.resolver.QualityResolver;
 import org.schabi.newpipe.player.resolver.VideoPlaybackResolver;
 import org.schabi.newpipe.player.datasource.SabrSessionStore;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.lang.reflect.Field;
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -67,6 +89,10 @@ import java.util.concurrent.atomic.AtomicReference;
 @RunWith(AndroidJUnit4.class)
 @LargeTest
 public final class SabrPlaybackSmokeTest {
+    private static final int SMOKE_AUDIO_ITAG = 140;
+    private static final int SMOKE_VIDEO_ITAG = 248;
+    private static final int PROTO_WIRE_VARINT = 0;
+    private static final int PROTO_WIRE_LENGTH_DELIMITED = 2;
     private static final String DEFAULT_URL =
             "https://www.youtube.com/watch?v=G-eNlqqkn1w";
     private static final int DEFAULT_MAX_VIDEO_HEIGHT = 720;
@@ -105,6 +131,57 @@ public final class SabrPlaybackSmokeTest {
     @Test
     public void seekToStreamEndReachesEnded() throws Exception {
         runSmokeCase(SmokeCase.endSeek());
+    }
+
+    @Test
+    public void demandBackoffDoesNotBlockLoaderUntilServerDelay() throws Exception {
+        try (SabrSmokeHarness harness = SabrSmokeHarness.create()) {
+            harness.downloader.enqueue(new UmpFixture()
+                    .segment(1, SMOKE_VIDEO_ITAG, 1, 0, 30_000)
+                    .bytes());
+            harness.downloader.enqueue(new UmpFixture()
+                    .part(SabrResponseDecoder.NEXT_REQUEST_POLICY, nextRequestPolicy(30_000))
+                    .bytes());
+            harness.downloader.enqueue(new UmpFixture()
+                    .segment(2, SMOKE_VIDEO_ITAG, 2, 30_000, 5_000)
+                    .bytes());
+
+            final long elapsedMs = harness.openMediaSegment(
+                    SabrSegmentRequest.media(harness.videoFormat, 2), 5_000);
+
+            final String trace = harness.holder.session.getDiagnosticTrace();
+            assertTrue("Demand path did not request the target segment: " + trace,
+                    trace.contains("pump_demand itag=" + SMOKE_VIDEO_ITAG + " seq=2"));
+            assertTrue("Demand path honored a long SABR backoff while loader waited: " + trace,
+                    trace.contains("skip_backoff waitTarget backoffMs=30000"));
+            assertTrue("Loader waited too long for demand retry: elapsedMs=" + elapsedMs
+                    + " trace=" + trace, elapsedMs < 5_000);
+        }
+    }
+
+    @Test
+    public void demandIncompleteMediaResponseRetriesThroughPump() throws Exception {
+        try (SabrSmokeHarness harness = SabrSmokeHarness.create()) {
+            harness.downloader.enqueue(new UmpFixture()
+                    .segment(1, SMOKE_VIDEO_ITAG, 1, 0, 30_000)
+                    .bytes());
+            harness.downloader.enqueue(new UmpFixture()
+                    .mediaHeader(2, SMOKE_VIDEO_ITAG, 2, 30_000, 5_000)
+                    .media(2)
+                    .bytes());
+            harness.downloader.enqueue(new UmpFixture()
+                    .segment(3, SMOKE_VIDEO_ITAG, 2, 30_000, 5_000)
+                    .bytes());
+
+            final SabrSegmentRequest request = SabrSegmentRequest.media(harness.videoFormat, 2);
+            harness.openMediaSegment(request, 5_000);
+
+            final String trace = harness.holder.session.getDiagnosticTrace();
+            assertTrue("Incomplete media response was not exercised: " + trace,
+                    trace.contains("missing-media-end:2"));
+            assertNotNull("Demand retry did not fetch the target segment: " + trace,
+                    harness.holder.session.getCachedSegment(request));
+        }
     }
 
     private static void runSmokeCase(final SmokeCase smokeCase) throws Exception {
@@ -561,6 +638,67 @@ public final class SabrPlaybackSmokeTest {
         assertEquals("Playback position did not reach target", targetMs, positionOf(player));
     }
 
+    private static YoutubeSabrFormat smokeFormat(final int itag, final boolean audio)
+            throws Exception {
+        final Constructor<YoutubeSabrFormat> constructor =
+                YoutubeSabrFormat.class.getDeclaredConstructor(int.class, long.class,
+                        String.class, String.class, String.class, String.class, boolean.class,
+                        String.class, String.class, boolean.class, int.class, int.class,
+                        int.class, long.class, long.class, String.class, long.class, long.class);
+        constructor.setAccessible(true);
+        return constructor.newInstance(
+                itag,
+                123456L,
+                audio ? "audio-xtags" : "video-xtags",
+                audio ? "audio/mp4" : "video/webm",
+                audio ? "audio-track" : null,
+                audio ? "English original" : null,
+                audio,
+                audio ? null : "1080p",
+                audio ? "AUDIO_QUALITY_MEDIUM" : null,
+                false,
+                audio ? -1 : 1920,
+                audio ? -1 : 1080,
+                audio ? 128_000 : 2_000_000,
+                100_000L,
+                300_000L,
+                "https://media.test/" + itag,
+                -1L,
+                -1L);
+    }
+
+    private static YoutubeSabrInfo smokeInfo(final YoutubeSabrFormat audioFormat,
+                                             final YoutubeSabrFormat videoFormat)
+            throws Exception {
+        final Constructor<YoutubeSabrInfo> constructor =
+                YoutubeSabrInfo.class.getDeclaredConstructor(YoutubeSabrClientProfile.class,
+                        String.class, String.class, String.class, String.class, String.class,
+                        String.class, List.class);
+        constructor.setAccessible(true);
+        return constructor.newInstance(YoutubeSabrClientProfile.MWEB, "smoke-video", "cpn",
+                "2.20250122.04.00", "visitor", "https://sabr.test",
+                base64(new byte[]{1, 2, 3, 4}), Arrays.asList(audioFormat, videoFormat));
+    }
+
+    private static byte[] nextRequestPolicy(final int backoffMs) {
+        return proto()
+                .u64(1, 3_000)
+                .u64(2, 4_000)
+                .u64(3, 1_000)
+                .u64(4, backoffMs)
+                .u64(5, 500)
+                .u64(6, 600)
+                .bytes();
+    }
+
+    private static Proto proto() {
+        return new Proto();
+    }
+
+    private static String base64(final byte[] bytes) {
+        return android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP);
+    }
+
     private static final class SmokeCase {
         private enum Kind {
             PLAYBACK,
@@ -600,6 +738,223 @@ public final class SabrPlaybackSmokeTest {
         private static SmokeCase endSeek() {
             return new SmokeCase(Kind.END_SEEK);
         }
+    }
+
+    private static final class SabrSmokeHarness implements AutoCloseable {
+        private final Downloader previousDownloader;
+        private final Localization previousLocalization;
+        private final ContentCountry previousContentCountry;
+        private final FakeSabrDownloader downloader;
+        private final SabrSessionStore.Holder holder;
+        private final YoutubeSabrFormat videoFormat;
+        private final Object readerOwner;
+
+        private SabrSmokeHarness(final Downloader previousDownloader,
+                                 final Localization previousLocalization,
+                                 final ContentCountry previousContentCountry,
+                                 final FakeSabrDownloader downloader,
+                                 final SabrSessionStore.Holder holder,
+                                 final YoutubeSabrFormat videoFormat,
+                                 final Object readerOwner) {
+            this.previousDownloader = previousDownloader;
+            this.previousLocalization = previousLocalization;
+            this.previousContentCountry = previousContentCountry;
+            this.downloader = downloader;
+            this.holder = holder;
+            this.videoFormat = videoFormat;
+            this.readerOwner = readerOwner;
+        }
+
+        private static SabrSmokeHarness create() throws Exception {
+            final Downloader previousDownloader = NewPipe.getDownloader();
+            final Localization previousLocalization = NewPipe.getPreferredLocalization();
+            final ContentCountry previousContentCountry = NewPipe.getPreferredContentCountry();
+            final FakeSabrDownloader downloader = new FakeSabrDownloader();
+            NewPipe.init(downloader, Localization.DEFAULT, ContentCountry.DEFAULT);
+            final YoutubeSabrFormat audioFormat = smokeFormat(SMOKE_AUDIO_ITAG, true);
+            final YoutubeSabrFormat videoFormat = smokeFormat(SMOKE_VIDEO_ITAG, false);
+            final YoutubeSabrInfo info = smokeInfo(audioFormat, videoFormat);
+            final YoutubeSabrSession session =
+                    new YoutubeSabrSession(info, audioFormat, videoFormat);
+            session.getStreamState().setVideoOnlyRequestMode();
+            final Constructor<SabrSessionStore.Holder> constructor =
+                    SabrSessionStore.Holder.class.getDeclaredConstructor(String.class,
+                            YoutubeSabrInfo.class, YoutubeSabrSession.class,
+                            YoutubeSabrFormat.class, YoutubeSabrFormat.class);
+            constructor.setAccessible(true);
+            final SabrSessionStore.Holder holder = constructor.newInstance(
+                    "smoke-video", info, session, audioFormat, videoFormat);
+            final Object readerOwner = new Object();
+            final Method setActiveTracks = SabrSessionStore.Holder.class.getDeclaredMethod(
+                    "setActiveTracks", Object.class, boolean.class, boolean.class);
+            setActiveTracks.setAccessible(true);
+            setActiveTracks.invoke(holder, readerOwner, true, false);
+            return new SabrSmokeHarness(previousDownloader, previousLocalization,
+                    previousContentCountry, downloader, holder, videoFormat, readerOwner);
+        }
+
+        private long openMediaSegment(final SabrSegmentRequest request,
+                                      final long timeoutMs) throws Exception {
+            final AtomicReference<Throwable> failure = new AtomicReference<>();
+            final CountDownLatch done = new CountDownLatch(1);
+            final long startMs = System.currentTimeMillis();
+            final Thread thread = new Thread(() -> {
+                final SabrSegmentDataSource dataSource = new SabrSegmentDataSource(
+                        holder, readerOwner, request.getFormat(), new Localization("en", "US"),
+                        false);
+                try {
+                    dataSource.open(new DataSpec(Uri.parse("sabr://"
+                            + request.getFormat().getItag() + '/'
+                            + request.getSequenceNumber())));
+                } catch (final Throwable e) {
+                    failure.set(e);
+                } finally {
+                    dataSource.close();
+                    done.countDown();
+                }
+            }, "SabrSmokeDemandOpen");
+            thread.start();
+            assertTrue("SABR smoke demand open timed out, trace="
+                            + holder.session.getDiagnosticTrace(),
+                    done.await(timeoutMs, TimeUnit.MILLISECONDS));
+            if (failure.get() != null) {
+                throw new AssertionError("SABR smoke demand open failed, trace="
+                        + holder.session.getDiagnosticTrace(), failure.get());
+            }
+            return System.currentTimeMillis() - startMs;
+        }
+
+        @Override
+        public void close() throws Exception {
+            final Method stop = SabrSessionStore.Holder.class.getDeclaredMethod(
+                    "stop", String.class);
+            stop.setAccessible(true);
+            stop.invoke(holder, "smoke_harness_close");
+            NewPipe.init(previousDownloader, previousLocalization, previousContentCountry);
+        }
+    }
+
+    private static final class FakeSabrDownloader extends Downloader {
+        private final LinkedBlockingQueue<byte[]> responses = new LinkedBlockingQueue<>();
+
+        private void enqueue(final byte[] body) {
+            responses.add(body);
+        }
+
+        @Override
+        public Response execute(final Request request) throws IOException {
+            throw new IOException("Unexpected buffered request in SABR smoke: "
+                    + request.httpMethod() + " " + request.url());
+        }
+
+        @Override
+        public StreamingResponse postStreaming(final String url,
+                                               final Map<String, List<String>> headers,
+                                               final byte[] dataToSend,
+                                               final Localization localization)
+                throws IOException {
+            final byte[] body = responses.poll();
+            if (body == null) {
+                throw new IOException("No queued SABR smoke response for " + url);
+            }
+            final Map<String, List<String>> responseHeaders = new HashMap<>();
+            responseHeaders.put("Content-Type",
+                    Collections.singletonList("application/vnd.yt-ump"));
+            return new StreamingResponse(200, responseHeaders, new ByteArrayInputStream(body));
+        }
+
+        @Override
+        public CancellableCall executeAsync(final Request request,
+                                            final AsyncCallback callback)
+                throws IOException, ReCaptchaException {
+            throw new IOException("Unexpected async request in SABR smoke: "
+                    + request.httpMethod() + " " + request.url());
+        }
+    }
+
+    private static final class UmpFixture {
+        private final ByteArrayOutputStream output = new ByteArrayOutputStream();
+
+        private UmpFixture segment(final int headerId, final int itag, final int sequence) {
+            return mediaHeader(headerId, itag, sequence).media(headerId).mediaEnd(headerId);
+        }
+
+        private UmpFixture segment(final int headerId,
+                                   final int itag,
+                                   final int sequence,
+                                   final long startMs,
+                                   final long durationMs) {
+            return mediaHeader(headerId, itag, sequence, startMs, durationMs)
+                    .media(headerId)
+                    .mediaEnd(headerId);
+        }
+
+        private UmpFixture mediaHeader(final int headerId, final int itag, final int sequence) {
+            return mediaHeader(headerId, itag, sequence, (sequence - 1) * 5_000L, 5_000L);
+        }
+
+        private UmpFixture mediaHeader(final int headerId,
+                                       final int itag,
+                                       final int sequence,
+                                       final long startMs,
+                                       final long durationMs) {
+            final Proto header = proto()
+                    .u64(1, headerId)
+                    .u64(3, itag)
+                    .u64(4, 123456)
+                    .u64(8, 0)
+                    .u64(9, sequence)
+                    .u64(11, Math.max(0, startMs))
+                    .u64(12, Math.max(0, durationMs))
+                    .u64(14, 4);
+            return part(SabrResponseDecoder.MEDIA_HEADER, header.bytes());
+        }
+
+        private UmpFixture media(final int headerId) {
+            final byte[] payload = new byte[]{10, 11, 12, 13};
+            final byte[] part = new byte[payload.length + 1];
+            part[0] = (byte) headerId;
+            System.arraycopy(payload, 0, part, 1, payload.length);
+            return part(SabrResponseDecoder.MEDIA, part);
+        }
+
+        private UmpFixture mediaEnd(final int headerId) {
+            return part(SabrResponseDecoder.MEDIA_END, new byte[]{(byte) headerId});
+        }
+
+        private UmpFixture part(final int type, final byte[] payload) {
+            writeVarint(output, type);
+            writeVarint(output, payload.length);
+            output.write(payload, 0, payload.length);
+            return this;
+        }
+
+        private byte[] bytes() {
+            return output.toByteArray();
+        }
+    }
+
+    private static final class Proto {
+        private final ByteArrayOutputStream output = new ByteArrayOutputStream();
+
+        private Proto u64(final int field, final long value) {
+            writeVarint(output, ((long) field << 3) | PROTO_WIRE_VARINT);
+            writeVarint(output, value);
+            return this;
+        }
+
+        private byte[] bytes() {
+            return output.toByteArray();
+        }
+    }
+
+    private static void writeVarint(final ByteArrayOutputStream output, final long value) {
+        long remaining = value;
+        while ((remaining & ~0x7fL) != 0) {
+            output.write((int) ((remaining & 0x7f) | 0x80));
+            remaining >>>= 7;
+        }
+        output.write((int) remaining);
     }
 
     private static final class BoundedQualityResolver implements QualityResolver {
