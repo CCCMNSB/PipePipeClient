@@ -81,9 +81,15 @@ public class App extends MultiDexApplication {
     @Override
     public void onCreate() {
         super.onCreate();
-        EdgeToEdgeWorkaround.apply();
-
         app = this;
+
+        if (ACRA.isACRASenderServiceProcess()) {
+            Log.i(TAG, "This is the ACRA sender process! "
+                    + "Aborting initialization of App[onCreate]");
+            return;
+        }
+
+        EdgeToEdgeWorkaround.apply();
 
         if (ProcessPhoenix.isPhoenixProcess(this)) {
             Log.i(TAG, "This is a phoenix process! "

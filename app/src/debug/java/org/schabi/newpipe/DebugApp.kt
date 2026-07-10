@@ -6,11 +6,16 @@ import com.facebook.stetho.okhttp3.StethoInterceptor
 import leakcanary.AppWatcher
 import leakcanary.LeakCanary
 import okhttp3.OkHttpClient
+import org.acra.ACRA
 import org.schabi.newpipe.extractor.downloader.Downloader
 
 class DebugApp : App() {
     override fun onCreate() {
         super.onCreate()
+        if (ACRA.isACRASenderServiceProcess()) {
+            return
+        }
+
         initStetho()
 
         // Give each object 10 seconds to be GC'ed, before LeakCanary gets nosy on it
