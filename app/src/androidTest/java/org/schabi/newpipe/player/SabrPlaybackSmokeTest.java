@@ -61,6 +61,7 @@ import org.schabi.newpipe.player.helper.PlayerDataSource;
 import org.schabi.newpipe.player.resolver.QualityResolver;
 import org.schabi.newpipe.player.resolver.VideoPlaybackResolver;
 import org.schabi.newpipe.player.datasource.SabrSessionStore;
+import org.schabi.newpipe.player.datasource.SabrSourceSpec;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -107,6 +108,8 @@ public final class SabrPlaybackSmokeTest {
     private static final int PROTO_WIRE_LENGTH_DELIMITED = 2;
     private static final String DEFAULT_URL =
             "https://www.youtube.com/watch?v=G-eNlqqkn1w";
+    private static final String RICKROLL_URL =
+            "https://www.youtube.com/watch?v=dQw4w9WgXcQ";
     private static final int DEFAULT_MAX_VIDEO_HEIGHT = 720;
     private static final long DEFAULT_SEEK_POSITION_MS = (49 * 60 + 55) * 1000L;
     private static final long DEFAULT_LINEAR_PLAYBACK_MS = 3_000;
@@ -141,8 +144,13 @@ public final class SabrPlaybackSmokeTest {
     }
 
     @Test
-    public void seekToStreamEndReachesEnded() throws Exception {
-        runSmokeCase(SmokeCase.endSeek());
+    public void playbackIntoSponsorBlockSkipsToDuration() throws Exception {
+        runSmokeCase(SmokeCase.sponsorBlockPlayback());
+    }
+
+    @Test
+    public void seekIntoSponsorBlockSkipsToDuration() throws Exception {
+        runSmokeCase(SmokeCase.sponsorBlockSeek());
     }
 
     @Test
@@ -204,15 +212,16 @@ public final class SabrPlaybackSmokeTest {
         final YoutubeSabrFormat videoFormat = smokeFormat(
                 SMOKE_VIDEO_ITAG, false, null, -1, -1);
         try (SabrSmokeHarness harness = SabrSmokeHarness.create(audioFormat, videoFormat)) {
-            new SabrDashMediaSource(new MediaItem.Builder()
+            final SabrSourceSpec spec = SabrSessionStore.createSourceSpec(
+                    "smoke-video", SMOKE_VIDEO_ITAG, harness.holder.info);
+            new SabrDashMediaSource(
+                    InstrumentationRegistry.getInstrumentation().getTargetContext(),
+                    new MediaItem.Builder()
                     .setUri(Uri.parse("sabr://smoke-video"))
-                    .build(), harness.holder, new Localization("en", "US"));
+                    .build(), spec);
 
-            final String trace = harness.holder.session.getDiagnosticTrace();
-            assertTrue("Missing init URL did not fall back for audio: " + trace,
-                    trace.contains("initialization_prefetch_skip itag=" + SMOKE_AUDIO_ITAG));
-            assertTrue("Missing init URL did not fall back for video: " + trace,
-                    trace.contains("initialization_prefetch_skip itag=" + SMOKE_VIDEO_ITAG));
+            assertNull(spec.getAudioFormat().getInitializationUrl());
+            assertNull(spec.getVideoFormat().getInitializationUrl());
         }
     }
 
@@ -719,7 +728,8 @@ public final class SabrPlaybackSmokeTest {
                 context instanceof App);
 
         final Bundle arguments = InstrumentationRegistry.getArguments();
-        final String url = arguments.getString("url", DEFAULT_URL);
+        final String url = arguments.getString("url",
+                smokeCase.isSponsorBlockCase() ? RICKROLL_URL : DEFAULT_URL);
         final String client = arguments.getString("youtubeClient", "mweb");
         NewPipe.setYoutubePlayerClient(client);
 
@@ -739,27 +749,39 @@ public final class SabrPlaybackSmokeTest {
                 new BoundedQualityResolver(maxVideoHeight, targetCodec));
         final MediaSource mediaSource = resolver.resolve(info);
         assertNotNull("VideoPlaybackResolver returned no MediaSource", mediaSource);
+        assertNull("Resolving a SABR MediaSource eagerly created a session",
+                findHolder(info.getId()));
+        final long tailStartPositionMs;
+        if (smokeCase.isSponsorBlockCase()) {
+            final long extractedDurationMs = info.getDuration() * 1000L;
+            assertTrue("Video is too short for the SponsorBlock tail test: "
+                    + extractedDurationMs, extractedDurationMs > 30_000);
+            tailStartPositionMs = extractedDurationMs - 30_000;
+        } else {
+            tailStartPositionMs = C.TIME_UNSET;
+        }
         if (smokeCase.kind == SmokeCase.Kind.STALLED_READER) {
-            try {
-                verifyStalledReaderReadAhead(getHolder(info.getId()));
+            try (SabrSessionStore.Lease lease = acquireSourceLease(context, mediaSource)) {
+                verifyStalledReaderReadAhead(holderOf(lease));
             } finally {
                 SabrSessionStore.evict(info.getId());
             }
             return;
         }
         if (smokeCase.kind == SmokeCase.Kind.REWIND_STATE) {
-            try {
-                verifyRewindResetsSabrState(getHolder(info.getId()));
+            try (SabrSessionStore.Lease lease = acquireSourceLease(context, mediaSource)) {
+                verifyRewindResetsSabrState(holderOf(lease));
             } finally {
                 SabrSessionStore.evict(info.getId());
             }
             return;
         }
         final boolean simulateEvictedRewind = smokeCase.kind == SmokeCase.Kind.EVICTED_REWIND;
-        final SabrSessionStore.Holder injectedHolder =
+        final SabrSessionStore.Lease injectedLease =
                 smokeCase.kind == SmokeCase.Kind.MISSING_INITIALIZATION
-                        ? discardSabrInitialization(info.getId())
-                        : null;
+                        ? acquireSourceLease(context, mediaSource) : null;
+        final SabrSessionStore.Holder injectedHolder = injectedLease == null
+                ? null : discardSabrInitialization(holderOf(injectedLease));
 
         final CountDownLatch ready = new CountDownLatch(1);
         final CountDownLatch firstVideoFrame = new CountDownLatch(1);
@@ -830,6 +852,9 @@ public final class SabrPlaybackSmokeTest {
             player.setVideoSurface(surface);
             player.setVolume(0f);
             player.setMediaSource(mediaSource);
+            if (tailStartPositionMs != C.TIME_UNSET) {
+                player.seekTo(tailStartPositionMs);
+            }
             player.prepare();
             player.play();
             textureRef.set(texture);
@@ -850,9 +875,9 @@ public final class SabrPlaybackSmokeTest {
             if (injectedHolder != null) {
                 verifyInitializationRecovery(injectedHolder);
             }
-            if (smokeCase.kind == SmokeCase.Kind.END_SEEK) {
-                verifyEndSeekReachesEnded(playerRef.get(), seekProcessed, seekPositionReported,
-                        playerError, ended);
+            if (smokeCase.isSponsorBlockCase()) {
+                verifySponsorBlockSkipToEnd(playerRef.get(), smokeCase, tailStartPositionMs,
+                        seekProcessed, seekPositionReported, playerError, ended);
                 return;
             }
 
@@ -949,6 +974,9 @@ public final class SabrPlaybackSmokeTest {
                     texture.release();
                 }
             });
+            if (injectedLease != null) {
+                injectedLease.close();
+            }
             SabrSessionStore.evict(info.getId());
         }
     }
@@ -958,14 +986,65 @@ public final class SabrPlaybackSmokeTest {
     }
 
     private static SabrSessionStore.Holder getHolder(final String videoId) throws Exception {
+        final SabrSessionStore.Holder holder = findHolder(videoId);
+        assertNotNull("SABR session was not created", holder);
+        return holder;
+    }
+
+    private static SabrSessionStore.Holder findHolder(final String videoId) throws Exception {
         final Field sessionsField = SabrSessionStore.class.getDeclaredField("SESSIONS");
         sessionsField.setAccessible(true);
         @SuppressWarnings("unchecked")
-        final Map<String, SabrSessionStore.Holder> sessions =
-                (Map<String, SabrSessionStore.Holder>) sessionsField.get(null);
-        final SabrSessionStore.Holder holder = sessions.get(videoId);
-        assertNotNull("SABR session was not created", holder);
+        final Map<Object, SabrSessionStore.Holder> sessions =
+                (Map<Object, SabrSessionStore.Holder>) sessionsField.get(null);
+        SabrSessionStore.Holder holder = null;
+        for (final SabrSessionStore.Holder candidate : sessions.values()) {
+            if (videoId.equals(candidate.videoId)) {
+                holder = candidate;
+                break;
+            }
+        }
         return holder;
+    }
+
+    private static SabrSessionStore.Lease acquireSourceLease(
+            final Context context, final MediaSource mediaSource) throws Exception {
+        final SabrDashMediaSource sabrSource = findSabrSource(mediaSource);
+        assertNotNull("Expected a SABR child in " + mediaSource.getClass(), sabrSource);
+        final Field specField = SabrDashMediaSource.class.getDeclaredField("spec");
+        specField.setAccessible(true);
+        final SabrSourceSpec spec = (SabrSourceSpec) specField.get(sabrSource);
+        final Method acquire = SabrSessionStore.class.getDeclaredMethod(
+                "acquire", Context.class, SabrSourceSpec.class);
+        acquire.setAccessible(true);
+        return (SabrSessionStore.Lease) acquire.invoke(null, context, spec);
+    }
+
+    private static SabrDashMediaSource findSabrSource(final MediaSource mediaSource)
+            throws Exception {
+        if (mediaSource instanceof SabrDashMediaSource) {
+            return (SabrDashMediaSource) mediaSource;
+        }
+        if (!"androidx.media3.exoplayer.source.MergingMediaSource"
+                .equals(mediaSource.getClass().getName())) {
+            return null;
+        }
+        final Field childrenField = mediaSource.getClass().getDeclaredField("mediaSources");
+        childrenField.setAccessible(true);
+        for (final MediaSource child : (MediaSource[]) childrenField.get(mediaSource)) {
+            final SabrDashMediaSource result = findSabrSource(child);
+            if (result != null) {
+                return result;
+            }
+        }
+        return null;
+    }
+
+    private static SabrSessionStore.Holder holderOf(final SabrSessionStore.Lease lease)
+            throws Exception {
+        final Field holderField = SabrSessionStore.Lease.class.getDeclaredField("holder");
+        holderField.setAccessible(true);
+        return (SabrSessionStore.Holder) holderField.get(lease);
     }
 
     private static void verifyStalledReaderReadAhead(
@@ -1064,37 +1143,65 @@ public final class SabrPlaybackSmokeTest {
                 holder.session.getStreamState().getPlaybackCookie());
     }
 
-    private static void verifyEndSeekReachesEnded(
+    private static void verifySponsorBlockSkipToEnd(
             final ExoPlayer player,
+            final SmokeCase smokeCase,
+            final long tailStartPositionMs,
             final AtomicReference<CountDownLatch> seekProcessed,
             final AtomicReference<Long> seekPositionReported,
             final AtomicReference<PlaybackException> playerError,
             final CountDownLatch ended) throws Exception {
         final long durationMs = durationOf(player);
-        assertTrue("Cannot seek to stream end when duration is unset",
+        assertTrue("Cannot run SponsorBlock tail test when duration is unset",
                 durationMs != C.TIME_UNSET);
-        assertTrue("Video is too short for an end-seek smoke test: " + durationMs,
-                durationMs > 10_000);
+        assertTrue("Video is too short for the SponsorBlock tail test: " + durationMs,
+                durationMs > 30_000);
+        assertTrue("Extractor and player durations disagree: extracted tail start="
+                        + tailStartPositionMs + " player duration=" + durationMs,
+                Math.abs(tailStartPositionMs - (durationMs - 30_000)) <= 1_000);
+        final long sponsorStartMs = durationMs - 20_000;
 
+        assertTrue("Playback did not start near duration - 30s: requested="
+                        + tailStartPositionMs + " current=" + positionOf(player),
+                positionOf(player) >= tailStartPositionMs - 1_000
+                        && positionOf(player) < sponsorStartMs);
+        if (smokeCase.kind == SmokeCase.Kind.SPONSOR_BLOCK_PLAYBACK) {
+            waitForPosition(player, sponsorStartMs, PLAYBACK_TIMEOUT_SECONDS);
+        } else {
+            waitForPosition(player, tailStartPositionMs + 5_000, PLAYBACK_TIMEOUT_SECONDS);
+            seekAndAssertPosition(player, sponsorStartMs, "SponsorBlock start",
+                    seekProcessed, seekPositionReported);
+        }
+
+        seekAndAssertPosition(player, durationMs, "SponsorBlock end",
+                seekProcessed, seekPositionReported);
+        assertTrue("Player did not reach ENDED after SponsorBlock skipped to duration",
+                ended.await(PLAYBACK_TIMEOUT_SECONDS, TimeUnit.SECONDS));
+        assertNull("Player failed after SponsorBlock skipped to duration", playerError.get());
+    }
+
+    private static void seekAndAssertPosition(
+            final ExoPlayer player,
+            final long positionMs,
+            final String description,
+            final AtomicReference<CountDownLatch> seekProcessed,
+            final AtomicReference<Long> seekPositionReported) throws Exception {
         seekProcessed.set(new CountDownLatch(1));
         seekPositionReported.set(null);
         InstrumentationRegistry.getInstrumentation().runOnMainSync(
-                () -> player.seekTo(durationMs));
-        assertTrue("Player did not report processing the end seek",
+                () -> player.seekTo(positionMs));
+        assertTrue("Player did not report processing the " + description + " seek",
                 seekProcessed.get().await(10, TimeUnit.SECONDS));
-        assertNotNull("End seek did not report a new position", seekPositionReported.get());
-        assertTrue("End seek landed outside the expected tail: duration=" + durationMs
+        assertNotNull(description + " seek did not report a new position",
+                seekPositionReported.get());
+        assertTrue(description + " seek landed outside the expected position: requested="
+                        + positionMs
                         + " reported=" + seekPositionReported.get(),
-                seekPositionReported.get() >= durationMs - 1_000
-                        && seekPositionReported.get() <= durationMs);
-        assertTrue("Player did not reach ENDED after seeking to stream end",
-                ended.await(PLAYBACK_TIMEOUT_SECONDS, TimeUnit.SECONDS));
-        assertNull("Player failed after seeking to stream end", playerError.get());
+                Math.abs(seekPositionReported.get() - positionMs) <= 1_000);
     }
 
     private static SabrSessionStore.Holder discardSabrInitialization(
-            final String videoId) throws Exception {
-        final SabrSessionStore.Holder holder = getHolder(videoId);
+            final SabrSessionStore.Holder holder) throws Exception {
         holder.session.pumpOnce(new Localization("en", "US"));
         final SabrSegmentRequest audioInit =
                 SabrSegmentRequest.initialization(holder.audioFormat);
@@ -1565,7 +1672,8 @@ public final class SabrPlaybackSmokeTest {
             EVICTED_REWIND,
             STALLED_READER,
             REWIND_STATE,
-            END_SEEK
+            SPONSOR_BLOCK_PLAYBACK,
+            SPONSOR_BLOCK_SEEK
         }
 
         private final Kind kind;
@@ -1594,8 +1702,16 @@ public final class SabrPlaybackSmokeTest {
             return new SmokeCase(Kind.REWIND_STATE);
         }
 
-        private static SmokeCase endSeek() {
-            return new SmokeCase(Kind.END_SEEK);
+        private static SmokeCase sponsorBlockPlayback() {
+            return new SmokeCase(Kind.SPONSOR_BLOCK_PLAYBACK);
+        }
+
+        private static SmokeCase sponsorBlockSeek() {
+            return new SmokeCase(Kind.SPONSOR_BLOCK_SEEK);
+        }
+
+        private boolean isSponsorBlockCase() {
+            return kind == Kind.SPONSOR_BLOCK_PLAYBACK || kind == Kind.SPONSOR_BLOCK_SEEK;
         }
     }
 

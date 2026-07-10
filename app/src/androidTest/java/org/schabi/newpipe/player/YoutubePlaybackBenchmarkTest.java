@@ -42,15 +42,21 @@ import org.schabi.newpipe.extractor.stream.AudioStream;
 import org.schabi.newpipe.extractor.stream.DeliveryMethod;
 import org.schabi.newpipe.extractor.stream.StreamInfo;
 import org.schabi.newpipe.extractor.stream.VideoStream;
+import org.schabi.newpipe.player.datasource.SabrDashMediaSource;
 import org.schabi.newpipe.player.datasource.SabrSessionStore;
+import org.schabi.newpipe.player.datasource.SabrSourceSpec;
 import org.schabi.newpipe.player.helper.LegacySubtitleRenderersFactory;
 import org.schabi.newpipe.player.helper.LoadController;
 import org.schabi.newpipe.player.helper.PlayerDataSource;
 import org.schabi.newpipe.player.resolver.QualityResolver;
 import org.schabi.newpipe.player.resolver.VideoPlaybackResolver;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -82,6 +88,10 @@ public final class YoutubePlaybackBenchmarkTest {
         assertTrue(context instanceof App);
         SharedWebViewRuntime.get(context).ensureReady(120_000L, "benchmark WebView warmup");
         final Bundle args = InstrumentationRegistry.getArguments();
+        final String cookieFile = args.getString("cookieFile", "");
+        if (!cookieFile.isEmpty()) {
+            ServiceList.YouTube.setTokens(readTextFile(new File(cookieFile)).trim());
+        }
         final String url = args.getString("url", DEFAULT_URL);
         final int repetitions = positive(args.getString("repetitions", "5"), "repetitions");
         final int warmups = Integer.parseInt(args.getString("warmups", "1"));
@@ -200,12 +210,12 @@ public final class YoutubePlaybackBenchmarkTest {
         final long resolveMs = elapsedMs(resolveStart);
         assertNotNull("Resolver returned no source for " + path.name, source);
         assertNotNull("Resolver did not select a stream for " + path.name, selector.selected);
-        final SabrSessionStore.Holder sabrHolder = path.sourceDelivery == DeliveryMethod.SABR
-                ? sabrHolder(info.getId()) : null;
+        final SabrSessionStore.Lease sabrLease = path.sourceDelivery == DeliveryMethod.SABR
+                ? acquireSourceLease(context, source) : null;
+        final SabrSessionStore.Holder sabrHolder = sabrLease == null
+                ? null : holderOf(sabrLease);
         if (sabrHolder != null) {
             sabrHolder.session.setTraceEnabled(true);
-        } else if (path.sourceDelivery == DeliveryMethod.SABR) {
-            throw new AssertionError("SABR benchmark session was not created");
         }
 
         final AtomicReference<PlaybackException> error = new AtomicReference<>();
@@ -317,7 +327,7 @@ public final class YoutubePlaybackBenchmarkTest {
             if (startPositionMs >= 0) {
                 countRebuffers.set(false);
                 if (path.sourceDelivery == DeliveryMethod.SABR) {
-                    sabrStats = sabrStats(info.getId());
+                    sabrStats = sabrStats(sabrHolder);
                     seekTrace = SeekTrace.fromSabrStartup(sabrHolder, startPositionMs);
                 } else {
                     seekTrace = transfers.finishSeekTrace();
@@ -346,7 +356,7 @@ public final class YoutubePlaybackBenchmarkTest {
                 throwPlayerError(error.get());
                 seekRecoveryMs = elapsedMs(seekStart);
                 if (path.sourceDelivery == DeliveryMethod.SABR) {
-                    sabrStats = sabrStats(info.getId());
+                    sabrStats = sabrStats(sabrHolder);
                     final org.schabi.newpipe.extractor.services.youtube.sabr.YoutubeSabrSession
                             .TraceSnapshot sabrTraceAfter = sabrHolder == null ? null
                             : sabrHolder.session.getTraceSnapshot();
@@ -376,6 +386,9 @@ public final class YoutubePlaybackBenchmarkTest {
                     textureRef.get().release();
                 }
             });
+            if (sabrLease != null) {
+                sabrLease.close();
+            }
             SabrSessionStore.evict(info.getId());
         }
         final long uidRxAfter = TrafficStats.getUidRxBytes(Process.myUid());
@@ -390,19 +403,47 @@ public final class YoutubePlaybackBenchmarkTest {
                 sabrStats, seekTrace);
     }
 
-    private static SabrSessionStore.Holder sabrHolder(final String videoId) throws Exception {
-        final Field sessions = SabrSessionStore.class.getDeclaredField("SESSIONS");
-        sessions.setAccessible(true);
-        @SuppressWarnings("unchecked") final Map<String, SabrSessionStore.Holder> values =
-                (Map<String, SabrSessionStore.Holder>) sessions.get(null);
-        return values.get(videoId);
+    private static SabrSessionStore.Lease acquireSourceLease(
+            final Context context, final MediaSource mediaSource) throws Exception {
+        final SabrDashMediaSource sabrSource = findSabrSource(mediaSource);
+        assertNotNull("Expected a SABR child in " + mediaSource.getClass(), sabrSource);
+        final Field specField = SabrDashMediaSource.class.getDeclaredField("spec");
+        specField.setAccessible(true);
+        final SabrSourceSpec spec = (SabrSourceSpec) specField.get(sabrSource);
+        final Method acquire = SabrSessionStore.class.getDeclaredMethod(
+                "acquire", Context.class, SabrSourceSpec.class);
+        acquire.setAccessible(true);
+        return (SabrSessionStore.Lease) acquire.invoke(null, context, spec);
     }
 
-    private static SabrStats sabrStats(final String videoId) throws Exception {
-        final SabrSessionStore.Holder holder = sabrHolder(videoId);
-        if (holder == null) {
-            return SabrStats.EMPTY;
+    private static SabrDashMediaSource findSabrSource(final MediaSource mediaSource)
+            throws Exception {
+        if (mediaSource instanceof SabrDashMediaSource) {
+            return (SabrDashMediaSource) mediaSource;
         }
+        if (!"androidx.media3.exoplayer.source.MergingMediaSource"
+                .equals(mediaSource.getClass().getName())) {
+            return null;
+        }
+        final Field childrenField = mediaSource.getClass().getDeclaredField("mediaSources");
+        childrenField.setAccessible(true);
+        for (final MediaSource child : (MediaSource[]) childrenField.get(mediaSource)) {
+            final SabrDashMediaSource result = findSabrSource(child);
+            if (result != null) {
+                return result;
+            }
+        }
+        return null;
+    }
+
+    private static SabrSessionStore.Holder holderOf(final SabrSessionStore.Lease lease)
+            throws Exception {
+        final Field holderField = SabrSessionStore.Lease.class.getDeclaredField("holder");
+        holderField.setAccessible(true);
+        return (SabrSessionStore.Holder) holderField.get(lease);
+    }
+
+    private static SabrStats sabrStats(final SabrSessionStore.Holder holder) {
         final SabrNextRequestPolicy policy = holder.session.getStreamState()
                 .getNextRequestPolicy();
         return new SabrStats(holder.session.getTotalResponseBytes(),
@@ -413,6 +454,18 @@ public final class YoutubePlaybackBenchmarkTest {
                 policy == null ? -1 : policy.getMinAudioReadaheadMs(),
                 policy == null ? -1 : policy.getMinVideoReadaheadMs(),
                 policy == null ? -1 : policy.getMaxTimeSinceLastRequestMs());
+    }
+
+    private static String readTextFile(final File file) throws Exception {
+        try (FileInputStream input = new FileInputStream(file);
+             ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            final byte[] buffer = new byte[4096];
+            int read;
+            while ((read = input.read(buffer)) != -1) {
+                output.write(buffer, 0, read);
+            }
+            return new String(output.toByteArray(), StandardCharsets.UTF_8);
+        }
     }
 
     private static JSONObject summarize(final Path path, final List<Result> all,

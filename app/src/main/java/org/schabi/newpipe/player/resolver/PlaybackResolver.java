@@ -49,11 +49,11 @@ import org.schabi.newpipe.player.mediaitem.StreamInfoTag;
 import org.schabi.newpipe.util.StreamTypeUtil;
 import org.schabi.newpipe.App;
 import org.schabi.newpipe.extractor.exceptions.ExtractionException;
-import org.schabi.newpipe.extractor.localization.Localization;
 import org.schabi.newpipe.extractor.services.youtube.sabr.YoutubeSabrFormat;
 import org.schabi.newpipe.extractor.services.youtube.sabr.YoutubeSabrInfo;
 import org.schabi.newpipe.player.datasource.SabrDashMediaSource;
 import org.schabi.newpipe.player.datasource.SabrSessionStore;
+import org.schabi.newpipe.player.datasource.SabrSourceSpec;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -469,20 +469,19 @@ public interface PlaybackResolver extends Resolver<StreamInfo, MediaSource> {
         final int preferredVideoItag =
                 (stream instanceof VideoStream) ? ((VideoStream) stream).getItag() : 0;
         final YoutubeSabrInfo sabrInfo = getSabrInfo(stream);
-        final SabrSessionStore.Holder holder;
+        final SabrSourceSpec spec;
         try {
-            holder = SabrSessionStore.getOrCreate(App.getApp(), videoId, preferredVideoItag,
-                    sabrInfo);
+            spec = SabrSessionStore.createSourceSpec(videoId, preferredVideoItag, sabrInfo);
         } catch (final ExtractionException e) {
-            throw new IOException("Could not start SABR session for " + videoId, e);
+            throw new IOException("Could not describe SABR source for " + videoId, e);
         }
-        enrichSabrAudioTracks(streamInfo, holder.info);
+        enrichSabrAudioTracks(streamInfo, spec.getInfo());
         final MediaItem mediaItem = new MediaItem.Builder()
                 .setTag(metadata)
                 .setUri(Uri.parse("sabr://" + videoId))
                 .setCustomCacheKey(cacheKey)
                 .build();
-        return new SabrDashMediaSource(mediaItem, holder, new Localization("en", "US"));
+        return new SabrDashMediaSource(App.getApp(), mediaItem, spec);
     }
 
     @Nullable

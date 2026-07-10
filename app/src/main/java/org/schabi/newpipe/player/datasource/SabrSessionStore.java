@@ -18,26 +18,98 @@ import org.schabi.newpipe.extractor.services.youtube.sabr.YoutubeSabrSession;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.IdentityHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public final class SabrSessionStore {
 
     private static final String TAG = "SabrSessionStore";
 
-    private static final Map<String, Holder> SESSIONS = new ConcurrentHashMap<>();
+    private static final Map<SessionKey, Holder> SESSIONS = new ConcurrentHashMap<>();
     private static final Map<String, String> PREFERRED_AUDIO = new ConcurrentHashMap<>();
-    // Previous, current, and next video, matching MediaSourceManager's playback window.
+    // Active MediaPeriods own leases. MediaSources outside the playback window are lightweight and
+    // therefore do not prevent old sessions from being trimmed.
     // Mutated only under the class lock.
     private static final int MAX_SESSIONS = 3;
-    private static final java.util.Deque<String> ORDER = new java.util.ArrayDeque<>();
+    private static final java.util.Deque<SessionKey> ORDER = new java.util.ArrayDeque<>();
     private static volatile LocalDomPoTokenProvider sharedProvider;
 
     private SabrSessionStore() {
+    }
+
+    private static final class SessionKey {
+        @NonNull private final String videoId;
+        private final long sourceId;
+        private final int videoItag;
+        private final int audioItag;
+        @NonNull private final String audioTrackId;
+        @NonNull private final YoutubeSabrClientProfile profile;
+
+        SessionKey(final long sourceId,
+                   @NonNull final String videoId,
+                   @NonNull final YoutubeSabrInfo info,
+                   @NonNull final YoutubeSabrFormat audioFormat,
+                   @NonNull final YoutubeSabrFormat videoFormat) {
+            this.videoId = videoId;
+            this.sourceId = sourceId;
+            this.videoItag = videoFormat.getItag();
+            this.audioItag = audioFormat.getItag();
+            this.audioTrackId = Objects.toString(audioFormat.getAudioTrackId(), "");
+            this.profile = info.getProfile();
+        }
+
+        @Override
+        public boolean equals(final Object other) {
+            if (this == other) {
+                return true;
+            }
+            if (!(other instanceof SessionKey)) {
+                return false;
+            }
+            final SessionKey that = (SessionKey) other;
+            return sourceId == that.sourceId
+                    && videoItag == that.videoItag
+                    && audioItag == that.audioItag
+                    && videoId.equals(that.videoId)
+                    && audioTrackId.equals(that.audioTrackId)
+                    && profile == that.profile;
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(sourceId, videoId, videoItag, audioItag, audioTrackId, profile);
+        }
+    }
+
+    public static final class Lease implements AutoCloseable {
+        @NonNull private final SessionKey key;
+        @NonNull private final Holder holder;
+        private final AtomicBoolean closed = new AtomicBoolean();
+
+        Lease(@NonNull final SessionKey key, @NonNull final Holder holder) {
+            this.key = key;
+            this.holder = holder;
+        }
+
+        @NonNull
+        Holder getHolder() {
+            return holder;
+        }
+
+        @Override
+        public void close() {
+            if (closed.compareAndSet(false, true)) {
+                releaseLease(key, holder);
+            }
+        }
     }
 
     @NonNull
@@ -56,6 +128,7 @@ public final class SabrSessionStore {
     }
 
     public static final class Holder {
+        @NonNull private final SessionKey key;
         @NonNull private final Context appContext;
         @NonNull public final String videoId;
         @NonNull public final YoutubeSabrInfo info;
@@ -72,7 +145,7 @@ public final class SabrSessionStore {
         // renderer, so requiring a video reader position there pins the SABR cache at the beginning.
         private final Set<Integer> activeReaderItags =
                 Collections.newSetFromMap(new ConcurrentHashMap<Integer, Boolean>());
-        private final AtomicInteger sourceReferences = new AtomicInteger();
+        private final AtomicInteger leaseReferences = new AtomicInteger();
         private Object readerOwner;
         private long readerGeneration;
         private volatile SabrStreamPump pump;
@@ -88,12 +161,26 @@ public final class SabrSessionStore {
                @NonNull final YoutubeSabrSession session,
                @NonNull final YoutubeSabrFormat audioFormat,
                @NonNull final YoutubeSabrFormat videoFormat) {
+            this.key = new SessionKey(0, videoId, info, audioFormat, videoFormat);
             this.appContext = appContext.getApplicationContext();
             this.videoId = videoId;
             this.info = info;
             this.session = session;
             this.audioFormat = audioFormat;
             this.videoFormat = videoFormat;
+        }
+
+        Holder(@NonNull final Context appContext,
+               @NonNull final SabrSourceSpec spec,
+               @NonNull final YoutubeSabrSession session) {
+            this.key = new SessionKey(spec.getSourceId(), spec.getVideoId(), spec.getInfo(),
+                    spec.getAudioFormat(), spec.getVideoFormat());
+            this.appContext = appContext.getApplicationContext();
+            this.videoId = spec.getVideoId();
+            this.info = spec.getInfo();
+            this.session = session;
+            this.audioFormat = spec.getAudioFormat();
+            this.videoFormat = spec.getVideoFormat();
         }
 
         public long getPlayerTimeMs() {
@@ -223,15 +310,12 @@ public final class SabrSessionStore {
             initializationData.put(itag, data);
         }
 
-        void retainSource() {
-            sourceReferences.incrementAndGet();
+        private void retainLease() {
+            leaseReferences.incrementAndGet();
         }
 
-        void releaseSource() {
-            final int refs = sourceReferences.decrementAndGet();
-            if (refs <= 0) {
-                evict(videoId, this, "sources_released refs=" + refs);
-            }
+        private boolean hasLeaseReferences() {
+            return leaseReferences.get() > 0;
         }
 
         private void applyActiveTracks() {
@@ -309,14 +393,14 @@ public final class SabrSessionStore {
 
         String getInvalidationDetails() {
             return "reason=" + stopReason
-                    + ", refs=" + sourceReferences.get()
+                    + ", leases=" + leaseReferences.get()
                     + ", trace=" + session.getDiagnosticTrace();
         }
 
         void failTerminal(@NonNull final SabrLogicException failure) {
             terminalFailure = failure;
             recordDiagnostics("terminal_failure message=" + failure.getMessage());
-            evict(videoId, this, "terminal_failure message=" + failure.getMessage());
+            evict(key, this, "terminal_failure message=" + failure.getMessage(), false);
         }
 
         void throwIfTerminal() throws SabrLogicException {
@@ -327,12 +411,12 @@ public final class SabrSessionStore {
 
         void stop(@NonNull final String reason) {
             Log.w(TAG, "stop video=" + videoId + " reason=" + reason
-                    + " refs=" + sourceReferences.get() + " activeTracks=" + hasActiveTracks()
+                    + " leases=" + leaseReferences.get() + " activeTracks=" + hasActiveTracks()
                     + " pump=" + (pump == null ? "none" : pump.getStateName()));
             recordDiagnostics("stop reason=" + reason);
             stopReason = reason;
             session.addDiagnosticEvent("session_stop reason=" + reason
-                    + " refs=" + sourceReferences.get() + " activeTracks=" + hasActiveTracks());
+                    + " leases=" + leaseReferences.get() + " activeTracks=" + hasActiveTracks());
             invalidated = true;
             synchronized (this) {
                 activeTrackModes.clear();
@@ -371,33 +455,23 @@ public final class SabrSessionStore {
     }
 
     public static void updatePlayerTime(@NonNull final String videoId, final long playerTimeMs) {
-        final Holder holder = SESSIONS.get(videoId);
-        if (holder != null && playerTimeMs >= 0) {
-            holder.setPlayerTimeMs(playerTimeMs);
-            holder.recordDiagnosticsThrottled("progress");
+        if (playerTimeMs < 0) {
+            return;
+        }
+        for (final Map.Entry<SessionKey, Holder> entry : SESSIONS.entrySet()) {
+            if (entry.getKey().videoId.equals(videoId) && entry.getValue().hasLeaseReferences()) {
+                entry.getValue().setPlayerTimeMs(playerTimeMs);
+                entry.getValue().recordDiagnosticsThrottled("progress");
+            }
         }
     }
 
     public static void updatePlaybackRate(@NonNull final String videoId, final float playbackRate) {
-        final Holder holder = SESSIONS.get(videoId);
-        if (holder != null) {
-            holder.session.getStreamState().setPlaybackRate(playbackRate);
+        for (final Map.Entry<SessionKey, Holder> entry : SESSIONS.entrySet()) {
+            if (entry.getKey().videoId.equals(videoId) && entry.getValue().hasLeaseReferences()) {
+                entry.getValue().session.getStreamState().setPlaybackRate(playbackRate);
+            }
         }
-    }
-
-    private static boolean sessionMatchesItag(@NonNull final Holder holder,
-                                              final int preferredVideoItag) {
-        if (preferredVideoItag <= 0) {
-            return true;
-        }
-        final YoutubeSabrFormat wanted = pickVideoFormat(holder.info, preferredVideoItag);
-        return wanted != null && wanted.getItag() == holder.videoFormat.getItag();
-    }
-
-    private static boolean sessionMatchesAudioTrack(@NonNull final Holder holder,
-                                                    @Nullable final String preferredTrackId) {
-        return preferredTrackId == null
-                || preferredTrackId.equals(holder.audioFormat.getAudioTrackId());
     }
 
     @NonNull
@@ -410,64 +484,92 @@ public final class SabrSessionStore {
         }
     }
 
-    public static Holder getOrCreate(@NonNull final Context context,
-                                     @NonNull final String videoId,
-                                     final int preferredVideoItag)
-            throws IOException, ExtractionException {
-        return getOrCreate(context, videoId, preferredVideoItag, null);
-    }
-
-    public static Holder getOrCreate(@NonNull final Context context,
-                                     @NonNull final String videoId,
-                                     final int preferredVideoItag,
-                                     @Nullable final YoutubeSabrInfo extractorInfo)
+    @NonNull
+    public static SabrSourceSpec createSourceSpec(@NonNull final String videoId,
+                                                  final int preferredVideoItag,
+                                                  @Nullable final YoutubeSabrInfo extractorInfo)
             throws IOException, ExtractionException {
         final String preferredAudioTrackId = PREFERRED_AUDIO.get(videoId);
-        final Holder existing = SESSIONS.get(videoId);
-        if (existing != null && sessionMatchesItag(existing, preferredVideoItag)
-                && sessionMatchesAudioTrack(existing, preferredAudioTrackId)) {
-            return existing;
+        final Localization localization = new Localization("en", "US");
+        final ContentCountry contentCountry = new ContentCountry("US");
+        final YoutubeSabrInfo info = isUsableExtractorInfo(extractorInfo, videoId)
+                ? extractorInfo
+                : YoutubeSabrProbeFetch(videoId, localization, contentCountry);
+        final YoutubeSabrFormat audioFormat = pickAudioFormat(info, preferredAudioTrackId);
+        final YoutubeSabrFormat videoFormat = pickVideoFormat(info, preferredVideoItag);
+        if (audioFormat == null || videoFormat == null) {
+            throw new IOException("SABR: could not select audio/video formats for " + videoId);
         }
+        final YoutubeSabrSession initializationSession = new YoutubeSabrSession(
+                info, audioFormat, videoFormat, null, null);
+        final byte[] videoInitializationData = fetchInitializationData(
+                initializationSession, videoFormat, localization, videoId);
+        final byte[] audioInitializationData = fetchInitializationData(
+                initializationSession, audioFormat, localization, videoId);
+        return new SabrSourceSpec(videoId, info, audioFormat, videoFormat, localization,
+                audioInitializationData, videoInitializationData);
+    }
+
+    @Nullable
+    private static byte[] fetchInitializationData(@NonNull final YoutubeSabrSession session,
+                                                  @NonNull final YoutubeSabrFormat format,
+                                                  @NonNull final Localization localization,
+                                                  @NonNull final String videoId) {
+        try {
+            return session.fetchInitializationDataFallback(format, localization);
+        } catch (final IOException e) {
+            Log.d(TAG, "Initialization metadata unavailable video=" + videoId
+                    + " itag=" + format.getItag() + " message=" + e.getMessage());
+            return null;
+        }
+    }
+
+    @NonNull
+    static Lease acquire(@NonNull final Context context, @NonNull final SabrSourceSpec spec)
+            throws IOException, ExtractionException {
+        final SessionKey key = new SessionKey(spec.getSourceId(), spec.getVideoId(), spec.getInfo(),
+                spec.getAudioFormat(), spec.getVideoFormat());
         synchronized (SabrSessionStore.class) {
-            final Holder current = SESSIONS.get(videoId);
+            final Holder current = SESSIONS.get(key);
             if (current != null) {
-                if (sessionMatchesItag(current, preferredVideoItag)
-                        && sessionMatchesAudioTrack(current, preferredAudioTrackId)) {
-                    current.recordDiagnosticsThrottled("session_reuse");
-                    return current;
-                }
-                // A SABR session is locked to its selected formats.
-                evict(videoId, null, "format_change oldVideoItag="
-                        + current.videoFormat.getItag() + " requestedVideoItag="
-                        + preferredVideoItag + " oldAudioTrack="
-                        + current.audioFormat.getAudioTrackId() + " requestedAudioTrack="
-                        + preferredAudioTrackId);
-            }
-            final Localization localization = new Localization("en", "US");
-            final ContentCountry contentCountry = new ContentCountry("US");
-            final YoutubeSabrInfo info = isUsableExtractorInfo(extractorInfo, videoId)
-                    ? extractorInfo
-                    : YoutubeSabrProbeFetch(videoId, localization, contentCountry);
-            final YoutubeSabrFormat audioFormat = pickAudioFormat(info, preferredAudioTrackId);
-            final YoutubeSabrFormat videoFormat = pickVideoFormat(info, preferredVideoItag);
-            if (audioFormat == null || videoFormat == null) {
-                throw new IOException("SABR: could not select audio/video formats for " + videoId);
+                current.retainLease();
+                current.recordDiagnosticsThrottled("session_reuse");
+                return new Lease(key, current);
             }
             final LocalDomPoTokenProvider provider = provider(context);
             final File spoolDirectory = new File(context.getApplicationContext().getCacheDir(),
-                    "sabr-segments/" + videoId + '-' + System.nanoTime());
-            final YoutubeSabrSession session =
-                    new YoutubeSabrSession(info, audioFormat, videoFormat, provider,
-                            spoolDirectory);
-            attachPoToken(videoId, info, provider, session);
-            final Holder holder = new Holder(context.getApplicationContext(), videoId, info,
-                    session, audioFormat, videoFormat);
-            SESSIONS.put(videoId, holder);
-            ORDER.remove(videoId);
-            ORDER.addLast(videoId);
-            trimSessions(videoId);
+                    "sabr-segments/" + spec.getVideoId() + '-' + System.nanoTime());
+            final YoutubeSabrSession session = new YoutubeSabrSession(spec.getInfo(),
+                    spec.getAudioFormat(), spec.getVideoFormat(), provider, spoolDirectory);
+            attachPoToken(spec.getVideoId(), spec.getInfo(), provider, session);
+            final Holder holder = new Holder(context, spec, session);
+            seedInitializationData(holder, spec, spec.getAudioFormat());
+            seedInitializationData(holder, spec, spec.getVideoFormat());
+            SESSIONS.put(key, holder);
+            ORDER.remove(key);
+            ORDER.addLast(key);
+            holder.retainLease();
+            trimSessions(key);
             holder.recordDiagnostics("session_create");
-            return holder;
+            return new Lease(key, holder);
+        }
+    }
+
+    private static void seedInitializationData(@NonNull final Holder holder,
+                                               @NonNull final SabrSourceSpec spec,
+                                               @NonNull final YoutubeSabrFormat format) {
+        final byte[] data = spec.getInitializationData(format.getItag());
+        if (data != null) {
+            holder.setInitializationData(format.getItag(), data);
+            holder.session.getStreamState().ingestInitializationData(format, data);
+        }
+    }
+
+    private static void releaseLease(@NonNull final SessionKey key,
+                                     @NonNull final Holder holder) {
+        final int references = holder.leaseReferences.decrementAndGet();
+        if (references <= 0) {
+            evict(key, holder, "leases_released count=" + references, true);
         }
     }
 
@@ -549,22 +651,39 @@ public final class SabrSessionStore {
     }
 
     public static void evict(@NonNull final String videoId) {
-        evict(videoId, null, "explicit");
+        final List<Holder> holders = new ArrayList<>();
+        synchronized (SabrSessionStore.class) {
+            final java.util.Iterator<Map.Entry<SessionKey, Holder>> iterator =
+                    SESSIONS.entrySet().iterator();
+            while (iterator.hasNext()) {
+                final Map.Entry<SessionKey, Holder> entry = iterator.next();
+                if (entry.getKey().videoId.equals(videoId)) {
+                    holders.add(entry.getValue());
+                    ORDER.remove(entry.getKey());
+                    iterator.remove();
+                }
+            }
+        }
+        for (final Holder holder : holders) {
+            holder.stop("explicit");
+        }
     }
 
-    private static void trimSessions(@Nullable final String protectedVideoId) {
+    private static void trimSessions(@Nullable final SessionKey protectedKey) {
         while (true) {
             final Holder holder;
             synchronized (SabrSessionStore.class) {
                 if (ORDER.size() <= MAX_SESSIONS) {
                     return;
                 }
-                String candidate = null;
-                for (final String videoId : ORDER) {
-                    final Holder current = SESSIONS.get(videoId);
-                    if (!videoId.equals(protectedVideoId)
-                            && current != null && !current.hasActiveTracks()) {
-                        candidate = videoId;
+                SessionKey candidate = null;
+                for (final SessionKey key : ORDER) {
+                    final Holder current = SESSIONS.get(key);
+                    if (!key.equals(protectedKey)
+                            && current != null
+                            && !current.hasActiveTracks()
+                            && !current.hasLeaseReferences()) {
+                        candidate = key;
                         break;
                     }
                 }
@@ -575,22 +694,26 @@ public final class SabrSessionStore {
                 ORDER.remove(candidate);
             }
             if (holder != null) {
-                holder.stop("session_trim protectedVideo=" + protectedVideoId);
+                holder.stop("session_trim protectedVideo="
+                        + (protectedKey == null ? null : protectedKey.videoId));
             }
         }
     }
 
-    private static void evict(@NonNull final String videoId,
+    private static void evict(@NonNull final SessionKey key,
                               @Nullable final Holder expectedHolder,
-                              @NonNull final String reason) {
+                              @NonNull final String reason,
+                              final boolean requireNoLeaseReferences) {
         final Holder holder;
         synchronized (SabrSessionStore.class) {
-            holder = SESSIONS.get(videoId);
-            if (holder == null || (expectedHolder != null && holder != expectedHolder)) {
+            holder = SESSIONS.get(key);
+            if (holder == null
+                    || (expectedHolder != null && holder != expectedHolder)
+                    || (requireNoLeaseReferences && holder.hasLeaseReferences())) {
                 return;
             }
-            SESSIONS.remove(videoId);
-            ORDER.remove(videoId);
+            SESSIONS.remove(key);
+            ORDER.remove(key);
         }
         if (holder != null) {
             holder.stop(reason);

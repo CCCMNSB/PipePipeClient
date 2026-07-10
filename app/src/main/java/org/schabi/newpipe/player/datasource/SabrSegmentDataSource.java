@@ -28,7 +28,10 @@ public final class SabrSegmentDataSource implements DataSource {
     private static final long REFETCH_AFTER_MS = 2_000;
     private static final long FORWARD_SEEK_AHEAD_MS = 30_000;
 
-    private final SabrSessionStore.Holder holder;
+    @Nullable
+    private SabrSessionStore.Holder holder;
+    @Nullable
+    private final SabrSessionHandle sessionHandle;
     private final Object readerOwner;
     @Nullable
     private final YoutubeSabrFormat fixedFormat;
@@ -52,6 +55,7 @@ public final class SabrSegmentDataSource implements DataSource {
                                  final Localization localization,
                                  final boolean prependInit) {
         this.holder = holder;
+        this.sessionHandle = null;
         this.readerOwner = readerOwner;
         this.fixedFormat = format;
         this.localization = localization;
@@ -63,6 +67,19 @@ public final class SabrSegmentDataSource implements DataSource {
                                  final Localization localization,
                                  final boolean prependInit) {
         this.holder = holder;
+        this.sessionHandle = null;
+        this.readerOwner = readerOwner;
+        this.fixedFormat = null;
+        this.localization = localization;
+        this.prependInit = prependInit;
+    }
+
+    SabrSegmentDataSource(final SabrSessionHandle sessionHandle,
+                          final Object readerOwner,
+                          final Localization localization,
+                          final boolean prependInit) {
+        this.holder = null;
+        this.sessionHandle = sessionHandle;
         this.readerOwner = readerOwner;
         this.fixedFormat = null;
         this.localization = localization;
@@ -75,6 +92,12 @@ public final class SabrSegmentDataSource implements DataSource {
 
     @Override
     public long open(final DataSpec dataSpec) throws IOException {
+        if (holder == null) {
+            if (sessionHandle == null) {
+                throw new IOException("SABR data source has no session handle");
+            }
+            holder = sessionHandle.acquireHolder();
+        }
         this.uri = dataSpec.uri;
         this.canceled = false;
         closeDataStream();

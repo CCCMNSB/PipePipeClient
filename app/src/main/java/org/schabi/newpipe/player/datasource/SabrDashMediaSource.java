@@ -1,5 +1,6 @@
 package org.schabi.newpipe.player.datasource;
 
+import android.content.Context;
 import android.net.Uri;
 import android.util.Log;
 
@@ -29,6 +30,7 @@ import androidx.media3.exoplayer.upstream.Allocator;
 
 import org.schabi.newpipe.extractor.localization.Localization;
 import org.schabi.newpipe.extractor.services.youtube.sabr.YoutubeSabrFormat;
+import org.schabi.newpipe.extractor.services.youtube.sabr.YoutubeSabrStreamState;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -42,51 +44,35 @@ public final class SabrDashMediaSource extends CompositeMediaSource<Integer> {
     private static final long END_SEEK_BACKOFF_US = 1_000L;
 
     private final MediaItem mediaItem;
-    private final SabrSessionStore.Holder holder;
+    private final SabrSourceSpec spec;
+    private final SabrSessionHandle sessionHandle;
     private final Localization localization;
+    private final YoutubeSabrStreamState manifestState;
     private final long durationUs;
     private final DashMediaSource childSource;
     private final PlaybackState playbackState = new PlaybackState();
-    private boolean released;
-
-    public SabrDashMediaSource(final MediaItem mediaItem,
-                               final SabrSessionStore.Holder holder,
-                               final Localization localization) throws IOException {
+    public SabrDashMediaSource(@NonNull final Context context,
+                               @NonNull final MediaItem mediaItem,
+                               @NonNull final SabrSourceSpec spec) throws IOException {
         this.mediaItem = mediaItem;
-        this.holder = holder;
-        this.localization = localization;
-        this.holder.retainSource();
+        this.spec = spec;
+        this.localization = spec.getLocalization();
+        this.manifestState = spec.newStreamState();
+        this.sessionHandle = new SabrSessionHandle(context, spec);
         this.playbackState.setReaderOwner(this);
-        final long durationMs = streamDurationMs(holder);
+        final long durationMs = spec.getDurationMs();
         this.durationUs = durationMs > 0 ? durationMs * 1000L : C.TIME_UNSET;
-        preloadInitialization(holder.videoFormat);
-        preloadInitialization(holder.audioFormat);
         final DataSource.Factory sabrDataSourceFactory =
-                () -> new SabrSegmentDataSource(holder, playbackState.getReaderOwner(),
+                () -> new SabrSegmentDataSource(sessionHandle, playbackState.getReaderOwner(),
                         localization, /* prependInit= */ false);
-        final DashManifest manifest = buildManifest(holder, durationMs);
+        final DashManifest manifest = buildManifest(spec, manifestState, durationMs);
         this.childSource = new DashMediaSource.Factory(
                 new DefaultDashChunkSource.Factory(sabrDataSourceFactory),
                 /* manifestDataSourceFactory= */ null)
                 .createMediaSource(manifest, mediaItem);
-        Log.d(TAG, "create source video=" + holder.videoId
-                + " videoItag=" + holder.videoFormat.getItag()
-                + " audioItag=" + holder.audioFormat.getItag());
-    }
-
-    private void preloadInitialization(final YoutubeSabrFormat format) throws IOException {
-        if (holder.getInitializationData(format.getItag()) != null) {
-            return;
-        }
-        try {
-            final byte[] data = holder.session.fetchInitializationDataFallback(format, localization);
-            holder.setInitializationData(format.getItag(), data);
-        } catch (final IOException e) {
-            holder.session.addDiagnosticEvent("initialization_prefetch_skip itag="
-                    + format.getItag()
-                    + " type=" + e.getClass().getSimpleName()
-                    + " message=" + e.getMessage());
-        }
+        Log.d(TAG, "create source video=" + spec.getVideoId()
+                + " videoItag=" + spec.getVideoFormat().getItag()
+                + " audioItag=" + spec.getAudioFormat().getItag());
     }
 
     @NonNull
@@ -111,39 +97,40 @@ public final class SabrDashMediaSource extends CompositeMediaSource<Integer> {
     @Override
     public MediaPeriod createPeriod(final MediaPeriodId id, final Allocator allocator,
                                     final long startPositionUs) {
-        if (startPositionUs > 0) {
-            holder.setPlayerTimeMs(startPositionUs / 1000L);
+        sessionHandle.onPeriodCreated(Math.max(0, startPositionUs / 1000L));
+        try {
+            final MediaPeriod child = childSource.createPeriod(id, allocator, startPositionUs);
+            final SabrDashMediaPeriod period = new SabrDashMediaPeriod(child);
+            playbackState.setReaderOwner(period);
+            Log.d(TAG, "createPeriod video=" + spec.getVideoId()
+                    + " startUs=" + startPositionUs);
+            return period;
+        } catch (final RuntimeException e) {
+            sessionHandle.onPeriodReleased();
+            throw e;
         }
-        final MediaPeriod child = childSource.createPeriod(id, allocator, startPositionUs);
-        final SabrDashMediaPeriod period = new SabrDashMediaPeriod(child);
-        playbackState.setReaderOwner(period);
-        Log.d(TAG, "createPeriod video=" + holder.videoId + " startUs=" + startPositionUs);
-        return period;
     }
 
     @Override
     public void releasePeriod(final MediaPeriod mediaPeriod) {
-        Log.d(TAG, "releasePeriod video=" + holder.videoId);
+        Log.d(TAG, "releasePeriod video=" + spec.getVideoId());
         final SabrDashMediaPeriod period = (SabrDashMediaPeriod) mediaPeriod;
         period.release();
-        childSource.releasePeriod(period.child);
+        try {
+            childSource.releasePeriod(period.child);
+        } finally {
+            sessionHandle.onPeriodReleased();
+        }
     }
 
     @Override
     protected void releaseSourceInternal() {
-        if (!released) {
-            released = true;
-            Log.d(TAG, "release source video=" + holder.videoId);
-            holder.releaseSource();
-        }
+        Log.d(TAG, "release source video=" + spec.getVideoId());
+        sessionHandle.close();
     }
 
-    private static long streamDurationMs(final SabrSessionStore.Holder holder) {
-        return Math.max(holder.audioFormat.getApproxDurationMs(),
-                holder.videoFormat.getApproxDurationMs());
-    }
-
-    private static DashManifest buildManifest(final SabrSessionStore.Holder holder,
+    private static DashManifest buildManifest(final SabrSourceSpec spec,
+                                              final YoutubeSabrStreamState state,
                                               final long durationMs)
             throws IOException {
         final String mpd = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
@@ -152,18 +139,18 @@ public final class SabrDashMediaSource extends CompositeMediaSource<Integer> {
                 + "minBufferTime=\"PT1.5S\" mediaPresentationDuration=\""
                 + formatDuration(durationMs) + "\">"
                 + "<Period id=\"0\" start=\"PT0S\">"
-                + adaptationSet(holder, holder.videoFormat, C.TRACK_TYPE_VIDEO)
-                + adaptationSet(holder, holder.audioFormat, C.TRACK_TYPE_AUDIO)
+                + adaptationSet(state, spec.getVideoFormat(), C.TRACK_TYPE_VIDEO)
+                + adaptationSet(state, spec.getAudioFormat(), C.TRACK_TYPE_AUDIO)
                 + "</Period></MPD>";
         try {
-            return new DashManifestParser().parse(Uri.parse("sabr://" + holder.videoId),
+            return new DashManifestParser().parse(Uri.parse("sabr://" + spec.getVideoId()),
                     new ByteArrayInputStream(mpd.getBytes(StandardCharsets.UTF_8)));
         } catch (final IOException e) {
             throw new IOException("Error when parsing generated SABR DASH manifest", e);
         }
     }
 
-    private static String adaptationSet(final SabrSessionStore.Holder holder,
+    private static String adaptationSet(final YoutubeSabrStreamState state,
                                         final YoutubeSabrFormat format,
                                         final int trackType) {
         final String mime = containerMimeType(format);
@@ -187,15 +174,15 @@ public final class SabrDashMediaSource extends CompositeMediaSource<Integer> {
         }
         builder.append(">")
                 .append("<BaseURL>sabrseg://").append(format.getItag()).append("/</BaseURL>")
-                .append(segmentTemplate(holder, format, trackType))
+                .append(segmentTemplate(state, format, trackType))
                 .append("</Representation></AdaptationSet>");
         return builder.toString();
     }
 
-    private static String segmentTemplate(final SabrSessionStore.Holder holder,
+    private static String segmentTemplate(final YoutubeSabrStreamState state,
                                           final YoutubeSabrFormat format,
                                           final int trackType) {
-        final long endSegment = holder.session.getStreamState().getEndSegment(format);
+        final long endSegment = state.getEndSegment(format);
         if (endSegment <= 0 || endSegment > 10_000) {
             final int segmentDurationMs = trackType == C.TRACK_TYPE_AUDIO ? 10_000 : 5_000;
             return "<SegmentTemplate timescale=\"1000\" startNumber=\"1\" duration=\""
@@ -206,9 +193,8 @@ public final class SabrDashMediaSource extends CompositeMediaSource<Integer> {
                 .append("initialization=\"init\" media=\"$Number$\">")
                 .append("<SegmentTimeline>");
         for (int sequence = 1; sequence <= endSegment; sequence++) {
-            final long startMs = holder.session.getStreamState().getSegmentStartMs(
-                    format, sequence);
-            final long endMs = holder.session.getStreamState().getSegmentEndMs(format, sequence);
+            final long startMs = state.getSegmentStartMs(format, sequence);
+            final long endMs = state.getSegmentEndMs(format, sequence);
             final long durationMs = Math.max(1, endMs - startMs);
             builder.append("<S t=\"").append(Math.max(0, startMs))
                     .append("\" d=\"").append(durationMs).append("\"/>");
@@ -321,16 +307,16 @@ public final class SabrDashMediaSource extends CompositeMediaSource<Integer> {
                     continue;
                 }
                 final Format format = selection.getSelectedFormat();
-                if (format != null && String.valueOf(holder.videoFormat.getItag())
+                if (format != null && String.valueOf(spec.getVideoFormat().getItag())
                         .equals(format.id)) {
                     videoActive = true;
-                } else if (format != null && String.valueOf(holder.audioFormat.getItag())
+                } else if (format != null && String.valueOf(spec.getAudioFormat().getItag())
                         .equals(format.id)) {
                     audioActive = true;
                 }
             }
-            holder.setActiveTracks(this, videoActive, audioActive);
-            Log.d(TAG, "activeTracks video=" + holder.videoId
+            sessionHandle.setActiveTracks(this, videoActive, audioActive);
+            Log.d(TAG, "activeTracks video=" + spec.getVideoId()
                     + " video=" + videoActive + " audio=" + audioActive);
             return videoActive || audioActive;
         }
@@ -347,9 +333,9 @@ public final class SabrDashMediaSource extends CompositeMediaSource<Integer> {
                 return;
             }
             final long normalizedTargetUs = normalizeSeekPositionUs(targetUs);
-            Log.d(TAG, "initialStart video=" + holder.videoId
+            Log.d(TAG, "initialStart video=" + spec.getVideoId()
                     + " positionUs=" + normalizedTargetUs);
-            holder.requestSeek(normalizedTargetUs / 1000L, localization);
+            sessionHandle.requestSeek(normalizedTargetUs / 1000L);
         }
 
         private long validPositionUs(final long positionUs) {
@@ -369,9 +355,9 @@ public final class SabrDashMediaSource extends CompositeMediaSource<Integer> {
         @Override
         public long seekToUs(final long positionUs) {
             playbackState.setReaderOwner(this);
-            holder.advanceReaderGeneration(this);
+            sessionHandle.advanceReaderGeneration(this);
             final long normalizedPositionUs = normalizeSeekPositionUs(positionUs);
-            holder.requestSeek(normalizedPositionUs / 1000L, localization);
+            sessionHandle.requestSeek(normalizedPositionUs / 1000L);
             return child.seekToUs(normalizedPositionUs);
         }
 
@@ -413,10 +399,10 @@ public final class SabrDashMediaSource extends CompositeMediaSource<Integer> {
                 return positionUs;
             }
             final long positionMs = Math.max(0, positionUs / 1000L);
-            final int currentSequence = holder.session.getStreamState()
-                    .getSegmentNumberAtOrAfterTimeMs(holder.videoFormat, positionMs);
-            final long nextStartMs = holder.session.getStreamState()
-                    .getSegmentStartMs(holder.videoFormat, currentSequence + 1);
+            final int currentSequence = manifestState.getSegmentNumberAtOrAfterTimeMs(
+                    spec.getVideoFormat(), positionMs);
+            final long nextStartMs = manifestState.getSegmentStartMs(
+                    spec.getVideoFormat(), currentSequence + 1);
             final long nextStartUs = nextStartMs * 1000L;
             if (nextStartUs > positionUs
                     && nextStartUs - positionUs <= toleranceUs) {
@@ -451,7 +437,7 @@ public final class SabrDashMediaSource extends CompositeMediaSource<Integer> {
         }
 
         private void release() {
-            holder.releaseTracks(this);
+            sessionHandle.releaseTracks(this);
             if (callback != null) {
                 callback = null;
             }
