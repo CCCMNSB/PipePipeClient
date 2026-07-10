@@ -44,7 +44,7 @@ internal object SabrDownloadFormatResolver {
             } else {
                 null
             }
-            ?: info.findBestVideoFormat()
+            ?: info.findLowestVideoFormat()
             ?: throw SabrDownloadException(
                 SabrDownloadException.Reason.FORMAT,
                 "SABR download failed: missing video format",

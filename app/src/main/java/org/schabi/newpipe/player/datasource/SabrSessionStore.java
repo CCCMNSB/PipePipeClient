@@ -647,7 +647,7 @@ public final class SabrSessionStore {
                 }
             }
         }
-        return info.findBestVideoFormat();
+        return info.findLowestVideoFormat();
     }
 
     public static void evict(@NonNull final String videoId) {
