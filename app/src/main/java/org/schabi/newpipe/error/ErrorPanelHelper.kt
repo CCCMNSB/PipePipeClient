@@ -118,8 +118,6 @@ class ErrorPanelHelper(
                     (errorInfo.throwable as AccountTerminatedException).message
                 errorServiceExplanationTextView.isVisible = true
             }
-        } else if (errorInfo.throwable is WebViewUnavailableException) {
-            errorTextView.setText(R.string.webview_unavailable_youtube_hint)
         } else {
             showAndSetErrorButtonAction(
                 R.string.error_snackbar_action
