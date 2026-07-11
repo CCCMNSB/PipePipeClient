@@ -124,7 +124,7 @@
 <item quantity="other">%s odpowiedzi</item>
     </plurals>
     <string name="random_play_order_summary">Automatycznie odtwarzaj losowo w twoich lokalnych playlistach, gdy odtwarzasz w tle</string>
-    <string name="update_log">### Nowe funkcje\n\n- Dodano eksperymentalne wsparcie dla protokołu SABR YouTube, z opcją wymuszenia jego włączenia w Zaawansowanych ustawieniach (YouTube)\n- Wsparcie dla pobierania filmów będąc zalogowanym (YouTube)\n- Ponownie dodano automatycznie tłumaczone napisy (działa tylko po zalogowaniu na konto) (YouTube)\n- Wsparcie dla wyszukiwania filmów w konkretnym kanale  (YouTube)\n- Wsparcie dla sortowania filmów w kanale (YouTube)\n- Pozostawienie ostatnio wybranych filtrów wyszukiwania\n- Wsparcie dla niestadardowych proporcji w odtwarzaczu wideo\n- Wsparcie dla ustawienia paska kart na dole strony głównej\n- Wsparcie dla ikony zgodnej z motywem\n\n### Poprawki błędów\n\n- Naprawienie niektórych filmów które nie chciały się przetworzyć i wyświetlały błąd treść niedostępna (YouTube)\n- Naprawienie wszystkich playlist pokazujących się jako puste (YouTube)\n- Naprawiono brakujące daty dodania \"Podobnych filmów\" na stronie wideo (YouTube)\n- Naprawienie automatycznego wybierania największej rozdzielczości, gdy najniższa dostępna rozdzielczość filmu jest mniejsza niż domyślne ustawienie\n- Naprawienie niepoprawnego aktualizowania znaczników segmentów SponsorBlock podczas przełączania filmów w tej samej kolejce\n- Naprawiono funkcję \"Wyślij Email\" niemogącą poprawnie zidentyfikować zainstalowanych aplikacji email na urządzeniu\n- Naprawiono błąd w którym wszystkie filmy na playliście pokazywały twórcę playlisty jako twórce filmów (YouTube)\n- Naprawiono błędy odtwarzania powodujące niechciane zatrzymania odtwarzania (Bilibili)\n- Naprawiono niedziałające pobieranie na architekturach armv7 i x86 (Bilibili, Niconico)\n- Naprawiono przetwarzanie krótkich linków `b23.tv` (Bilibili)\n- Naprawiono ignorowanie znaczników czasu w linkach (Niconico)\n- Naprawiono wyświetlanie komentarzy, gdy włączony był nowy eksperymentalny interfejs\n- Naprawiono awarie aplikacji w konkretnych przypadkach\n\n### Interfejs\n\n- Usunięto rekomendację włączenia dedykowanego kanału i przeniesiono powiązane ustawienie do ustawień zaawansowanych\n- Zaktualizowano wyświetlanie przycisku historii wyszukiwania w głównej karcie aby, uniknąć zduplikowanych ikon\n-Zaktualizowano rosyjskie tłumaczenie\n- Dodano Polskie tłumaczenie\n\n### Inne\n\n- Pełne wsparcie dla 16KB rozmiaru strony, lekko poprawiając wydajność na Androidzie 16+\n- Zaktualizowano target SDK do 36\n- Poprawa stabilności</string>
+    <string name="update_log">To wydanie naprawia błąd powstrzymujący poprawne odtwarzanie filmów na Youtube. \n\nYouTube ostatnio wyłączył wszystkie metody które były wcześniej używane do przechwytywania strumieni wideo, co powodowało niedziałanie filmów i transmisji na żywo dla prawie wszystkich użytkowników, wliczając w to tych którzy byli zalogowani do YouTube w ustawieniach. Po pilnych poprawkach, zmigrowaliśmy na nowy protokół SABR YouTube'a, aby przywrócić odtwarzanie.\n\nNowe w 5.2.2: Dodaliśmy kilka zapasowych endpointów wydobywania jako tymaczasowe obejście problemu dla użytkowników którzy odczuwają niestabilność z SABR. Jeżeli filmy nie odtwarzają się poprawnie, przejdź do Ustawienia → Zaawansowane → Endpoint wydobywania YouTube i spróbuj przełączyć go na inny i sprawdź czy naprawi to problem. \n\nYouTube często się zmienia, więc sprawdzaj często czy są nowe aktualizacje, aby wszystko dobrze działało.</string>
     <string name="speeding_playback_title">Przytrzymaj aby przyspieszyć odtwarzanie</string>
     <string name="view_on_github">Zobacz na GitHubie</string>
     <string name="contribution_encouragement">Niezależnie od tego, czy masz pomysł na tłumaczenie, zmiany w projekcie, oczyszczenie kodu źródłowego, czy na naprawdę ciężkie zmiany w kodzie — pomoc jest zawsze mile widziana. Im więcej jest zrobione, tym lepiej!</string>
@@ -460,7 +460,16 @@
     <string name="most_liked">Najbardziej lubiane</string>
     <string name="playlist_no_uploader">Wygenerowana automatycznie (nie znaleziono przesyłającego)</string>
     <string name="recovering">odzyskiwanie</string>
-    <string name="error_download_resource_gone">Nie udało się odzyskać tego pobrania</string>
+    <string name="error_download_resource_gone">Nie udało się odzyskać tego pobrania</string>   
+   <string name="error_sabr_download_failed">Pobieranie SABR nieudane</string>
+   <string name="error_sabr_download_format">Ten format SABR nie może być pobierany</string>
+   <string name="error_sabr_download_initialization">Inicjalizacja SABR nieudana</string>
+   <string name="error_sabr_download_protected">Ten strumień SABR wymaga poświadczenia</string>
+   <string name="error_sabr_download_stalled">SABR przestał zwracać media</string>
+   <string name="error_sabr_download_network">Pobieranie SABR nieudane z powodu sieci</string>
+   <string name="error_sabr_download_muxing">Nie udało się zmuxować mediów SABR</string>
+   <string name="error_sabr_download_storage">Nie udało się zapisać pobrania SABR</string>
+   <string name="error_sabr_download_protocol">Błąd protokołu SABR</string>
     <string name="choose_instance_prompt">Wybierz serwer</string>
     <string name="clear_download_history">Wyczyść historię pobierania</string>
     <string name="delete_downloaded_files">Usuń pobrane pliki</string>
@@ -1032,4 +1041,11 @@
     <string name="duration">Długość</string>
     <string name="license">Licencja</string>
     <string name="published">Opublikowano</string>
+    <string name="export_data_to_newpipe_title">Eksportuj do NewPipe</string>
+    <string name="export_data_to_newpipe_summary">Eksportuj kopię zapasową do formatu kompatybilnego z NewPipe</string>
+    <string name="settings_category_other_platforms_title">Inne platformy</string>
+    <string name="use_dns_over_https_fallback_title">Używaj zastępczego DNS przez HTTPS</string>
+    <string name="use_dns_over_https_fallback_summary">Ponawiaj nieudane zapytania DNS używaj DNS przez HTTPS Cloudflare. Zmienienie tej opcji zrestartuje aplikację.</string>
+    <string name="youtube_player_client_title">Endpoint wydobywania YouTube</string>
+    <string name="webview_unavailable_youtube_hint">WebView jest niedostępne. Upewnij się że twoja wersja WebView jest nowsza niż 80.\n\nAndroid 6 i 10: Zaktualizuj Android WebView w Sklepie Play.\nAndroid 7, 8, 9: Zaktualizuj Chrome w Sklepie Play.\nInne wersje: To nie powinno się dziać. Zgłoś to na naszym GitHubie.</string>
 </resources>
