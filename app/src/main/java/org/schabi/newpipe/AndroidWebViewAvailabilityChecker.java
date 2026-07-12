@@ -11,29 +11,13 @@ import org.schabi.newpipe.extractor.WebViewAvailabilityChecker;
 import org.schabi.newpipe.extractor.exceptions.WebViewUnavailableException;
 
 public final class AndroidWebViewAvailabilityChecker implements WebViewAvailabilityChecker {
-    private static final long PROBE_TIMEOUT_MS = 30_000L;
-    private static final String JS_CAPABILITY_PROBE = "(function () {"
-            + "try {"
-            + "const checks = ["
-            + "typeof Promise === 'function',"
-            + "typeof Uint8Array === 'function',"
-            + "typeof Function === 'function',"
-            + "typeof setTimeout === 'function',"
-            + "typeof globalThis === 'object',"
-            + "new Function(\"return ({a:{b:1}}?.a?.b ?? 0) === 1\")()"
-            + "];"
-            + "return checks.every(Boolean) ? 'ok' : 'missing';"
-            + "} catch (error) {"
-            + "return 'error:' + error;"
-            + "}"
-            + "})()";
+    private static final int MIN_WEBVIEW_MAJOR_VERSION = 80;
 
     private final SharedWebViewRuntime runtime;
     @Nullable
     private final PackageInfo packageInfo;
     @Nullable
     private volatile WebViewUnavailableException unavailableException;
-    private volatile boolean runtimeProbed;
 
     public AndroidWebViewAvailabilityChecker(@NonNull final Context context) {
         final Context appContext = context.getApplicationContext();
@@ -41,10 +25,7 @@ public final class AndroidWebViewAvailabilityChecker implements WebViewAvailabil
 
         final PackageInfo currentPackageInfo = WebViewCompat.getCurrentWebViewPackage(appContext);
         packageInfo = currentPackageInfo;
-        if (currentPackageInfo == null) {
-            unavailableException =
-                    new WebViewUnavailableException("No Android WebView provider is available");
-        }
+        unavailableException = checkProvider(currentPackageInfo);
     }
 
     public void warmUp() {
@@ -55,11 +36,7 @@ public final class AndroidWebViewAvailabilityChecker implements WebViewAvailabil
 
     @Override
     public void checkWebViewAvailable() throws WebViewUnavailableException {
-        WebViewUnavailableException exception = unavailableException;
-        if (exception == null && !runtimeProbed) {
-            probeRuntime();
-            exception = unavailableException;
-        }
+        final WebViewUnavailableException exception = unavailableException;
         if (exception != null) {
             throw exception;
         }
@@ -74,39 +51,45 @@ public final class AndroidWebViewAvailabilityChecker implements WebViewAvailabil
             return;
         }
         unavailableException = new WebViewUnavailableException(
-                providerDescription(info) + " failed to initialize",
+                "Android WebView provider " + info.packageName + " version "
+                        + info.versionName + " failed to initialize",
                 throwable);
     }
 
-    private void probeRuntime() {
-        if (unavailableException != null) {
-            return;
+    @Nullable
+    private static WebViewUnavailableException checkProvider(final PackageInfo packageInfo) {
+        if (packageInfo == null) {
+            return new WebViewUnavailableException("No Android WebView provider is available");
         }
+
+        final String versionName = packageInfo.versionName;
         try {
-            final String result = runtime.evaluateJavascriptBlocking(
-                    JS_CAPABILITY_PROBE,
-                    PROBE_TIMEOUT_MS,
-                    "WebView JavaScript capability probe");
-            if (!"\"ok\"".equals(result)) {
-                unavailableException = new WebViewUnavailableException(
-                        providerDescription(packageInfo)
-                                + " failed JavaScript capability probe: " + result);
-                return;
+            final int majorVersion = parseMajorVersion(versionName);
+            if (majorVersion < MIN_WEBVIEW_MAJOR_VERSION) {
+                return new WebViewUnavailableException("Android WebView provider "
+                        + packageInfo.packageName + " version " + versionName
+                        + " is lower than required major version "
+                        + MIN_WEBVIEW_MAJOR_VERSION);
             }
-            runtimeProbed = true;
-        } catch (final Throwable throwable) {
-            unavailableException = new WebViewUnavailableException(
-                    providerDescription(packageInfo)
-                            + " failed JavaScript capability probe",
-                    throwable);
+        } catch (final WebViewUnavailableException e) {
+            return e;
         }
+        return null;
     }
 
-    @NonNull
-    private static String providerDescription(@Nullable final PackageInfo info) {
-        if (info == null) {
-            return "Android WebView provider";
+    private static int parseMajorVersion(final String versionName) throws WebViewUnavailableException {
+        if (versionName == null || versionName.isEmpty()) {
+            throw new WebViewUnavailableException("Android WebView provider has no version name");
         }
-        return "Android WebView provider " + info.packageName + " version " + info.versionName;
+
+        final int dotIndex = versionName.indexOf('.');
+        final String major = dotIndex >= 0 ? versionName.substring(0, dotIndex) : versionName;
+        try {
+            return Integer.parseInt(major);
+        } catch (final NumberFormatException e) {
+            throw new WebViewUnavailableException(
+                    "Could not parse Android WebView provider version " + versionName,
+                    e);
+        }
     }
 }
