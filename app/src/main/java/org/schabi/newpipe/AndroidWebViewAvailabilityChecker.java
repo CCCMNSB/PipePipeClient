@@ -11,8 +11,6 @@ import org.schabi.newpipe.extractor.WebViewAvailabilityChecker;
 import org.schabi.newpipe.extractor.exceptions.WebViewUnavailableException;
 
 public final class AndroidWebViewAvailabilityChecker implements WebViewAvailabilityChecker {
-    private static final int MIN_WEBVIEW_MAJOR_VERSION = 80;
-
     private final SharedWebViewRuntime runtime;
     @Nullable
     private final PackageInfo packageInfo;
@@ -25,7 +23,10 @@ public final class AndroidWebViewAvailabilityChecker implements WebViewAvailabil
 
         final PackageInfo currentPackageInfo = WebViewCompat.getCurrentWebViewPackage(appContext);
         packageInfo = currentPackageInfo;
-        unavailableException = checkProvider(currentPackageInfo);
+        if (currentPackageInfo == null) {
+            unavailableException =
+                    new WebViewUnavailableException("No Android WebView provider is available");
+        }
     }
 
     public void warmUp() {
@@ -56,40 +57,4 @@ public final class AndroidWebViewAvailabilityChecker implements WebViewAvailabil
                 throwable);
     }
 
-    @Nullable
-    private static WebViewUnavailableException checkProvider(final PackageInfo packageInfo) {
-        if (packageInfo == null) {
-            return new WebViewUnavailableException("No Android WebView provider is available");
-        }
-
-        final String versionName = packageInfo.versionName;
-        try {
-            final int majorVersion = parseMajorVersion(versionName);
-            if (majorVersion < MIN_WEBVIEW_MAJOR_VERSION) {
-                return new WebViewUnavailableException("Android WebView provider "
-                        + packageInfo.packageName + " version " + versionName
-                        + " is lower than required major version "
-                        + MIN_WEBVIEW_MAJOR_VERSION);
-            }
-        } catch (final WebViewUnavailableException e) {
-            return e;
-        }
-        return null;
-    }
-
-    private static int parseMajorVersion(final String versionName) throws WebViewUnavailableException {
-        if (versionName == null || versionName.isEmpty()) {
-            throw new WebViewUnavailableException("Android WebView provider has no version name");
-        }
-
-        final int dotIndex = versionName.indexOf('.');
-        final String major = dotIndex >= 0 ? versionName.substring(0, dotIndex) : versionName;
-        try {
-            return Integer.parseInt(major);
-        } catch (final NumberFormatException e) {
-            throw new WebViewUnavailableException(
-                    "Could not parse Android WebView provider version " + versionName,
-                    e);
-        }
-    }
 }
