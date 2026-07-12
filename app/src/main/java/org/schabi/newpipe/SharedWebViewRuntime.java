@@ -28,6 +28,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
@@ -58,6 +59,8 @@ public final class SharedWebViewRuntime {
 
     private static final String TAG = "SharedWebViewRuntime";
     private static final long DEFAULT_TIMEOUT_MS = 30_000L;
+    private static final long READY_CALLBACK_ATTEMPT_TIMEOUT_MS = 1_000L;
+    private static final int MAX_READY_CALLBACK_ATTEMPTS = 2;
     private static final String USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
             + "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.3";
     private static volatile SharedWebViewRuntime instance;
@@ -72,6 +75,9 @@ public final class SharedWebViewRuntime {
     private CountDownLatch initLatch;
     @Nullable
     private AtomicReference<Throwable> initError;
+    @Nullable
+    private InitializationAttempt activeInitializationAttempt;
+    private long nextInitializationAttemptId;
     @Nullable
     private InitializationFailureCallback initializationFailureCallback;
     @Nullable
@@ -249,11 +255,15 @@ public final class SharedWebViewRuntime {
     private void startInitializationLocked() {
         final CountDownLatch latch = new CountDownLatch(1);
         final AtomicReference<Throwable> error = new AtomicReference<>();
+        final InitializationAttempt attempt = new InitializationAttempt(
+                ++nextInitializationAttemptId, 1, latch, error);
         initLatch = latch;
         initError = error;
-        if (!mainHandler.post(() -> createWebView(latch, error))) {
+        activeInitializationAttempt = attempt;
+        if (!mainHandler.post(() -> createWebView(attempt))) {
             final IllegalStateException exception =
                     new IllegalStateException("Could not post WebView creation");
+            activeInitializationAttempt = null;
             error.set(exception);
             latch.countDown();
             notifyInitializationFailure(exception);
@@ -261,15 +271,17 @@ public final class SharedWebViewRuntime {
     }
 
     @SuppressLint("SetJavaScriptEnabled")
-    private void createWebView(final CountDownLatch latch,
-                               final AtomicReference<Throwable> error) {
+    private void createWebView(@NonNull final InitializationAttempt attempt) {
+        if (!isActiveInitializationAttempt(attempt)) {
+            return;
+        }
         try {
-            if (webView != null) {
-                ready = true;
-                latch.countDown();
+            final WebView view = new WebView(appContext);
+            attempt.view = view;
+            if (!isActiveInitializationAttempt(attempt)) {
+                destroyWebView(view);
                 return;
             }
-            final WebView view = new WebView(appContext);
             if (BuildConfig.DEBUG) {
                 WebView.setWebContentsDebuggingEnabled(true);
             }
@@ -296,13 +308,11 @@ public final class SharedWebViewRuntime {
             view.setWebViewClient(new WebViewClient() {
                 @Override
                 public void onPageFinished(final WebView view, final String url) {
-                    synchronized (initLock) {
-                        webView = view;
-                        ready = true;
+                    // WebView 44/83 occasionally misses this callback for a headless local page.
+                    // Readiness is therefore determined only by the local document's bridge call.
+                    if (BuildConfig.DEBUG) {
+                        Log.d(TAG, "page finished url=" + url + " attempt=" + attempt.number);
                     }
-                    Log.i(TAG, "ready url=" + url + " mainThread="
-                            + (Looper.myLooper() == Looper.getMainLooper()));
-                    latch.countDown();
                 }
 
                 @Override
@@ -310,24 +320,107 @@ public final class SharedWebViewRuntime {
                                             final WebResourceError webError) {
                     super.onReceivedError(view, request, webError);
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && request.isForMainFrame()) {
-                        final IllegalStateException exception = new IllegalStateException(
+                        retryOrFail(attempt, new IllegalStateException(
                                 "WebView runtime main frame error " + webError.getErrorCode()
-                                        + ": " + webError.getDescription());
-                        if (!error.compareAndSet(null, exception)) {
-                            return;
-                        }
-                        latch.countDown();
-                        notifyInitializationFailure(exception);
+                                        + ": " + webError.getDescription()));
                     }
                 }
             });
             view.loadDataWithBaseURL("https://www.youtube.com/",
-                    "<!doctype html><html><head><title></title></head><body></body></html>",
+                    runtimeDocument(attempt.id),
                     "text/html", "UTF-8", null);
+            mainHandler.postDelayed(() -> retryOrFail(attempt, new IllegalStateException(
+                    "WebView runtime ready callback timed out")),
+                    READY_CALLBACK_ATTEMPT_TIMEOUT_MS);
         } catch (final Throwable throwable) {
-            error.compareAndSet(null, throwable);
-            latch.countDown();
-            notifyInitializationFailure(throwable);
+            retryOrFail(attempt, throwable);
+        }
+    }
+
+    @NonNull
+    private static String runtimeDocument(final long attemptId) {
+        return "<!doctype html><html><head><script>"
+                + "PipePipeWebViewBridge.onRuntimeDocumentReady('" + attemptId + "');"
+                + "</script><title></title></head><body></body></html>";
+    }
+
+    private void completeInitialization(@NonNull final InitializationAttempt attempt) {
+        if (!attempt.completed.compareAndSet(false, true)) {
+            return;
+        }
+        final boolean stale;
+        synchronized (initLock) {
+            stale = activeInitializationAttempt != attempt || ready;
+            if (!stale) {
+                webView = attempt.view;
+                ready = true;
+                activeInitializationAttempt = null;
+            }
+        }
+        if (stale) {
+            destroyWebView(attempt.view);
+            return;
+        }
+        Log.i(TAG, "ready source=bridge attempt=" + attempt.number + " mainThread="
+                + (Looper.myLooper() == Looper.getMainLooper()));
+        attempt.latch.countDown();
+    }
+
+    private void retryOrFail(@NonNull final InitializationAttempt attempt,
+                             @NonNull final Throwable throwable) {
+        if (!attempt.completed.compareAndSet(false, true)) {
+            return;
+        }
+        if (!isActiveInitializationAttempt(attempt)) {
+            destroyWebView(attempt.view);
+            return;
+        }
+        destroyWebView(attempt.view);
+        if (attempt.number < MAX_READY_CALLBACK_ATTEMPTS) {
+            final InitializationAttempt retry;
+            synchronized (initLock) {
+                if (activeInitializationAttempt != attempt || ready) {
+                    return;
+                }
+                retry = new InitializationAttempt(++nextInitializationAttemptId,
+                        attempt.number + 1, attempt.latch, attempt.error);
+                activeInitializationAttempt = retry;
+            }
+            Log.w(TAG, "retrying WebView runtime ready callback after attempt " + attempt.number,
+                    throwable);
+            if (!mainHandler.post(() -> createWebView(retry))) {
+                retryOrFail(retry, new IllegalStateException("Could not post WebView retry"));
+            }
+            return;
+        }
+        synchronized (initLock) {
+            if (activeInitializationAttempt != attempt || ready) {
+                return;
+            }
+            activeInitializationAttempt = null;
+            attempt.error.compareAndSet(null, throwable);
+        }
+        Log.e(TAG, "WebView runtime ready callback failed", throwable);
+        attempt.latch.countDown();
+        notifyInitializationFailure(throwable);
+    }
+
+    private boolean isActiveInitializationAttempt(@NonNull final InitializationAttempt attempt) {
+        synchronized (initLock) {
+            return activeInitializationAttempt == attempt && initLatch == attempt.latch
+                    && initError == attempt.error && !ready;
+        }
+    }
+
+    private static void destroyWebView(@Nullable final WebView view) {
+        if (view == null) {
+            return;
+        }
+        try {
+            view.stopLoading();
+            view.destroy();
+        } catch (final Throwable throwable) {
+            Log.w(TAG, "Could not destroy failed WebView initialization attempt", throwable);
         }
     }
 
@@ -341,7 +434,39 @@ public final class SharedWebViewRuntime {
         }
     }
 
+    private static final class InitializationAttempt {
+        private final long id;
+        private final int number;
+        private final CountDownLatch latch;
+        private final AtomicReference<Throwable> error;
+        private final AtomicBoolean completed = new AtomicBoolean();
+        @Nullable
+        private WebView view;
+
+        InitializationAttempt(final long id, final int number, @NonNull final CountDownLatch latch,
+                              @NonNull final AtomicReference<Throwable> error) {
+            this.id = id;
+            this.number = number;
+            this.latch = latch;
+            this.error = error;
+        }
+    }
+
     private final class Bridge {
+        @JavascriptInterface
+        public void onRuntimeDocumentReady(final String attemptId) {
+            mainHandler.post(() -> {
+                final InitializationAttempt attempt;
+                synchronized (initLock) {
+                    attempt = activeInitializationAttempt;
+                    if (attempt == null || !Long.toString(attempt.id).equals(attemptId)) {
+                        return;
+                    }
+                }
+                completeInitialization(attempt);
+            });
+        }
+
         @JavascriptInterface
         public void onSabrLocalDomJsInitializationError(final String sessionId,
                                                         final String error) {
