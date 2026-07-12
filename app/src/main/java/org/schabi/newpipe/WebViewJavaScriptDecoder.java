@@ -176,11 +176,12 @@ public final class WebViewJavaScriptDecoder implements YoutubeJavaScriptDecoder 
                             + "return Object.prototype.hasOwnProperty.call(o,p)}};"
                             + "if(!Array.prototype.at){Array.prototype.at=function(i){"
                             + "i=Math.trunc(i)||0;if(i<0)i+=this.length;return this[i]}};"
-                            + loadAsset("ejs/yt.solver.lib.min.js")
+                            + loadAsset("ejs/yt.solver.polyfills.es5.js")
+                            + loadAsset("ejs/yt.solver.lib.es5.min.js")
                             + ";var meriyah=lib.meriyah,astring=lib.astring;true",
                     TIMEOUT_MS, "V8 library initialization");
             final String value = runtime.evaluateJavascriptBlocking(
-                    loadAsset("ejs/yt.solver.core.min.js") + ";typeof jsc==='function'",
+                    loadAsset("ejs/yt.solver.core.es5.min.js") + ";typeof jsc==='function'",
                     TIMEOUT_MS, "V8 core initialization");
             if (!"true".equals(value)) {
                 throw new ParsingException("EJS initialization returned " + value);

@@ -26,7 +26,7 @@ internal class LocalDomPoTokenGenerator private constructor(
         try {
             runtime.ensureReady(INIT_TIMEOUT_MS, "Local DOM PO token initialization")
             runtime.evaluateJavascriptBlocking(
-                extractScript(runtime.loadAsset(ASSET)) + "\ntrue",
+                runtime.loadAsset(ASSET) + "\ntrue",
                 INIT_TIMEOUT_MS,
                 "Local DOM BotGuard helper injection",
             )
@@ -48,28 +48,8 @@ internal class LocalDomPoTokenGenerator private constructor(
         }
         val u8Identifier = stringToSabrU8(identifier)
         val posted = runtime.evaluateJavascript(
-            """try {
-                const sessionId = ${jsString(sessionId)};
-                const identifier = ${jsString(identifier)};
-                const session = this.__sabrLocalDomSessions &&
-                    this.__sabrLocalDomSessions[sessionId];
-                if (!session || !session.poTokenMinter) {
-                    throw new Error('Local DOM PO token minter is not ready');
-                }
-                const u8Identifier = $u8Identifier;
-                const poTokenU8 = obtainPoToken(session.poTokenMinter, u8Identifier);
-                let poTokenU8String = "";
-                for (let i = 0; i < poTokenU8.length; i++) {
-                    if (i !== 0) poTokenU8String += ",";
-                    poTokenU8String += poTokenU8[i];
-                }
-                ${SharedWebViewRuntime.BRIDGE_NAME}.onSabrLocalDomObtainPoTokenResult(
-                    sessionId, identifier, poTokenU8String);
-            } catch (error) {
-                ${SharedWebViewRuntime.BRIDGE_NAME}.onSabrLocalDomObtainPoTokenError(
-                    ${jsString(sessionId)}, ${jsString(identifier)},
-                    String(error) + "\n" + error.stack);
-            }""",
+            "pipepipeSabrObtainPoToken(" + jsString(sessionId) + ", "
+                + jsString(identifier) + ", " + u8Identifier + ");",
             null,
         ) { error -> onTokenError(identifier, error) }
         if (!posted) {
@@ -117,9 +97,7 @@ internal class LocalDomPoTokenGenerator private constructor(
             tokenWaiters.clear()
         }
         runtime.evaluateJavascript(
-            """if (this.__sabrLocalDomSessions) {
-                delete this.__sabrLocalDomSessions[${jsString(sessionId)}];
-            }""",
+            "pipepipeSabrDeleteSession(" + jsString(sessionId) + ");",
             null,
             null,
         )
@@ -220,95 +198,56 @@ internal class LocalDomPoTokenGenerator private constructor(
     }
 
     private fun downloadAndRunBotguard() {
-            makeBotguardServiceRequest(
-                "https://www.youtube.com/youtubei/v1/att/get?prettyPrint=false",
-                """{"context":{"client":{"clientName":"WEB","clientVersion":"$ATT_CLIENT_VERSION"}},"engagementType":"ENGAGEMENT_TYPE_UNBOUND"}""",
-                contentType = "application/json",
-                onSuccess = { body ->
-                    try {
-                        val challenge = parseSabrAttChallengeData(body)
-                        makeBotguardGetRequest(
-                            challenge.interpreterUrl,
-                            onSuccess = { interpreterJavascript ->
-                                val challengeData = buildSabrAttChallengeData(
-                                    challenge,
-                                    interpreterJavascript,
-                                )
-                                runtime.evaluateJavascript(
-                                    """try {
-                                        const sessionId = ${jsString(sessionId)};
-                                        const data = $challengeData;
-                                        runBotGuard(data).then(function (result) {
-                                            this.__sabrLocalDomSessions =
-                                                this.__sabrLocalDomSessions || {};
-                                            this.__sabrLocalDomSessions[sessionId] = {
-                                                webPoSignalOutput: result.webPoSignalOutput
-                                            };
-                                            ${SharedWebViewRuntime.BRIDGE_NAME}
-                                                .onSabrLocalDomRunBotguardResult(
-                                                    sessionId, result.botguardResponse);
-                                        }, function (error) {
-                                            ${SharedWebViewRuntime.BRIDGE_NAME}
-                                                .onSabrLocalDomJsInitializationError(
-                                                    sessionId,
-                                                    String(error) + "\n" + error.stack);
-                                        });
-                                    } catch (error) {
-                                        ${SharedWebViewRuntime.BRIDGE_NAME}
-                                            .onSabrLocalDomJsInitializationError(
-                                                ${jsString(sessionId)},
-                                                String(error) + "\n" + error.stack);
-                                    }""",
-                                    null,
-                                ) { error -> failInitialization(error) }
-                            },
-                            onError = ::failInitialization,
-                        )
-                    } catch (error: Throwable) {
-                        failInitialization(error)
-                    }
-                },
-                onError = ::failInitialization,
-            )
-        }
+        makeBotguardServiceRequest(
+            "https://www.youtube.com/youtubei/v1/att/get?prettyPrint=false",
+            """{"context":{"client":{"clientName":"WEB","clientVersion":"$ATT_CLIENT_VERSION"}},"engagementType":"ENGAGEMENT_TYPE_UNBOUND"}""",
+            contentType = "application/json",
+            onSuccess = { body ->
+                try {
+                    val challenge = parseSabrAttChallengeData(body)
+                    makeBotguardGetRequest(
+                        challenge.interpreterUrl,
+                        onSuccess = { interpreterJavascript ->
+                            val challengeData = buildSabrAttChallengeData(
+                                challenge,
+                                interpreterJavascript,
+                            )
+                            runtime.evaluateJavascript(
+                                "pipepipeSabrRunBotguard(" + jsString(sessionId)
+                                    + ", " + challengeData + ");",
+                                null,
+                            ) { error -> failInitialization(error) }
+                        },
+                        onError = ::failInitialization,
+                    )
+                } catch (error: Throwable) {
+                    failInitialization(error)
+                }
+            },
+            onError = ::failInitialization,
+        )
+    }
 
     private fun onRunBotguardResult(botguardResponse: String) {
-            makeBotguardServiceRequest(
-                "https://jnn-pa.googleapis.com/\$rpc/google.internal.waa.v1.Waa/GenerateIT",
-                "[ \"$REQUEST_KEY\", \"$botguardResponse\" ]",
-                onSuccess = { body ->
-                    try {
-                        val (integrityToken, expirationSeconds) = parseSabrIntegrityTokenData(body)
-                        expirationInstant = Instant.now().plusSeconds(expirationSeconds - 600)
-                        runtime.evaluateJavascript(
-                            """try {
-                                const sessionId = ${jsString(sessionId)};
-                                const session = this.__sabrLocalDomSessions &&
-                                    this.__sabrLocalDomSessions[sessionId];
-                                if (!session || !session.webPoSignalOutput) {
-                                    throw new Error('Local DOM WebPO signal output is missing');
-                                }
-                                session.integrityToken = $integrityToken;
-                                session.poTokenMinter = createPoTokenMinter(
-                                    session.webPoSignalOutput,
-                                    session.integrityToken);
-                                ${SharedWebViewRuntime.BRIDGE_NAME}
-                                    .onSabrLocalDomMinterReady(sessionId);
-                            } catch (error) {
-                                ${SharedWebViewRuntime.BRIDGE_NAME}
-                                    .onSabrLocalDomJsInitializationError(
-                                        ${jsString(sessionId)},
-                                        String(error) + "\n" + error.stack);
-                            }""",
-                            null,
-                        ) { error -> failInitialization(error) }
-                    } catch (error: Throwable) {
-                        failInitialization(error)
-                    }
-                },
-                onError = ::failInitialization,
-            )
-        }
+        makeBotguardServiceRequest(
+            "https://jnn-pa.googleapis.com/\$rpc/google.internal.waa.v1.Waa/GenerateIT",
+            "[ \"$REQUEST_KEY\", \"$botguardResponse\" ]",
+            onSuccess = { body ->
+                try {
+                    val (integrityToken, expirationSeconds) = parseSabrIntegrityTokenData(body)
+                    expirationInstant = Instant.now().plusSeconds(expirationSeconds - 600)
+                    runtime.evaluateJavascript(
+                        "pipepipeSabrCreateMinter(" + jsString(sessionId) + ", "
+                            + integrityToken + ");",
+                        null,
+                    ) { error -> failInitialization(error) }
+                } catch (error: Throwable) {
+                    failInitialization(error)
+                }
+            },
+            onError = ::failInitialization,
+        )
+    }
 
     private inner class Callbacks : SharedWebViewRuntime.SabrLocalDomCallbacks {
         override fun onJsInitializationError(error: String) {
@@ -345,7 +284,7 @@ internal class LocalDomPoTokenGenerator private constructor(
     }
 
     companion object {
-        private const val ASSET = "sabr_po_token.html"
+        private const val ASSET = "sabr_po_token.js"
         private const val TOKEN_TIMEOUT_MS = 30_000L
         private const val INIT_TIMEOUT_MS = 60_000L
         private const val GOOGLE_API_KEY = "AIzaSyDyT5W0Jh49F30Pqqtyfdf7pDLFKLJoAnw"
@@ -385,15 +324,6 @@ internal class LocalDomPoTokenGenerator private constructor(
                 .replace("\"", "\\\"")
                 .replace("\n", "\\n")
                 .replace("\r", "\\r") + "\""
-        }
-
-        private fun extractScript(html: String): String {
-            val start = html.indexOf("<script>")
-            val end = html.lastIndexOf("</script>")
-            if (start < 0 || end <= start) {
-                throw IllegalStateException("Local DOM PO token asset has no script")
-            }
-            return html.substring(start + "<script>".length, end)
         }
     }
 }
