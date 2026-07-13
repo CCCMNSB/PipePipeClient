@@ -737,6 +737,14 @@ public final class SabrSessionStore {
         }
     }
 
+    /** Reset SABR-only caches before a cold benchmark trial. Not used by playback code. */
+    public static void clearBenchmarkCaches(@NonNull final Context context,
+                                            @NonNull final String videoId) {
+        evict(videoId);
+        INITIALIZATION_CACHE.clear();
+        provider(context).clearCachedToken(videoId);
+    }
+
     private static void trimSessions(@Nullable final SessionKey protectedKey) {
         while (true) {
             final Holder holder;

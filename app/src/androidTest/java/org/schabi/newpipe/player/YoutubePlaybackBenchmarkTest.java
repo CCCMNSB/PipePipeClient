@@ -13,14 +13,19 @@ import android.os.SystemClock;
 import android.view.Surface;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.media3.common.C;
+import androidx.media3.common.Format;
 import androidx.media3.common.PlaybackException;
 import androidx.media3.common.Player;
 import androidx.media3.datasource.DataSource;
 import androidx.media3.datasource.DataSpec;
 import androidx.media3.datasource.TransferListener;
+import androidx.media3.exoplayer.DecoderReuseEvaluation;
 import androidx.media3.exoplayer.ExoPlayer;
 import androidx.media3.exoplayer.analytics.AnalyticsListener;
+import androidx.media3.exoplayer.source.LoadEventInfo;
+import androidx.media3.exoplayer.source.MediaLoadData;
 import androidx.media3.exoplayer.source.MediaSource;
 import androidx.media3.exoplayer.trackselection.DefaultTrackSelector;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
@@ -42,9 +47,7 @@ import org.schabi.newpipe.extractor.stream.AudioStream;
 import org.schabi.newpipe.extractor.stream.DeliveryMethod;
 import org.schabi.newpipe.extractor.stream.StreamInfo;
 import org.schabi.newpipe.extractor.stream.VideoStream;
-import org.schabi.newpipe.player.datasource.SabrDashMediaSource;
 import org.schabi.newpipe.player.datasource.SabrSessionStore;
-import org.schabi.newpipe.player.datasource.SabrSourceSpec;
 import org.schabi.newpipe.player.helper.LegacySubtitleRenderersFactory;
 import org.schabi.newpipe.player.helper.LoadController;
 import org.schabi.newpipe.player.helper.PlayerDataSource;
@@ -54,8 +57,8 @@ import org.schabi.newpipe.player.resolver.VideoPlaybackResolver;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.IOException;
 import java.lang.reflect.Field;
-import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -78,16 +81,30 @@ import java.util.concurrent.atomic.AtomicReference;
 @LargeTest
 public final class YoutubePlaybackBenchmarkTest {
     private static final String DEFAULT_URL =
-            "https://www.youtube.com/watch?v=dQw4w9WgXcQ";
+            "https://www.youtube.com/watch?v=G-eNlqqkn1w";
+    private static final String DEFAULT_PATHS = "sabr,tv_downgraded_generated_dash";
+    private static final String PRODUCTION_LOAD_CONTROLLER = LoadController.class.getName();
+    private static final int DEFAULT_PLAY_SECONDS = 60;
+    private static final long DEFAULT_START_POSITION_MS = 2_995_000;
     private static final long START_TIMEOUT_MS = 150_000;
+    private static final long PLAYBACK_STALL_BUDGET_MS = 60_000;
+    private static final long PLAYBACK_POLL_MS = 1_000;
 
     @Test
     public void compareSabrHlsAndGeneratedDash() throws Exception {
         final Context context = InstrumentationRegistry.getInstrumentation()
                 .getTargetContext().getApplicationContext();
         assertTrue(context instanceof App);
-        SharedWebViewRuntime.get(context).ensureReady(120_000L, "benchmark WebView warmup");
         final Bundle args = InstrumentationRegistry.getArguments();
+        final boolean warmWebViewRuntime = Boolean.parseBoolean(
+                args.getString("warmWebViewRuntime", "false"));
+        final boolean diagnosticDetails = Boolean.parseBoolean(
+                args.getString("diagnosticDetails", "false"));
+        final boolean coldSabrCachesEachTrial = Boolean.parseBoolean(
+                args.getString("coldSabrCachesEachTrial", "false"));
+        if (warmWebViewRuntime) {
+            SharedWebViewRuntime.get(context).ensureReady(120_000L, "benchmark WebView warmup");
+        }
         final String cookieFile = args.getString("cookieFile", "");
         if (!cookieFile.isEmpty()) {
             ServiceList.YouTube.setTokens(readTextFile(new File(cookieFile)).trim());
@@ -95,8 +112,10 @@ public final class YoutubePlaybackBenchmarkTest {
         final String url = args.getString("url", DEFAULT_URL);
         final int repetitions = positive(args.getString("repetitions", "5"), "repetitions");
         final int warmups = Integer.parseInt(args.getString("warmups", "1"));
-        final int playSeconds = positive(args.getString("playSeconds", "10"), "playSeconds");
-        final long startPositionMs = Long.parseLong(args.getString("startPositionMs", "-1"));
+        final int playSeconds = positive(args.getString("playSeconds",
+                String.valueOf(DEFAULT_PLAY_SECONDS)), "playSeconds");
+        final long startPositionMs = Long.parseLong(args.getString("startPositionMs",
+                String.valueOf(DEFAULT_START_POSITION_MS)));
         assertTrue("startPositionMs must be unset or non-negative: " + startPositionMs,
                 startPositionMs >= -1);
         final long seekTargetMs = Long.parseLong(args.getString("seekTargetMs", "-1"));
@@ -110,7 +129,7 @@ public final class YoutubePlaybackBenchmarkTest {
                 "hlsExtractionRetries");
         final boolean replacePlayerCache = Boolean.parseBoolean(
                 args.getString("replacePlayerCache", "false"));
-        final String pathFilter = args.getString("paths", "");
+        final String pathFilter = args.getString("paths", DEFAULT_PATHS);
         final File playerCacheDirectory = new File(context.getFilesDir(),
                 "youtube-playback-benchmark/player-responses");
         DownloaderImpl.getInstance().configureYoutubePlayerResponseCacheForBenchmark(
@@ -127,6 +146,23 @@ public final class YoutubePlaybackBenchmarkTest {
                 new Path("android_vr_generated_dash", "android_vr",
                         DeliveryMethod.PROGRESSIVE_HTTP)), pathFilter);
         assertTrue("No benchmark paths selected by paths=" + pathFilter, !paths.isEmpty());
+        emit("PIPEPIPE_BENCHMARK_CONFIG", new JSONObject()
+                .put("url", url)
+                .put("paths", new JSONArray(pathNames(paths)))
+                .put("repetitions", repetitions)
+                .put("warmups", warmups)
+                .put("playSeconds", playSeconds)
+                .put("startPositionMs", startPositionMs)
+                .put("seekTargetMs", seekTargetMs)
+                .put("maxVideoHeight", maxHeight)
+                .put("targetCodec", targetCodec)
+                .put("loadController", PRODUCTION_LOAD_CONTROLLER)
+                .put("warmWebViewRuntime", warmWebViewRuntime)
+                .put("diagnosticDetails", diagnosticDetails)
+                .put("playerMediaCacheClearedEachTrial", true)
+                .put("sabrSessionEvictedEachTrial", true)
+                .put("coldSabrCachesEachTrial", coldSabrCachesEachTrial)
+                .put("cachedExtractionAcrossTrials", true));
         final Map<Path, CachedExtraction> extractions = new LinkedHashMap<>();
         for (final Path path : paths) {
             final int maxAttempts = path.sourceDelivery == DeliveryMethod.HLS
@@ -176,13 +212,16 @@ public final class YoutubePlaybackBenchmarkTest {
                 final boolean warmup = round < 0;
                 final Result result = runTrial(context, path, extractions.get(path).info,
                         round, warmup, playSeconds, startPositionMs, seekTargetMs,
-                        maxHeight, targetCodec);
+                        maxHeight, targetCodec, url, warmWebViewRuntime,
+                        diagnosticDetails, coldSabrCachesEachTrial);
                 emit("PIPEPIPE_BENCHMARK_RESULT", result.toJson());
+                emitTrialDetails(result);
                 if (!warmup) {
                     measured.add(result);
                 }
             }
         }
+        verifyComparableFormats(measured, targetCodec);
         for (final Path path : paths) {
             emit("PIPEPIPE_BENCHMARK_SUMMARY", summarize(path, measured,
                     extractions.get(path).extractionMs));
@@ -193,10 +232,17 @@ public final class YoutubePlaybackBenchmarkTest {
                                    final int round, final boolean warmup, final int playSeconds,
                                    final long startPositionMs,
                                    final long seekTargetMs,
-                                   final int maxHeight, final String targetCodec) throws Exception {
+                                   final int maxHeight, final String targetCodec,
+                                   final String url, final boolean warmWebViewRuntime,
+                                   final boolean diagnosticDetails,
+                                   final boolean coldSabrCachesEachTrial) throws Exception {
         NewPipe.setYoutubePlayerClient(path.client);
-        SabrSessionStore.evict(info.getId());
-        final CountingTransferListener transfers = new CountingTransferListener();
+        if (coldSabrCachesEachTrial && path.sourceDelivery == DeliveryMethod.SABR) {
+            SabrSessionStore.clearBenchmarkCaches(context, info.getId());
+        } else {
+            SabrSessionStore.evict(info.getId());
+        }
+        final CountingTransferListener transfers = new CountingTransferListener(diagnosticDetails);
         final PlayerDataSource dataSource = new PlayerDataSource(context,
                 DownloaderImpl.USER_AGENT, transfers);
         // Constructing PlayerDataSource opens any persistent cache from an earlier app run; clear it
@@ -213,14 +259,6 @@ public final class YoutubePlaybackBenchmarkTest {
         final long resolveMs = elapsedMs(resolveStart);
         assertNotNull("Resolver returned no source for " + path.name, source);
         assertNotNull("Resolver did not select a stream for " + path.name, selector.selected);
-        final SabrSessionStore.Lease sabrLease = path.sourceDelivery == DeliveryMethod.SABR
-                ? acquireSourceLease(context, source) : null;
-        final SabrSessionStore.Holder sabrHolder = sabrLease == null
-                ? null : holderOf(sabrLease);
-        if (sabrHolder != null) {
-            sabrHolder.session.setTraceEnabled(true);
-        }
-
         final AtomicReference<PlaybackException> error = new AtomicReference<>();
         final AtomicLong readyNs = new AtomicLong();
         final AtomicLong frameNs = new AtomicLong();
@@ -230,7 +268,17 @@ public final class YoutubePlaybackBenchmarkTest {
         final AtomicLong rebufferNs = new AtomicLong();
         final AtomicLong bufferingStartNs = new AtomicLong();
         final AtomicBoolean started = new AtomicBoolean();
+        final AtomicBoolean ended = new AtomicBoolean();
         final AtomicBoolean countRebuffers = new AtomicBoolean(true);
+        final AtomicLong firstFramePositionMs = new AtomicLong(-1);
+        final AtomicLong firstFrameBufferedPositionMs = new AtomicLong(-1);
+        final AtomicInteger stateTransitionCount = new AtomicInteger();
+        final AtomicInteger loadEventCount = new AtomicInteger();
+        final AtomicReference<Format> actualVideoFormat = new AtomicReference<>();
+        final AtomicReference<Format> actualAudioFormat = new AtomicReference<>();
+        final List<String> stateTransitions =
+                Collections.synchronizedList(new ArrayList<>());
+        final List<String> loadEvents = Collections.synchronizedList(new ArrayList<>());
         final AtomicReference<ExoPlayer> playerRef = new AtomicReference<>();
         final AtomicReference<SurfaceTexture> textureRef = new AtomicReference<>();
         final AtomicReference<Surface> surfaceRef = new AtomicReference<>();
@@ -258,12 +306,20 @@ public final class YoutubePlaybackBenchmarkTest {
             renderers.setEnableDecoderFallback(true);
             final ExoPlayer player = new ExoPlayer.Builder(context, renderers)
                     .setTrackSelector(new DefaultTrackSelector(context))
-                    .setLoadControl(path.sourceDelivery == DeliveryMethod.SABR
-                            ? LoadController.forSabr() : new LoadController()).build();
+                    .setLoadControl(new LoadController())
+                    .build();
             player.addListener(new Player.Listener() {
                 @Override
                 public void onPlaybackStateChanged(final int state) {
                     final long now = SystemClock.elapsedRealtimeNanos();
+                    stateTransitionCount.incrementAndGet();
+                    if (diagnosticDetails) {
+                        stateTransitions.add(playbackEvent(prepareNs, player,
+                                "state=" + playerStateName(state)));
+                    }
+                    if (state == Player.STATE_ENDED) {
+                        ended.set(true);
+                    }
                     if (state == Player.STATE_READY) {
                         readyNs.compareAndSet(0, now);
                         final long buffering = bufferingStartNs.getAndSet(0);
@@ -278,7 +334,19 @@ public final class YoutubePlaybackBenchmarkTest {
                 }
 
                 @Override
+                public void onIsLoadingChanged(final boolean isLoading) {
+                    if (diagnosticDetails) {
+                        stateTransitions.add(playbackEvent(prepareNs, player,
+                                "isLoading=" + isLoading));
+                    }
+                }
+
+                @Override
                 public void onPlayerError(final PlaybackException failure) {
+                    if (diagnosticDetails) {
+                        stateTransitions.add(playbackEvent(prepareNs, player,
+                                "error=" + failure.getErrorCodeName()));
+                    }
                     error.compareAndSet(null, failure);
                 }
             });
@@ -286,20 +354,96 @@ public final class YoutubePlaybackBenchmarkTest {
                 @Override
                 public void onRenderedFirstFrame(final EventTime eventTime, final Object output,
                                                  final long renderTimeMs) {
-                    frameNs.compareAndSet(0, SystemClock.elapsedRealtimeNanos());
-                    started.set(true);
+                    if (frameNs.compareAndSet(0, SystemClock.elapsedRealtimeNanos())) {
+                        firstFramePositionMs.set(player.getCurrentPosition());
+                        firstFrameBufferedPositionMs.set(player.getBufferedPosition());
+                        if (diagnosticDetails) {
+                            stateTransitions.add(playbackEvent(prepareNs, player,
+                                    "event=first_frame"));
+                        }
+                        started.set(true);
+                    }
                 }
 
                 @Override
                 public void onAudioPositionAdvancing(final EventTime eventTime,
                                                      final long playoutStartSystemTimeMs) {
-                    audioNs.compareAndSet(0, SystemClock.elapsedRealtimeNanos());
+                    if (audioNs.compareAndSet(0, SystemClock.elapsedRealtimeNanos())) {
+                        if (diagnosticDetails) {
+                            stateTransitions.add(playbackEvent(prepareNs, player,
+                                    "event=audio_advancing"));
+                        }
+                    }
                 }
 
                 @Override
                 public void onDroppedVideoFrames(final EventTime eventTime, final int count,
                                                  final long elapsedMs) {
                     droppedFrames.addAndGet(count);
+                }
+
+                @Override
+                public void onVideoInputFormatChanged(final EventTime eventTime,
+                                                      final Format format,
+                                                      @Nullable final DecoderReuseEvaluation
+                                                              reuse) {
+                    actualVideoFormat.set(format);
+                }
+
+                @Override
+                public void onAudioInputFormatChanged(final EventTime eventTime,
+                                                      final Format format,
+                                                      @Nullable final DecoderReuseEvaluation
+                                                              reuse) {
+                    actualAudioFormat.set(format);
+                }
+
+                @Override
+                public void onLoadStarted(final EventTime eventTime,
+                                          final LoadEventInfo loadEventInfo,
+                                          final MediaLoadData mediaLoadData,
+                                          final int retryCount) {
+                    loadEventCount.incrementAndGet();
+                    if (diagnosticDetails) {
+                        loadEvents.add(loadEvent(prepareNs, "start", loadEventInfo,
+                                mediaLoadData, "retry=" + retryCount));
+                    }
+                }
+
+                @Override
+                public void onLoadCompleted(final EventTime eventTime,
+                                            final LoadEventInfo loadEventInfo,
+                                            final MediaLoadData mediaLoadData) {
+                    loadEventCount.incrementAndGet();
+                    if (diagnosticDetails) {
+                        loadEvents.add(loadEvent(prepareNs, "complete", loadEventInfo,
+                                mediaLoadData, null));
+                    }
+                }
+
+                @Override
+                public void onLoadCanceled(final EventTime eventTime,
+                                           final LoadEventInfo loadEventInfo,
+                                           final MediaLoadData mediaLoadData) {
+                    loadEventCount.incrementAndGet();
+                    if (diagnosticDetails) {
+                        loadEvents.add(loadEvent(prepareNs, "canceled", loadEventInfo,
+                                mediaLoadData, null));
+                    }
+                }
+
+                @Override
+                public void onLoadError(final EventTime eventTime,
+                                        final LoadEventInfo loadEventInfo,
+                                        final MediaLoadData mediaLoadData,
+                                        final IOException loadError,
+                                        final boolean wasCanceled) {
+                    loadEventCount.incrementAndGet();
+                    if (diagnosticDetails) {
+                        loadEvents.add(loadEvent(prepareNs, "error", loadEventInfo,
+                                mediaLoadData, "canceled=" + wasCanceled
+                                        + ",type=" + loadError.getClass().getSimpleName()));
+                    }
                 }
             });
             player.setVideoSurface(surface);
@@ -315,22 +459,60 @@ public final class YoutubePlaybackBenchmarkTest {
             playerRef.set(player);
         });
 
+        // Historical output field: mid-start trials leave this at -1 and put startup details in the
+        // seek-prefixed trace fields. Keep the name so existing benchmark parsers remain compatible.
         long seekRecoveryMs = -1;
+        long linearPlaybackWallMs = -1;
+        long finalPositionMs = -1;
+        long finalBufferedPositionMs = -1;
         SabrStats sabrStats = SabrStats.EMPTY;
         SeekTrace seekTrace = SeekTrace.EMPTY;
+        SabrSessionStore.Holder sabrHolder = null;
         try {
-            waitUntil(() -> frameNs.get() != 0 || error.get() != null, START_TIMEOUT_MS);
+            waitUntil(() -> frameNs.get() != 0 || ended.get() || error.get() != null,
+                    START_TIMEOUT_MS);
             throwPlayerError(error.get());
-            final long playbackStartPositionMs = startPositionMs >= 0 ? startPositionMs : 0;
+            assertTrue("Playback ended before rendering the first frame", frameNs.get() != 0);
+            if (path.sourceDelivery == DeliveryMethod.SABR) {
+                sabrHolder = findActiveSabrHolder(info.getId());
+                assertNotNull("SABR player reached first frame without an active session holder",
+                        sabrHolder);
+                if (diagnosticDetails) {
+                    sabrHolder.session.setTraceEnabled(true);
+                }
+            }
+            final long playbackStartPositionMs = firstFramePositionMs.get();
+            assertTrue("First frame did not report a valid playback position: "
+                    + playbackStartPositionMs, playbackStartPositionMs >= 0);
+            final long playbackTargetPositionMs = playbackStartPositionMs
+                    + playSeconds * 1_000L;
+            final long playbackTimeoutMs = playSeconds * 1_000L + PLAYBACK_STALL_BUDGET_MS;
             waitUntil(() -> position(playerRef.get(), info.getId())
-                            >= playbackStartPositionMs + playSeconds * 1_000L
-                    || error.get() != null, START_TIMEOUT_MS);
+                            >= playbackTargetPositionMs
+                    || ended.get() || error.get() != null, playbackTimeoutMs, PLAYBACK_POLL_MS);
             throwPlayerError(error.get());
+            countRebuffers.set(false);
+            final long linearBuffer = bufferingStartNs.getAndSet(0);
+            if (linearBuffer != 0) {
+                rebufferNs.addAndGet(SystemClock.elapsedRealtimeNanos() - linearBuffer);
+            }
+            final long reachedPositionMs = position(playerRef.get(), info.getId());
+            if (reachedPositionMs < playbackTargetPositionMs) {
+                throw new AssertionError("Playback ended before completing the benchmark window: "
+                        + "firstFramePositionMs=" + playbackStartPositionMs
+                        + ", targetPositionMs=" + playbackTargetPositionMs
+                        + ", reachedPositionMs=" + reachedPositionMs
+                        + ", durationMs=" + duration(playerRef.get()));
+            }
+            linearPlaybackWallMs = toMs(SystemClock.elapsedRealtimeNanos() - frameNs.get());
+            finalPositionMs = reachedPositionMs;
+            finalBufferedPositionMs = bufferedPosition(playerRef.get());
             if (startPositionMs >= 0) {
-                countRebuffers.set(false);
                 if (path.sourceDelivery == DeliveryMethod.SABR) {
                     sabrStats = sabrStats(sabrHolder);
-                    seekTrace = SeekTrace.fromSabrStartup(sabrHolder, startPositionMs);
+                    if (diagnosticDetails) {
+                        seekTrace = SeekTrace.fromSabrStartup(sabrHolder, startPositionMs);
+                    }
                 } else {
                     seekTrace = transfers.finishSeekTrace();
                 }
@@ -339,16 +521,12 @@ public final class YoutubePlaybackBenchmarkTest {
                 final long target = seekTargetMs >= 0 ? seekTargetMs
                         : duration == C.TIME_UNSET ? 30_000
                         : Math.max(1_000, Math.min(30_000, duration / 2));
-                countRebuffers.set(false);
-                final long linearBuffer = bufferingStartNs.getAndSet(0);
-                if (linearBuffer != 0) {
-                    rebufferNs.addAndGet(SystemClock.elapsedRealtimeNanos() - linearBuffer);
-                }
                 final org.schabi.newpipe.extractor.services.youtube.sabr.YoutubeSabrSession
-                        .TraceSnapshot sabrTraceBefore = sabrHolder == null ? null
+                        .TraceSnapshot sabrTraceBefore = !diagnosticDetails || sabrHolder == null
+                        ? null
                         : sabrHolder.session.getTraceSnapshot();
-                final SeekCacheSnapshot sabrCacheBefore = SeekCacheSnapshot.fromSabr(
-                        sabrHolder, target);
+                final SeekCacheSnapshot sabrCacheBefore = diagnosticDetails
+                        ? SeekCacheSnapshot.fromSabr(sabrHolder, target) : SeekCacheSnapshot.EMPTY;
                 transfers.startSeekTrace();
                 final long seekStart = SystemClock.elapsedRealtimeNanos();
                 InstrumentationRegistry.getInstrumentation().runOnMainSync(
@@ -359,17 +537,42 @@ public final class YoutubePlaybackBenchmarkTest {
                 seekRecoveryMs = elapsedMs(seekStart);
                 if (path.sourceDelivery == DeliveryMethod.SABR) {
                     sabrStats = sabrStats(sabrHolder);
-                    final org.schabi.newpipe.extractor.services.youtube.sabr.YoutubeSabrSession
-                            .TraceSnapshot sabrTraceAfter = sabrHolder == null ? null
-                            : sabrHolder.session.getTraceSnapshot();
-                    final SeekCacheSnapshot sabrCacheAfter = SeekCacheSnapshot.fromSabr(
-                            sabrHolder, target);
-                    seekTrace = SeekTrace.fromSabr(sabrTraceBefore, sabrTraceAfter,
-                            sabrCacheBefore, sabrCacheAfter);
+                    if (diagnosticDetails) {
+                        final org.schabi.newpipe.extractor.services.youtube.sabr.YoutubeSabrSession
+                                .TraceSnapshot sabrTraceAfter = sabrHolder == null ? null
+                                : sabrHolder.session.getTraceSnapshot();
+                        final SeekCacheSnapshot sabrCacheAfter = SeekCacheSnapshot.fromSabr(
+                                sabrHolder, target);
+                        seekTrace = SeekTrace.fromSabr(sabrTraceBefore, sabrTraceAfter,
+                                sabrCacheBefore, sabrCacheAfter);
+                    }
                 } else {
                     seekTrace = transfers.finishSeekTrace();
                 }
             }
+        } catch (final Exception | AssertionError failure) {
+            try {
+                emit("PIPEPIPE_BENCHMARK_FAILURE", new JSONObject()
+                        .put("path", path.name)
+                        .put("client", path.client)
+                        .put("videoId", info.getId())
+                        .put("round", round)
+                        .put("warmup", warmup)
+                        .put("requestedStartPositionMs", startPositionMs)
+                        .put("type", failure.getClass().getSimpleName())
+                        .put("message", safeDiagnosticMessage(failure.getMessage()))
+                        .put("stateTransitionCount", stateTransitionCount.get())
+                        .put("loadEventCount", loadEventCount.get()));
+                if (diagnosticDetails) {
+                    emitEvents("PIPEPIPE_BENCHMARK_STATE", path, info.getId(), round, warmup,
+                            startPositionMs, "failure", snapshot(stateTransitions));
+                    emitEvents("PIPEPIPE_BENCHMARK_LOAD", path, info.getId(), round, warmup,
+                            startPositionMs, "failure", snapshot(loadEvents));
+                }
+            } catch (final Exception diagnosticFailure) {
+                failure.addSuppressed(diagnosticFailure);
+            }
+            throw failure;
         } finally {
             final long openBuffer = bufferingStartNs.getAndSet(0);
             if (openBuffer != 0) {
@@ -388,9 +591,6 @@ public final class YoutubePlaybackBenchmarkTest {
                     textureRef.get().release();
                 }
             });
-            if (sabrLease != null) {
-                sabrLease.close();
-            }
             SabrSessionStore.evict(info.getId());
         }
         final long uidRxAfter = TrafficStats.getUidRxBytes(Process.myUid());
@@ -402,47 +602,30 @@ public final class YoutubePlaybackBenchmarkTest {
                 toMs(audioNs.get() - prepareNs), seekRecoveryMs, rebufferCount.get(),
                 durationMs(rebufferNs.get()), droppedFrames.get(), mediaBytes, uidRxBytes,
                 Process.getElapsedCpuTime() - cpuBefore, peakPssKb.get(), baselinePssKb,
-                sabrStats, seekTrace);
+                sabrStats, seekTrace, url, info.getId(), playSeconds, startPositionMs,
+                seekTargetMs, maxHeight, targetCodec, linearPlaybackWallMs,
+                firstFramePositionMs.get(), firstFrameBufferedPositionMs.get(), finalPositionMs,
+                finalBufferedPositionMs, actualVideoFormat.get(), actualAudioFormat.get(),
+                snapshot(stateTransitions), snapshot(loadEvents), warmWebViewRuntime,
+                diagnosticDetails, coldSabrCachesEachTrial,
+                stateTransitionCount.get(), loadEventCount.get());
     }
 
-    private static SabrSessionStore.Lease acquireSourceLease(
-            final Context context, final MediaSource mediaSource) throws Exception {
-        final SabrDashMediaSource sabrSource = findSabrSource(mediaSource);
-        assertNotNull("Expected a SABR child in " + mediaSource.getClass(), sabrSource);
-        final Field specField = SabrDashMediaSource.class.getDeclaredField("spec");
-        specField.setAccessible(true);
-        final SabrSourceSpec spec = (SabrSourceSpec) specField.get(sabrSource);
-        final Method acquire = SabrSessionStore.class.getDeclaredMethod(
-                "acquire", Context.class, SabrSourceSpec.class);
-        acquire.setAccessible(true);
-        return (SabrSessionStore.Lease) acquire.invoke(null, context, spec);
-    }
-
-    private static SabrDashMediaSource findSabrSource(final MediaSource mediaSource)
+    @Nullable
+    private static SabrSessionStore.Holder findActiveSabrHolder(final String videoId)
             throws Exception {
-        if (mediaSource instanceof SabrDashMediaSource) {
-            return (SabrDashMediaSource) mediaSource;
-        }
-        if (!"androidx.media3.exoplayer.source.MergingMediaSource"
-                .equals(mediaSource.getClass().getName())) {
-            return null;
-        }
-        final Field childrenField = mediaSource.getClass().getDeclaredField("mediaSources");
-        childrenField.setAccessible(true);
-        for (final MediaSource child : (MediaSource[]) childrenField.get(mediaSource)) {
-            final SabrDashMediaSource result = findSabrSource(child);
-            if (result != null) {
-                return result;
+        final Field sessionsField = SabrSessionStore.class.getDeclaredField("SESSIONS");
+        sessionsField.setAccessible(true);
+        final Map<?, ?> sessions = (Map<?, ?>) sessionsField.get(null);
+        for (final Object value : sessions.values()) {
+            if (value instanceof SabrSessionStore.Holder) {
+                final SabrSessionStore.Holder holder = (SabrSessionStore.Holder) value;
+                if (videoId.equals(holder.videoId)) {
+                    return holder;
+                }
             }
         }
         return null;
-    }
-
-    private static SabrSessionStore.Holder holderOf(final SabrSessionStore.Lease lease)
-            throws Exception {
-        final Field holderField = SabrSessionStore.Lease.class.getDeclaredField("holder");
-        holderField.setAccessible(true);
-        return (SabrSessionStore.Holder) holderField.get(lease);
     }
 
     private static SabrStats sabrStats(final SabrSessionStore.Holder holder) {
@@ -483,7 +666,14 @@ public final class YoutubePlaybackBenchmarkTest {
                 .put("firstFrameMsP50", percentile(values, r -> r.firstFrameMs, 0.50))
                 .put("firstFrameMsP95", percentile(values, r -> r.firstFrameMs, 0.95))
                 .put("seekRecoveryMsP50", percentile(values, r -> r.seekRecoveryMs, 0.50))
+                .put("linearPlaybackWallMsP50", percentile(values,
+                        r -> r.linearPlaybackWallMs, 0.50))
+                .put("linearPlaybackWallMsP95", percentile(values,
+                        r -> r.linearPlaybackWallMs, 0.95))
+                .put("rebufferCountP50", percentile(values, r -> r.rebufferCount, 0.50))
+                .put("rebufferCountP95", percentile(values, r -> r.rebufferCount, 0.95))
                 .put("rebufferMsP50", percentile(values, r -> r.rebufferMs, 0.50))
+                .put("rebufferMsP95", percentile(values, r -> r.rebufferMs, 0.95))
                 .put("mediaBytesP50", percentile(values, r -> r.mediaBytes, 0.50))
                 .put("seekNetworkBytesP50", percentile(values,
                         r -> r.seekTrace.networkBytes, 0.50))
@@ -503,6 +693,53 @@ public final class YoutubePlaybackBenchmarkTest {
                 .put("peakPssDeltaKbP50", percentile(values, r -> r.peakPssDeltaKb, 0.50));
     }
 
+    private static void verifyComparableFormats(final List<Result> results,
+                                                final String targetCodec) {
+        for (final Result sabr : results) {
+            if (!"sabr".equals(sabr.path.name)) {
+                continue;
+            }
+            Result tv = null;
+            for (final Result candidate : results) {
+                if (candidate.round == sabr.round
+                        && "tv_downgraded_generated_dash".equals(candidate.path.name)) {
+                    tv = candidate;
+                    break;
+                }
+            }
+            if (tv == null) {
+                continue;
+            }
+            assertNotNull("SABR did not report its actual video format in round " + sabr.round,
+                    sabr.actualVideoFormat);
+            assertNotNull("TV did not report its actual video format in round " + sabr.round,
+                    tv.actualVideoFormat);
+            assertNotNull("SABR did not report its actual audio format in round " + sabr.round,
+                    sabr.actualAudioFormat);
+            assertNotNull("TV did not report its actual audio format in round " + sabr.round,
+                    tv.actualAudioFormat);
+            assertTrue("Video heights differ in round " + sabr.round + ": SABR="
+                            + sabr.actualVideoFormat.height + " TV=" + tv.actualVideoFormat.height,
+                    sabr.actualVideoFormat.height == tv.actualVideoFormat.height);
+            final String sabrCodec = String.valueOf(sabr.actualVideoFormat.codecs)
+                    .toLowerCase(Locale.ROOT);
+            final String tvCodec = String.valueOf(tv.actualVideoFormat.codecs)
+                    .toLowerCase(Locale.ROOT);
+            assertTrue("Actual SABR codec does not match target " + targetCodec + ": " + sabrCodec,
+                    targetCodec.isEmpty() || sabrCodec.contains(targetCodec));
+            assertTrue("Actual TV codec does not match target " + targetCodec + ": " + tvCodec,
+                    targetCodec.isEmpty() || tvCodec.contains(targetCodec));
+            assertTrue("Video codecs differ in round " + sabr.round + ": SABR="
+                            + sabrCodec + " TV=" + tvCodec,
+                    sabrCodec.equals(tvCodec));
+            assertTrue("Audio MIME types differ in round " + sabr.round + ": SABR="
+                            + sabr.actualAudioFormat.sampleMimeType + " TV="
+                            + tv.actualAudioFormat.sampleMimeType,
+                    java.util.Objects.equals(sabr.actualAudioFormat.sampleMimeType,
+                            tv.actualAudioFormat.sampleMimeType));
+        }
+    }
+
     private interface Value { long get(Result result); }
 
     private static long percentile(final List<Result> values, final Value value,
@@ -520,6 +757,48 @@ public final class YoutubePlaybackBenchmarkTest {
         System.out.println(marker + " " + json);
     }
 
+    private static void emitTrialDetails(final Result result) throws Exception {
+        emitEvents("PIPEPIPE_BENCHMARK_STATE", result, "playback",
+                result.stateTransitions);
+        emitEvents("PIPEPIPE_BENCHMARK_LOAD", result, "media3", result.loadEvents);
+        emitEvents("PIPEPIPE_BENCHMARK_SABR_SEGMENT", result, "before",
+                result.seekTrace.sabrSegmentsBefore);
+        emitEvents("PIPEPIPE_BENCHMARK_SABR_SEGMENT", result, "measured",
+                result.seekTrace.sabrSegments);
+        emitEvents("PIPEPIPE_BENCHMARK_SABR_DISCARD", result, "before",
+                result.seekTrace.sabrDiscardsBefore);
+        emitEvents("PIPEPIPE_BENCHMARK_SABR_DISCARD", result, "measured",
+                result.seekTrace.sabrDiscards);
+        emitEvents("PIPEPIPE_BENCHMARK_SABR_RESPONSE", result, "measured",
+                result.seekTrace.sabrResponses);
+        emitEvents("PIPEPIPE_BENCHMARK_TRANSFER", result, "measured",
+                result.seekTrace.transfers);
+    }
+
+    private static void emitEvents(final String marker, final Result result,
+                                   final String phase, final List<String> events) throws Exception {
+        emitEvents(marker, result.path, result.videoId, result.round, result.warmup,
+                result.requestedStartPositionMs, phase, events);
+    }
+
+    private static void emitEvents(final String marker, final Path path, final String videoId,
+                                   final int round, final boolean warmup,
+                                   final long requestedStartPositionMs, final String phase,
+                                   final List<String> events) throws Exception {
+        for (int i = 0; i < events.size(); i++) {
+            emit(marker, new JSONObject()
+                    .put("path", path.name)
+                    .put("client", path.client)
+                    .put("videoId", videoId)
+                    .put("round", round)
+                    .put("warmup", warmup)
+                    .put("requestedStartPositionMs", requestedStartPositionMs)
+                    .put("phase", phase)
+                    .put("index", i)
+                    .put("event", events.get(i)));
+        }
+    }
+
     private static int positive(final String value, final String name) {
         final int parsed = Integer.parseInt(value);
         if (parsed <= 0) throw new IllegalArgumentException(name + " must be positive");
@@ -529,9 +808,18 @@ public final class YoutubePlaybackBenchmarkTest {
     private interface Condition { boolean test() throws Exception; }
 
     private static void waitUntil(final Condition condition, final long timeoutMs) throws Exception {
+        waitUntil(condition, timeoutMs, 50);
+    }
+
+    private static void waitUntil(final Condition condition, final long timeoutMs,
+                                  final long pollMs) throws Exception {
         final long deadline = SystemClock.elapsedRealtime() + timeoutMs;
-        while (!condition.test() && SystemClock.elapsedRealtime() < deadline) {
-            SystemClock.sleep(50);
+        while (SystemClock.elapsedRealtime() < deadline) {
+            if (condition.test()) {
+                return;
+            }
+            SystemClock.sleep(Math.min(pollMs,
+                    Math.max(1, deadline - SystemClock.elapsedRealtime())));
         }
         assertTrue("Benchmark phase timed out after " + timeoutMs + "ms", condition.test());
     }
@@ -553,6 +841,111 @@ public final class YoutubePlaybackBenchmarkTest {
         InstrumentationRegistry.getInstrumentation().runOnMainSync(
                 () -> value.set(player.getDuration()));
         return value.get();
+    }
+
+    private static long bufferedPosition(final ExoPlayer player) {
+        final AtomicLong value = new AtomicLong();
+        InstrumentationRegistry.getInstrumentation().runOnMainSync(
+                () -> value.set(player.getBufferedPosition()));
+        return value.get();
+    }
+
+    private static String playbackEvent(final long prepareNs, final ExoPlayer player,
+                                        final String event) {
+        final long positionMs = player.getCurrentPosition();
+        final long bufferedPositionMs = player.getBufferedPosition();
+        return "elapsedMs=" + elapsedMs(prepareNs)
+                + ',' + event
+                + ",positionMs=" + positionMs
+                + ",bufferedPositionMs=" + bufferedPositionMs
+                + ",bufferedDurationMs=" + Math.max(0, bufferedPositionMs - positionMs);
+    }
+
+    private static String playerStateName(final int state) {
+        switch (state) {
+            case Player.STATE_IDLE:
+                return "IDLE";
+            case Player.STATE_BUFFERING:
+                return "BUFFERING";
+            case Player.STATE_READY:
+                return "READY";
+            case Player.STATE_ENDED:
+                return "ENDED";
+            default:
+                return "UNKNOWN_" + state;
+        }
+    }
+
+    private static String loadEvent(final long prepareNs,
+                                    final String event,
+                                    final LoadEventInfo info,
+                                    final MediaLoadData data,
+                                    @Nullable final String detail) {
+        final String resource = summarizeUri(info.uri);
+        final StringBuilder value = new StringBuilder()
+                .append("elapsedMs=").append(elapsedMs(prepareNs))
+                .append(",event=").append(event)
+                .append(",loadTaskId=").append(info.loadTaskId)
+                .append(",resource=").append(resource)
+                .append(",position=").append(info.dataSpec.position)
+                .append(",length=").append(info.dataSpec.length)
+                .append(",bytesLoaded=").append(info.bytesLoaded)
+                .append(",loadDurationMs=").append(info.loadDurationMs)
+                .append(",trackType=").append(trackTypeName(data.trackType))
+                .append(",mediaStartMs=").append(data.mediaStartTimeMs)
+                .append(",mediaEndMs=").append(data.mediaEndTimeMs);
+        if (data.trackFormat != null) {
+            value.append(",formatId=").append(data.trackFormat.id);
+        }
+        if (detail != null) {
+            value.append(',').append(detail);
+        }
+        return value.toString();
+    }
+
+    private static String summarizeUri(final android.net.Uri uri) {
+        return uri.buildUpon()
+                .encodedQuery(null)
+                .fragment(null)
+                .build()
+                .toString();
+    }
+
+    private static String safeDiagnosticMessage(@Nullable final String message) {
+        if (message == null) {
+            return "";
+        }
+        final String redacted = message.replaceAll("(?i)https?://\\S+", "<url>");
+        return redacted.length() <= 240 ? redacted : redacted.substring(0, 240);
+    }
+
+    private static String trackTypeName(final int trackType) {
+        switch (trackType) {
+            case C.TRACK_TYPE_AUDIO:
+                return "audio";
+            case C.TRACK_TYPE_VIDEO:
+                return "video";
+            case C.TRACK_TYPE_TEXT:
+                return "text";
+            case C.TRACK_TYPE_METADATA:
+                return "metadata";
+            default:
+                return "unknown_" + trackType;
+        }
+    }
+
+    private static List<String> snapshot(final List<String> values) {
+        synchronized (values) {
+            return new ArrayList<>(values);
+        }
+    }
+
+    private static List<String> pathNames(final List<Path> paths) {
+        final List<String> names = new ArrayList<>();
+        for (final Path path : paths) {
+            names.add(path.name);
+        }
+        return names;
     }
 
     private static List<Path> filterPaths(final List<Path> paths, final String filter) {
@@ -578,10 +971,14 @@ public final class YoutubePlaybackBenchmarkTest {
     private static long durationMs(final long ns) { return Math.max(0, ns / 1_000_000); }
 
     private static final class CountingTransferListener implements TransferListener {
+        private final boolean diagnosticDetails;
         private final AtomicLong networkBytes = new AtomicLong();
         private final AtomicBoolean traceSeek = new AtomicBoolean();
         private final AtomicLong seekNetworkBytes = new AtomicLong();
         private final List<String> seekTransfers = Collections.synchronizedList(new ArrayList<>());
+        private CountingTransferListener(final boolean diagnosticDetails) {
+            this.diagnosticDetails = diagnosticDetails;
+        }
         @Override public void onTransferInitializing(@NonNull final DataSource source,
                 @NonNull final DataSpec spec, final boolean network) { }
         @Override public void onTransferStart(@NonNull final DataSource source,
@@ -597,8 +994,8 @@ public final class YoutubePlaybackBenchmarkTest {
         }
         @Override public void onTransferEnd(@NonNull final DataSource source,
                 @NonNull final DataSpec spec, final boolean network) {
-            if (network && traceSeek.get()) {
-                seekTransfers.add("uri=" + spec.uri
+            if (diagnosticDetails && network && traceSeek.get()) {
+                seekTransfers.add("resource=" + summarizeUri(spec.uri)
                         + ",position=" + spec.position
                         + ",length=" + spec.length);
             }
@@ -639,8 +1036,7 @@ public final class YoutubePlaybackBenchmarkTest {
                 if (stream.getDeliveryMethod() != delivery || height > maxHeight) continue;
                 final String streamCodec = stream.getCodec() == null ? ""
                         : stream.getCodec().toLowerCase(Locale.ROOT);
-                if (!codec.isEmpty() && !streamCodec.isEmpty()
-                        && !streamCodec.contains(codec)) continue;
+                if (!codec.isEmpty() && !streamCodec.contains(codec)) continue;
                 if (height > bestHeight) { best = i; bestHeight = height; }
             }
             if (best >= 0) selected = streams.get(best);
@@ -682,17 +1078,38 @@ public final class YoutubePlaybackBenchmarkTest {
         private final Path path; private final int round; private final boolean warmup;
         private final VideoStream stream; private final long resolveMs, readyMs, firstFrameMs,
                 audioMs, seekRecoveryMs, rebufferMs, mediaBytes, uidRxBytes, cpuMs, peakPssKb,
-                peakPssDeltaKb;
-        private final int rebufferCount, droppedFrames;
+                peakPssDeltaKb, linearPlaybackWallMs, firstFramePositionMs,
+                firstFrameBufferedPositionMs, finalPositionMs, finalBufferedPositionMs;
+        private final int rebufferCount, droppedFrames, stateTransitionCount, loadEventCount;
+        private final boolean warmWebViewRuntime, diagnosticDetails, coldSabrCachesEachTrial;
         private final SabrStats sabrStats;
         private final SeekTrace seekTrace;
+        private final String url, videoId, targetCodec;
+        private final int playSeconds, maxVideoHeight;
+        private final long requestedStartPositionMs, requestedSeekTargetMs;
+        @Nullable private final Format actualVideoFormat;
+        @Nullable private final Format actualAudioFormat;
+        private final List<String> stateTransitions;
+        private final List<String> loadEvents;
         private Result(final Path path, final int round, final boolean warmup,
                        final VideoStream stream, final long resolveMs, final long readyMs,
                        final long firstFrameMs, final long audioMs, final long seekRecoveryMs,
                        final int rebufferCount, final long rebufferMs, final int droppedFrames,
                        final long mediaBytes, final long uidRxBytes, final long cpuMs,
                        final long peakPssKb, final long baselinePssKb,
-                       final SabrStats sabrStats, final SeekTrace seekTrace) {
+                       final SabrStats sabrStats, final SeekTrace seekTrace,
+                       final String url, final String videoId, final int playSeconds,
+                       final long requestedStartPositionMs, final long requestedSeekTargetMs,
+                       final int maxVideoHeight, final String targetCodec,
+                       final long linearPlaybackWallMs, final long firstFramePositionMs,
+                       final long firstFrameBufferedPositionMs, final long finalPositionMs,
+                       final long finalBufferedPositionMs,
+                       @Nullable final Format actualVideoFormat,
+                       @Nullable final Format actualAudioFormat,
+                       final List<String> stateTransitions, final List<String> loadEvents,
+                       final boolean warmWebViewRuntime, final boolean diagnosticDetails,
+                       final boolean coldSabrCachesEachTrial, final int stateTransitionCount,
+                       final int loadEventCount) {
             this.path=path; this.round=round; this.warmup=warmup; this.stream=stream;
             this.resolveMs=resolveMs; this.readyMs=readyMs; this.firstFrameMs=firstFrameMs;
             this.audioMs=audioMs; this.seekRecoveryMs=seekRecoveryMs;
@@ -702,15 +1119,47 @@ public final class YoutubePlaybackBenchmarkTest {
             this.peakPssDeltaKb=Math.max(0, peakPssKb-baselinePssKb);
             this.sabrStats=sabrStats;
             this.seekTrace=seekTrace;
+            this.url=url; this.videoId=videoId; this.playSeconds=playSeconds;
+            this.requestedStartPositionMs=requestedStartPositionMs;
+            this.requestedSeekTargetMs=requestedSeekTargetMs;
+            this.maxVideoHeight=maxVideoHeight; this.targetCodec=targetCodec;
+            this.linearPlaybackWallMs=linearPlaybackWallMs;
+            this.firstFramePositionMs=firstFramePositionMs;
+            this.firstFrameBufferedPositionMs=firstFrameBufferedPositionMs;
+            this.finalPositionMs=finalPositionMs;
+            this.finalBufferedPositionMs=finalBufferedPositionMs;
+            this.actualVideoFormat=actualVideoFormat; this.actualAudioFormat=actualAudioFormat;
+            this.stateTransitions=stateTransitions; this.loadEvents=loadEvents;
+            this.warmWebViewRuntime=warmWebViewRuntime;
+            this.diagnosticDetails=diagnosticDetails;
+            this.coldSabrCachesEachTrial=coldSabrCachesEachTrial;
+            this.stateTransitionCount=stateTransitionCount;
+            this.loadEventCount=loadEventCount;
         }
         private JSONObject toJson() throws Exception {
             return new JSONObject().put("path",path.name).put("client",path.client)
                     .put("round",round).put("warmup",warmup)
+                    .put("url",url).put("videoId",videoId)
+                    .put("playSeconds",playSeconds)
+                    .put("requestedStartPositionMs",requestedStartPositionMs)
+                    .put("requestedSeekTargetMs",requestedSeekTargetMs)
+                    .put("maxVideoHeight",maxVideoHeight).put("targetCodec",targetCodec)
+                    .put("loadController",PRODUCTION_LOAD_CONTROLLER)
+                    .put("warmWebViewRuntime",warmWebViewRuntime)
+                    .put("diagnosticDetails",diagnosticDetails)
+                    .put("coldSabrCachesEachTrial",coldSabrCachesEachTrial)
                     .put("height",SelectingQualityResolver.effectiveHeight(stream))
                     .put("itag",stream.getItag()).put("codec",String.valueOf(stream.getCodec()))
                     .put("sourceDelivery",stream.getDeliveryMethod().name())
                     .put("resolveMs",resolveMs).put("readyMs",readyMs)
                     .put("firstFrameMs",firstFrameMs).put("audioMs",audioMs)
+                    .put("linearPlaybackWallMs",linearPlaybackWallMs)
+                    .put("firstFramePositionMs",firstFramePositionMs)
+                    .put("firstFrameBufferedPositionMs",firstFrameBufferedPositionMs)
+                    .put("finalPositionMs",finalPositionMs)
+                    .put("finalBufferedPositionMs",finalBufferedPositionMs)
+                    .put("actualVideoFormat",formatJson(actualVideoFormat))
+                    .put("actualAudioFormat",formatJson(actualAudioFormat))
                     .put("seekRecoveryMs",seekRecoveryMs).put("rebufferCount",rebufferCount)
                     .put("rebufferMs",rebufferMs).put("droppedFrames",droppedFrames)
                     .put("mediaBytes",mediaBytes).put("uidRxBytes",uidRxBytes)
@@ -734,12 +1183,29 @@ public final class YoutubePlaybackBenchmarkTest {
                     .put("seekSabrCachedBytesDelta",seekTrace.sabrCachedBytesDelta)
                     .put("seekSabrCacheBefore",seekTrace.sabrCacheBefore.toJson())
                     .put("seekSabrCacheAfter",seekTrace.sabrCacheAfter.toJson())
-                    .put("seekSabrSegmentsBefore",new JSONArray(seekTrace.sabrSegmentsBefore))
-                    .put("seekSabrDiscardsBefore",new JSONArray(seekTrace.sabrDiscardsBefore))
-                    .put("seekSabrSegments",new JSONArray(seekTrace.sabrSegments))
-                    .put("seekSabrDiscards",new JSONArray(seekTrace.sabrDiscards))
-                    .put("seekSabrResponses",new JSONArray(seekTrace.sabrResponses))
-                    .put("seekTransfers",new JSONArray(seekTrace.transfers));
+                    .put("seekSabrSegmentsBeforeCount",seekTrace.sabrSegmentsBefore.size())
+                    .put("seekSabrDiscardsBeforeCount",seekTrace.sabrDiscardsBefore.size())
+                    .put("seekSabrSegmentCount",seekTrace.sabrSegments.size())
+                    .put("seekSabrDiscardCount",seekTrace.sabrDiscards.size())
+                    .put("seekSabrResponseCount",seekTrace.sabrResponses.size())
+                    .put("seekTransferCount",seekTrace.transfers.size())
+                    .put("stateTransitionCount",stateTransitionCount)
+                    .put("loadEventCount",loadEventCount);
+        }
+
+        private static JSONObject formatJson(@Nullable final Format format) throws Exception {
+            if (format == null) {
+                return new JSONObject();
+            }
+            return new JSONObject()
+                    .put("id", String.valueOf(format.id))
+                    .put("sampleMimeType", String.valueOf(format.sampleMimeType))
+                    .put("codecs", String.valueOf(format.codecs))
+                    .put("bitrate", format.bitrate)
+                    .put("width", format.width)
+                    .put("height", format.height)
+                    .put("channelCount", format.channelCount)
+                    .put("sampleRate", format.sampleRate);
         }
     }
 

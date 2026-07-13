@@ -63,6 +63,13 @@ class LocalDomPoTokenProvider(context: Context) : SabrPoTokenProvider {
         return diskLoad(videoId) != null
     }
 
+    fun clearCachedToken(videoId: String) {
+        synchronized(mintLocks.computeIfAbsent(videoId) { Any() }) {
+            cache.remove(videoId)
+            prefs.edit().remove(videoId).commit()
+        }
+    }
+
     private fun ensureGenerator(visitorData: String): LocalDomPoTokenGenerator {
         synchronized(generatorLock) {
             val current = generator
