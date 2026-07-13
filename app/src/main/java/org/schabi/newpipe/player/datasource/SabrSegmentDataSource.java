@@ -347,6 +347,12 @@ public final class SabrSegmentDataSource implements DataSource {
                         + " seq=" + request.getSequenceNumber());
                 return null;
             }
+            final IOException demandFailure = !request.isInitializationSegment()
+                    && readerGeneration >= 0
+                    ? pump.takeDemandFailure(request, readerOwner, readerGeneration) : null;
+            if (demandFailure != null) {
+                throw demandFailure;
+            }
             final IOException networkFailure = pump.takeNetworkFailure();
             if (networkFailure != null) {
                 throw networkFailure;

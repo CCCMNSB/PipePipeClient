@@ -49,9 +49,11 @@ final class SabrStreamPump {
     private static final long SEEK_MODE_MS = 8_000;
     private static final long MIN_SERVER_READAHEAD_CUSHION_MS = 3_000;
     private static final long DEMAND_FORWARD_JUMP_MS = 30_000;
-    // Hard byte ceiling on read-ahead so a high-bitrate stream can't OOM the heap. The pump is
-    // intentionally tighter than the session's absolute cap so it slows down before eviction churn.
-    private static final long MAX_AHEAD_BYTES = 24L * 1024 * 1024;
+    private static final int MAX_DEMAND_RESPONSES_WITHOUT_TARGET = 3;
+    private static final long DEMAND_TARGET_DEADLINE_MS = 15_000;
+    // Use the session's cache ceiling as the single source of truth. A lower pump threshold leaves a
+    // byte range where the pump is throttled but the session cannot evict, forcing demand-time fetches.
+    private static final long MAX_AHEAD_BYTES = YoutubeSabrSession.getMaxCacheBytes();
     // Keep a short rewind cushion in cache; deeper rewinds are refetched by repositioning the session.
     private static final long BACK_BUFFER_MS = 12_000;
     // Shrink the back-buffer when over budget so eviction can free enough data to keep fetching.
@@ -73,6 +75,7 @@ final class SabrStreamPump {
     private volatile SabrSegmentRequest pendingForwardSeek;
     private volatile long pendingForwardSeekPositionMs = -1;
     private final Map<DemandKey, SegmentDemand> activeDemands = new ConcurrentHashMap<>();
+    private final Map<DemandKey, IOException> demandFailures = new ConcurrentHashMap<>();
     private volatile YoutubeSabrFormat pendingInitialization;
     private volatile long seekModeUntilMs;
     private volatile long startedAtMs;
@@ -128,6 +131,13 @@ final class SabrStreamPump {
         return failure;
     }
 
+    @Nullable
+    IOException takeDemandFailure(@NonNull final SabrSegmentRequest request,
+                                  @NonNull final Object readerOwner,
+                                  final long readerGeneration) {
+        return demandFailures.remove(DemandKey.from(request, readerOwner, readerGeneration));
+    }
+
     boolean canRecover() {
         return state == State.IDLE || state == State.THROTTLED;
     }
@@ -162,8 +172,11 @@ final class SabrStreamPump {
             clearSegmentDemand(request, readerOwner, readerGeneration);
             return;
         }
-        activateSeekMode();
         final DemandKey key = DemandKey.from(request, readerOwner, readerGeneration);
+        if (demandFailures.containsKey(key)) {
+            wake();
+            return;
+        }
         final boolean added = activeDemands.putIfAbsent(key, new SegmentDemand(
                 request, readerOwner, readerGeneration, System.currentTimeMillis())) == null;
         ensureStarted();
@@ -176,6 +189,7 @@ final class SabrStreamPump {
                             @NonNull final Object readerOwner,
                             final long readerGeneration) {
         activeDemands.remove(DemandKey.from(request, readerOwner, readerGeneration));
+        demandFailures.remove(DemandKey.from(request, readerOwner, readerGeneration));
     }
 
     void requestSeekTo(@NonNull final SabrSegmentRequest request, final boolean backward) {
@@ -286,41 +300,68 @@ final class SabrStreamPump {
                             final long demandStartMs = session.getStreamState()
                                     .getSegmentStartMs(demand.request.getFormat(),
                                             demand.request.getSequenceNumber());
-                            if (demandStartMs < edgeMs) {
+                            if (demand.shouldReposition()) {
                                 state = State.REPOSITIONING;
+                                demand.repositioned = true;
+                                session.addDiagnosticEvent("pump_demand_reposition itag="
+                                        + demand.request.getFormat().getItag()
+                                        + " seq=" + demand.request.getSequenceNumber()
+                                        + " startMs=" + demandStartMs
+                                        + " edgeMs=" + edgeMs
+                                        + " misses=" + demand.responsesWithoutTarget);
+                                if (demandStartMs < edgeMs) {
+                                    session.prepareForRewind(demand.request);
+                                } else if (demandStartMs
+                                        > edgeMs + DEMAND_FORWARD_JUMP_MS) {
+                                    session.prepareForForwardJump(demand.request);
+                                } else {
+                                    session.prepareForMissingSegment(demand.request);
+                                }
+                                final YoutubeSabrSession.DemandResponseResult result =
+                                        pumpOnceStreamingUntilCached(
+                                        demand.request);
+                                final boolean demandCompleted = finishDemandAttempt(demand, result);
+                                state = State.IDLE;
+                                consecutiveIoErrors = 0;
+                                if (!demandCompleted) {
+                                    awaitDemandRetry();
+                                }
+                                continue;
+                            } else if (demandStartMs < edgeMs) {
+                                state = State.REPOSITIONING;
+                                demand.repositioned = true;
                                 session.addDiagnosticEvent("pump_demand_rewind itag="
                                         + demand.request.getFormat().getItag()
                                         + " seq=" + demand.request.getSequenceNumber()
                                         + " startMs=" + demandStartMs
                                         + " edgeMs=" + edgeMs);
                                 session.prepareForRewind(demand.request);
-                                final int segmentCount = pumpOnceStreamingUntilCached(
+                                final YoutubeSabrSession.DemandResponseResult result =
+                                        pumpOnceStreamingUntilCached(
                                         demand.request);
-                                if (session.getCachedSegment(demand.request) != null) {
-                                    clearDemand(demand);
-                                }
+                                final boolean demandCompleted = finishDemandAttempt(demand, result);
                                 state = State.IDLE;
                                 consecutiveIoErrors = 0;
-                                if (segmentCount == 0) {
+                                if (!demandCompleted) {
                                     awaitDemandRetry();
                                 }
                                 continue;
                             } else if (demandStartMs > edgeMs + DEMAND_FORWARD_JUMP_MS) {
                                 state = State.REPOSITIONING;
+                                demand.repositioned = true;
                                 session.addDiagnosticEvent("pump_demand_forward itag="
                                         + demand.request.getFormat().getItag()
                                         + " seq=" + demand.request.getSequenceNumber()
                                         + " startMs=" + demandStartMs
                                         + " edgeMs=" + edgeMs);
                                 session.prepareForForwardJump(demand.request);
-                                final int segmentCount = pumpOnceStreamingUntilCached(
+                                final YoutubeSabrSession.DemandResponseResult result =
+                                        pumpOnceStreamingUntilCached(
                                         demand.request);
-                                if (session.getCachedSegment(demand.request) != null) {
-                                    clearDemand(demand);
-                                }
+                                final boolean demandCompleted = finishDemandAttempt(demand, result);
                                 state = State.IDLE;
                                 consecutiveIoErrors = 0;
-                                if (segmentCount == 0) {
+                                if (!demandCompleted) {
                                     awaitDemandRetry();
                                 }
                                 continue;
@@ -338,14 +379,13 @@ final class SabrStreamPump {
                                 final long requestPlayerTimeMs = cappedServerAheadPlayerTimeMs(
                                         playerTimeMs, edgeMs);
                                 session.getStreamState().setPlayerTimeMs(requestPlayerTimeMs);
-                                final int segmentCount = pumpOnceStreamingUntilCached(
+                                final YoutubeSabrSession.DemandResponseResult result =
+                                        pumpOnceStreamingUntilCached(
                                         demand.request);
-                                if (session.getCachedSegment(demand.request) != null) {
-                                    clearDemand(demand);
-                                }
+                                final boolean demandCompleted = finishDemandAttempt(demand, result);
                                 state = State.IDLE;
                                 consecutiveIoErrors = 0;
-                                if (segmentCount == 0) {
+                                if (!demandCompleted) {
                                     awaitDemandRetry();
                                 }
                                 continue;
@@ -469,19 +509,21 @@ final class SabrStreamPump {
         }
     }
 
-    private int pumpOnceStreamingUntilCached(@NonNull final SabrSegmentRequest request)
+    private YoutubeSabrSession.DemandResponseResult pumpOnceStreamingUntilCached(
+            @NonNull final SabrSegmentRequest request)
             throws IOException, ExtractionException {
-        final int segmentCount;
+        final YoutubeSabrSession.DemandResponseResult result;
         try {
-            segmentCount = session.pumpOnceStreamingUntilCached(localization, request);
+            result = session.pumpOnceStreamingForDemand(localization, request);
             holder.recordDiagnosticsThrottled("pump_until_cached itag="
                     + request.getFormat().getItag()
                     + " seq=" + request.getSequenceNumber()
-                    + " segments=" + segmentCount);
+                    + " segments=" + result.getSegmentCount()
+                    + " targetTrackSegments=" + result.getTargetTrackSegmentCount());
         } finally {
             lastRequestMs = System.currentTimeMillis();
         }
-        return segmentCount;
+        return result;
     }
 
     private void awaitDemandRetry() {
@@ -623,6 +665,65 @@ final class SabrStreamPump {
                 demand.readerGeneration));
     }
 
+    private boolean finishDemandAttempt(
+            @NonNull final SegmentDemand demand,
+            @NonNull final YoutubeSabrSession.DemandResponseResult result) {
+        if (!isDemandActive(demand)) {
+            return true;
+        }
+        if (session.getCachedSegment(demand.request) != null) {
+            clearDemand(demand);
+            return true;
+        }
+        final long elapsedMs = Math.max(0, System.currentTimeMillis() - demand.sinceMs);
+        if (result.getTargetTrackSegmentCount() > 0) {
+            demand.responsesWithoutTarget++;
+            session.addDiagnosticEvent("pump_demand_target_miss itag="
+                    + demand.request.getFormat().getItag()
+                    + " seq=" + demand.request.getSequenceNumber()
+                    + " misses=" + demand.responsesWithoutTarget
+                    + " segments=" + result.getSegmentCount()
+                    + " elapsedMs=" + elapsedMs);
+            if (demand.responsesWithoutTarget >= MAX_DEMAND_RESPONSES_WITHOUT_TARGET
+                    || elapsedMs >= DEMAND_TARGET_DEADLINE_MS) {
+                failDemand(demand, new IOException(
+                        "SABR response repeatedly omitted demanded segment itag="
+                                + demand.request.getFormat().getItag()
+                                + ", seq=" + demand.request.getSequenceNumber()
+                                + ", responses=" + demand.responsesWithoutTarget
+                                + ", elapsedMs=" + elapsedMs));
+                return true;
+            }
+        } else if (elapsedMs >= DEMAND_TARGET_DEADLINE_MS) {
+            failDemand(demand, new IOException("SABR demand timed out without target-track media"
+                    + " itag=" + demand.request.getFormat().getItag()
+                    + ", seq=" + demand.request.getSequenceNumber()
+                    + ", elapsedMs=" + elapsedMs));
+            return true;
+        }
+        return false;
+    }
+
+    private boolean isDemandActive(@NonNull final SegmentDemand demand) {
+        final DemandKey key = DemandKey.from(demand.request, demand.readerOwner,
+                demand.readerGeneration);
+        return activeDemands.get(key) == demand
+                && holder.isReaderGenerationActive(demand.readerOwner, demand.readerGeneration);
+    }
+
+    private void failDemand(@NonNull final SegmentDemand demand,
+                            @NonNull final IOException failure) {
+        final DemandKey key = DemandKey.from(demand.request, demand.readerOwner,
+                demand.readerGeneration);
+        if (activeDemands.remove(key, demand)) {
+            demandFailures.put(key, failure);
+            session.addDiagnosticEvent("pump_demand_failed itag="
+                    + demand.request.getFormat().getItag()
+                    + " seq=" + demand.request.getSequenceNumber()
+                    + " message=" + failure.getMessage());
+        }
+    }
+
     private static final class SegmentDemand {
         @NonNull
         private final SabrSegmentRequest request;
@@ -630,6 +731,8 @@ final class SabrStreamPump {
         private final Object readerOwner;
         private final long readerGeneration;
         private final long sinceMs;
+        private int responsesWithoutTarget;
+        private boolean repositioned;
 
         private SegmentDemand(@NonNull final SabrSegmentRequest request,
                               @NonNull final Object readerOwner,
@@ -639,6 +742,10 @@ final class SabrStreamPump {
             this.readerOwner = readerOwner;
             this.readerGeneration = readerGeneration;
             this.sinceMs = sinceMs;
+        }
+
+        private boolean shouldReposition() {
+            return responsesWithoutTarget > 0 && !repositioned;
         }
     }
 

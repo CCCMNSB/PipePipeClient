@@ -155,6 +155,129 @@ public final class SabrPlaybackSmokeTest {
     }
 
     @Test
+    public void demandRepositionsAfterNonTargetMediaBatch() throws Exception {
+        try (SabrSmokeHarness harness = SabrSmokeHarness.create()) {
+            harness.setPlayerTimeMs(20_000);
+            harness.downloader.enqueue(new UmpFixture()
+                    .initSegment(0, SMOKE_VIDEO_ITAG)
+                    .segment(1, SMOKE_VIDEO_ITAG, 1, 0, 5_000)
+                    .bytes());
+            harness.downloader.enqueue(new UmpFixture()
+                    .segment(2, SMOKE_VIDEO_ITAG, 4, 15_000, 5_000)
+                    .segment(3, SMOKE_VIDEO_ITAG, 5, 20_000, 5_000)
+                    .segment(4, SMOKE_VIDEO_ITAG, 6, 25_000, 5_000)
+                    .segment(5, SMOKE_VIDEO_ITAG, 7, 30_000, 5_000)
+                    .segment(6, SMOKE_VIDEO_ITAG, 8, 35_000, 5_000)
+                    .bytes());
+            harness.downloader.enqueue(new UmpFixture()
+                    .segment(7, SMOKE_VIDEO_ITAG, 3, 10_000, 5_000)
+                    .bytes());
+
+            harness.openMediaSegment(
+                    SabrSegmentRequest.media(harness.videoFormat, 3), 5_000);
+
+            final String trace = harness.holder.session.getDiagnosticTrace();
+            assertTrue("A non-target media batch did not force demand repositioning: " + trace,
+                    trace.contains("pump_demand_reposition itag="
+                            + SMOKE_VIDEO_ITAG + " seq=3"));
+            assertTrue("Expected initial, non-target, and repositioned target requests",
+                    harness.downloader.requestBodies.size() >= 3);
+            final String repositionedRequest = SabrRequestDumper.summarize(
+                    harness.downloader.requestBodies.get(2));
+            assertTrue("Repositioned demand did not report the target as the next segment: "
+                            + repositionedRequest,
+                    repositionedRequest.contains("seq=1-2"));
+            assertTrue("Repositioned demand kept the ahead-of-hole player time: "
+                            + repositionedRequest,
+                    repositionedRequest.contains("playerTimeMs=10000"));
+        }
+    }
+
+    @Test
+    public void companionOnlyResponseDoesNotConsumeTargetMissBudget() throws Exception {
+        try (SabrSmokeHarness harness = SabrSmokeHarness.create()) {
+            harness.downloader.enqueue(new UmpFixture()
+                    .segment(1, SMOKE_VIDEO_ITAG, 1, 0, 5_000)
+                    .bytes());
+            harness.downloader.enqueue(new UmpFixture()
+                    .segment(2, SMOKE_AUDIO_ITAG, 1, 0, 5_000)
+                    .bytes());
+            harness.downloader.enqueue(new UmpFixture()
+                    .segment(3, SMOKE_VIDEO_ITAG, 3, 10_000, 5_000)
+                    .bytes());
+
+            harness.openMediaSegment(
+                    SabrSegmentRequest.media(harness.videoFormat, 3), 5_000);
+
+            final String trace = harness.holder.session.getDiagnosticTrace();
+            assertTrue("Companion-only response was treated as a target-track miss: " + trace,
+                    !trace.contains("pump_demand_target_miss itag="
+                            + SMOKE_VIDEO_ITAG + " seq=3"));
+            assertTrue("Companion-only response triggered target repositioning: " + trace,
+                    !trace.contains("pump_demand_reposition itag="
+                            + SMOKE_VIDEO_ITAG + " seq=3"));
+        }
+    }
+
+    @Test
+    public void repeatedNonTargetMediaBatchesFailWithinDemandBudget() throws Exception {
+        try (SabrSmokeHarness harness = SabrSmokeHarness.create()) {
+            harness.downloader.enqueue(new UmpFixture()
+                    .initSegment(0, SMOKE_VIDEO_ITAG)
+                    .segment(1, SMOKE_VIDEO_ITAG, 1, 0, 5_000)
+                    .bytes());
+            for (int response = 0; response < 3; response++) {
+                harness.downloader.enqueue(new UmpFixture()
+                        .segment(2 + response, SMOKE_VIDEO_ITAG,
+                                4 + response, 15_000 + response * 5_000L, 5_000)
+                        .bytes());
+            }
+
+            harness.openMediaSegmentExpectFailure(
+                    SabrSegmentRequest.media(harness.videoFormat, 3), 5_000);
+
+            final String trace = harness.holder.session.getDiagnosticTrace();
+            assertTrue("Demand did not record the bounded third target miss: " + trace,
+                    trace.contains("pump_demand_target_miss itag="
+                            + SMOKE_VIDEO_ITAG + " seq=3 misses=3"));
+            assertTrue("Demand exceeded its response budget plus one resumed prefetch: requests="
+                            + harness.downloader.requestBodies.size() + " trace=" + trace,
+                    harness.downloader.requestBodies.size() <= 5);
+        }
+    }
+
+    @Test
+    public void activePrefetchDoesNotDeadZoneBelowSessionCacheLimit() throws Exception {
+        try (SabrSmokeHarness harness = SabrSmokeHarness.create()) {
+            final int firstSegmentBytes = 28 * 1024 * 1024;
+            final SabrSegmentRequest first =
+                    SabrSegmentRequest.media(harness.videoFormat, 1);
+            final SabrSegmentRequest second =
+                    SabrSegmentRequest.media(harness.videoFormat, 2);
+            harness.downloader.enqueue(new GeneratedLargeMediaResponse(
+                    1, SMOKE_VIDEO_ITAG, 1, 0, 5_000, firstSegmentBytes));
+            harness.downloader.enqueue(new UmpFixture()
+                    .segment(2, SMOKE_VIDEO_ITAG, 2, 5_000, 30_000)
+                    .bytes());
+
+            harness.openMediaSegment(first, 30_000);
+            harness.setPlayerTimeMs(5_000);
+            final long deadlineNs = System.nanoTime() + TimeUnit.SECONDS.toNanos(3);
+            while (harness.holder.session.getCachedSegment(second) == null
+                    && System.nanoTime() < deadlineNs) {
+                Thread.sleep(50);
+            }
+
+            final String trace = harness.holder.session.getDiagnosticTrace();
+            assertNotNull("Active prefetch stopped between the pump and session byte limits: "
+                            + trace,
+                    harness.holder.session.getCachedSegment(second));
+            assertTrue("Active prefetch did not make a second request: " + trace,
+                    harness.downloader.requestBodies.size() >= 2);
+        }
+    }
+
+    @Test
     public void demandBackoffIsCappedForWaitingLoader() throws Exception {
         try (SabrSmokeHarness harness = SabrSmokeHarness.create()) {
             harness.downloader.enqueue(new UmpFixture()
@@ -280,8 +403,7 @@ public final class SabrPlaybackSmokeTest {
                     throw new IOException("Interrupted waiting to release stale demand response", e);
                 }
                 return new ByteArrayInputStream(new UmpFixture()
-                        .part(SabrResponseDecoder.NEXT_REQUEST_POLICY,
-                                nextRequestPolicy(2_000))
+                        .segment(2, SMOKE_VIDEO_ITAG, 3, 60_000, 5_000)
                         .bytes());
             });
 
@@ -325,6 +447,12 @@ public final class SabrPlaybackSmokeTest {
                     failure.get() instanceof IOException);
             assertTrue("Stale reader demand failed the shared SABR session: " + trace,
                     !trace.contains("terminal_failure"));
+            assertTrue("Media-bearing stale demand changed the session after cancellation: " + trace,
+                    !trace.contains("pump_demand_target_miss itag=" + SMOKE_VIDEO_ITAG + " seq=2")
+                            && !trace.contains("pump_demand_reposition itag="
+                            + SMOKE_VIDEO_ITAG + " seq=2")
+                            && !trace.contains("pump_demand_failed itag="
+                            + SMOKE_VIDEO_ITAG + " seq=2"));
         }
     }
 
