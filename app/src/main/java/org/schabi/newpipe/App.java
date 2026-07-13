@@ -1,8 +1,11 @@
 package org.schabi.newpipe;
 
+import android.app.Activity;
+import android.app.Application;
 import android.content.*;
 import android.content.pm.ResolveInfo;
 import android.os.Build;
+import android.os.Bundle;
 import android.text.TextUtils;
 import android.util.Log;
 
@@ -39,6 +42,7 @@ import io.reactivex.rxjava3.exceptions.OnErrorNotImplementedException;
 import io.reactivex.rxjava3.exceptions.UndeliverableException;
 import io.reactivex.rxjava3.functions.Consumer;
 import io.reactivex.rxjava3.plugins.RxJavaPlugins;
+import io.reactivex.rxjava3.schedulers.Schedulers;
 
 import static org.schabi.newpipe.MainActivity.DEBUG;
 
@@ -126,6 +130,7 @@ public class App extends MultiDexApplication {
         webViewAvailabilityChecker.warmUp();
         final WebViewJavaScriptDecoder decoder = new WebViewJavaScriptDecoder(this);
         YoutubeApiDecoder.setLocalDecoder(decoder);
+        scheduleYoutubeDecoderPrewarm(decoder);
 
         Localization.initPrettyTime(Localization.resolvePrettyTime(getApplicationContext()));
 
@@ -170,6 +175,49 @@ public class App extends MultiDexApplication {
                 && prefs.getBoolean(getString(R.string.show_image_indicators_key), false));
 
         configureRxJavaErrorHandler();
+    }
+
+    private void scheduleYoutubeDecoderPrewarm(final WebViewJavaScriptDecoder decoder) {
+        registerActivityLifecycleCallbacks(new Application.ActivityLifecycleCallbacks() {
+            private boolean scheduled;
+
+            @Override
+            public void onActivityResumed(@NonNull final Activity activity) {
+                if (scheduled) {
+                    return;
+                }
+                scheduled = true;
+                unregisterActivityLifecycleCallbacks(this);
+                activity.getWindow().getDecorView().postDelayed(
+                        () -> Schedulers.io().scheduleDirect(decoder::prewarm), 1_000);
+            }
+
+            @Override
+            public void onActivityCreated(@NonNull final Activity activity,
+                                          final Bundle savedInstanceState) {
+            }
+
+            @Override
+            public void onActivityStarted(@NonNull final Activity activity) {
+            }
+
+            @Override
+            public void onActivityPaused(@NonNull final Activity activity) {
+            }
+
+            @Override
+            public void onActivityStopped(@NonNull final Activity activity) {
+            }
+
+            @Override
+            public void onActivitySaveInstanceState(@NonNull final Activity activity,
+                                                    @NonNull final Bundle outState) {
+            }
+
+            @Override
+            public void onActivityDestroyed(@NonNull final Activity activity) {
+            }
+        });
     }
 
     @Override

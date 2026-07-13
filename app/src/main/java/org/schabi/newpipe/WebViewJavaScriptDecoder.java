@@ -16,6 +16,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -46,12 +47,33 @@ public final class WebViewJavaScriptDecoder implements YoutubeJavaScriptDecoder 
     private String loadedPlayerId;
     private String preparedPlayerId;
     private String preparedPlayerCode;
+    private boolean solverReady;
+    private boolean prewarming;
 
     public WebViewJavaScriptDecoder(final Context context) {
         this.context = context.getApplicationContext();
         runtime = SharedWebViewRuntime.get(this.context);
         preferences = this.context.getSharedPreferences(
                 PLAYER_CACHE_PREFS, Context.MODE_PRIVATE);
+    }
+
+    public synchronized void prewarm() {
+        if (solverReady || prewarming) {
+            return;
+        }
+        prewarming = true;
+        final long start = SystemClock.elapsedRealtime();
+        try {
+            final PlayerData playerData = getPlayerData("");
+            decodeBatch(playerData.getPlayerId(), Collections.emptyList(),
+                    Collections.emptyList());
+            Log.i(TAG, "prewarm=" + (SystemClock.elapsedRealtime() - start) + "ms"
+                    + " player=" + playerData.getPlayerId());
+        } catch (final ParsingException e) {
+            Log.w(TAG, "Could not prewarm local decoder", e);
+        } finally {
+            prewarming = false;
+        }
     }
 
     @Nonnull
@@ -136,6 +158,7 @@ public final class WebViewJavaScriptDecoder implements YoutubeJavaScriptDecoder 
             request.put("requests", requests);
             final long localStart = SystemClock.elapsedRealtime();
             if (!playerId.equals(loadedPlayerId)) {
+                solverReady = false;
                 final String playerCode = playerId.equals(preparedPlayerId)
                         && preparedPlayerCode != null
                         ? preparedPlayerCode : fetchPlayer(playerId);
@@ -150,6 +173,7 @@ public final class WebViewJavaScriptDecoder implements YoutubeJavaScriptDecoder 
             final YoutubeApiDecoder.BatchDecodeResult local = parseResult(localJson,
                     throttlingParameters != null && !throttlingParameters.isEmpty(),
                     signatures != null && !signatures.isEmpty());
+            solverReady = true;
             Log.i(TAG, "player=" + playerId
                     + " cold=" + localJson.optBoolean("cold")
                     + " v8=" + localJson.optLong("elapsedMs") + "ms"
