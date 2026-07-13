@@ -68,6 +68,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InterruptedIOException;
 import java.lang.reflect.Field;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
@@ -154,7 +155,7 @@ public final class SabrPlaybackSmokeTest {
     }
 
     @Test
-    public void demandBackoffDoesNotBlockLoaderUntilServerDelay() throws Exception {
+    public void demandBackoffIsCappedForWaitingLoader() throws Exception {
         try (SabrSmokeHarness harness = SabrSmokeHarness.create()) {
             harness.downloader.enqueue(new UmpFixture()
                     .segment(1, SMOKE_VIDEO_ITAG, 1, 0, 30_000)
@@ -172,10 +173,209 @@ public final class SabrPlaybackSmokeTest {
             final String trace = harness.holder.session.getDiagnosticTrace();
             assertTrue("Demand path did not request the target segment: " + trace,
                     trace.contains("pump_demand itag=" + SMOKE_VIDEO_ITAG + " seq=2"));
-            assertTrue("Demand path honored a long SABR backoff while loader waited: " + trace,
-                    trace.contains("skip_backoff waitTarget backoffMs=30000"));
-            assertTrue("Loader waited too long for demand retry: elapsedMs=" + elapsedMs
-                    + " trace=" + trace, elapsedMs < 5_000);
+            final List<Long> requestTimesMs = harness.downloader.requestTimesSnapshot();
+            assertTrue("Expected initial, policy-only, and target requests: " + requestTimesMs,
+                    requestTimesMs.size() >= 3);
+            final long retryDelayMs = requestTimesMs.get(2) - requestTimesMs.get(1);
+            assertTrue("Demand retry ignored the server backoff entirely: delayMs="
+                            + retryDelayMs + " trace=" + trace,
+                    retryDelayMs >= 1_500);
+            assertTrue("Demand retry honored the full 30 second backoff instead of the bounded "
+                            + "loader wait: elapsedMs=" + elapsedMs + " trace=" + trace,
+                    elapsedMs < 5_000);
+        }
+    }
+
+    @Test
+    public void repeatedProtectedNoMediaResponsesHonorBackoffAndRecover() throws Exception {
+        try (SabrSmokeHarness harness = SabrSmokeHarness.create()) {
+            harness.downloader.enqueue(new UmpFixture()
+                    .segment(1, SMOKE_VIDEO_ITAG, 1, 0, 30_000)
+                    .bytes());
+            for (int i = 0; i < 3; i++) {
+                harness.downloader.enqueue(new UmpFixture()
+                        .part(SabrResponseDecoder.STREAM_PROTECTION_STATUS,
+                                streamProtection(3, 20))
+                        .part(SabrResponseDecoder.NEXT_REQUEST_POLICY,
+                                nextRequestPolicy(2_000))
+                        .bytes());
+            }
+            harness.downloader.enqueue(new UmpFixture()
+                    .segment(5, SMOKE_VIDEO_ITAG, 2, 30_000, 5_000)
+                    .bytes());
+
+            final long elapsedMs = harness.openMediaSegment(
+                    SabrSegmentRequest.media(harness.videoFormat, 2), 10_000);
+
+            final String trace = harness.holder.session.getDiagnosticTrace();
+            final List<Long> requestTimesMs = harness.downloader.requestTimesSnapshot();
+            assertTrue("Repeated protection responses were not exercised: " + trace,
+                    trace.contains("protection=3/20"));
+            assertTrue("Expected one initial request, three empty responses, and recovery: "
+                            + requestTimesMs,
+                    requestTimesMs.size() >= 5);
+            for (int i = 2; i < 5; i++) {
+                final long retryDelayMs = requestTimesMs.get(i) - requestTimesMs.get(i - 1);
+                assertTrue("Demand hammered a policy-only response at retry " + i
+                                + ": delayMs=" + retryDelayMs + " trace=" + trace,
+                        retryDelayMs >= 1_500);
+            }
+            assertTrue("Server-paced retries completed suspiciously fast: elapsedMs=" + elapsedMs
+                            + " trace=" + trace,
+                    elapsedMs >= 5_500);
+            assertTrue("Server-paced demand recovery took too long: elapsedMs=" + elapsedMs
+                            + " trace=" + trace,
+                    elapsedMs < 9_000);
+        }
+    }
+
+    @Test
+    public void nearEdgeNoProgressRefetchesBeforeFailingSession() throws Exception {
+        try (SabrSmokeHarness harness = SabrSmokeHarness.create()) {
+            harness.downloader.enqueue(new UmpFixture()
+                    .segment(1, SMOKE_VIDEO_ITAG, 1, 0, 30_000)
+                    .bytes());
+            for (int i = 0; i < 6; i++) {
+                harness.downloader.enqueue(new UmpFixture()
+                        .part(SabrResponseDecoder.NEXT_REQUEST_POLICY,
+                                nextRequestPolicy(2_000))
+                        .bytes());
+            }
+            harness.downloader.enqueue(new UmpFixture()
+                    .segment(8, SMOKE_VIDEO_ITAG, 2, 30_000, 5_000)
+                    .bytes());
+
+            final long elapsedMs = harness.openMediaSegment(
+                    SabrSegmentRequest.media(harness.videoFormat, 2), 15_000);
+
+            final String trace = harness.holder.session.getDiagnosticTrace();
+            assertTrue("Near-edge stall never performed an actionable recovery: " + trace,
+                    trace.contains("recovery type=near_edge_refetch"));
+            assertTrue("Near-edge recovery did not reposition the pump: " + trace,
+                    trace.contains("pump_rewind itag=" + SMOKE_VIDEO_ITAG + " seq=2"));
+            assertTrue("Near-edge recovery fired before sustained no-progress: elapsedMs="
+                            + elapsedMs + " trace=" + trace,
+                    elapsedMs >= 9_500);
+            assertTrue("Near-edge recovery failed the shared SABR session: " + trace,
+                    !trace.contains("terminal_failure"));
+        }
+    }
+
+    @Test
+    public void staleReaderDemandStopsWithoutFailingSession() throws Exception {
+        try (SabrSmokeHarness harness = SabrSmokeHarness.create()) {
+            harness.downloader.enqueue(new UmpFixture()
+                    .segment(1, SMOKE_VIDEO_ITAG, 1, 0, 30_000)
+                    .bytes());
+            final CountDownLatch responseStarted = new CountDownLatch(1);
+            final CountDownLatch releaseResponse = new CountDownLatch(1);
+            harness.downloader.enqueue(() -> {
+                responseStarted.countDown();
+                try {
+                    if (!releaseResponse.await(5, TimeUnit.SECONDS)) {
+                        throw new IOException("Timed out waiting to release stale demand response");
+                    }
+                } catch (final InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new IOException("Interrupted waiting to release stale demand response", e);
+                }
+                return new ByteArrayInputStream(new UmpFixture()
+                        .part(SabrResponseDecoder.NEXT_REQUEST_POLICY,
+                                nextRequestPolicy(2_000))
+                        .bytes());
+            });
+
+            final SabrSegmentRequest request =
+                    SabrSegmentRequest.media(harness.videoFormat, 2);
+            final SabrSegmentDataSource dataSource = new SabrSegmentDataSource(
+                    harness.holder, harness.readerOwner, request.getFormat(),
+                    new Localization("en", "US"), false);
+            final AtomicReference<Throwable> failure = new AtomicReference<>();
+            final CountDownLatch done = new CountDownLatch(1);
+            final Thread loader = new Thread(() -> {
+                try {
+                    dataSource.open(new DataSpec(harness.segmentUri(request)));
+                } catch (final Throwable e) {
+                    failure.set(e);
+                } finally {
+                    done.countDown();
+                }
+            }, "SabrSmokeStaleDemand");
+            loader.start();
+
+            boolean completed;
+            try {
+                assertTrue("Demand request did not reach the controlled response",
+                        responseStarted.await(5, TimeUnit.SECONDS));
+                harness.advanceReaderGeneration();
+                releaseResponse.countDown();
+                completed = done.await(1_500, TimeUnit.MILLISECONDS);
+            } finally {
+                releaseResponse.countDown();
+                dataSource.close();
+                loader.interrupt();
+                done.await(2, TimeUnit.SECONDS);
+            }
+
+            final String trace = harness.holder.session.getDiagnosticTrace();
+            assertTrue("Stale reader demand kept waiting until the no-progress watchdog: " + trace,
+                    completed);
+            assertTrue("Stale reader demand should end as a recoverable load cancellation: "
+                            + failure.get(),
+                    failure.get() instanceof IOException);
+            assertTrue("Stale reader demand failed the shared SABR session: " + trace,
+                    !trace.contains("terminal_failure"));
+        }
+    }
+
+    @Test
+    public void interruptedUmpReadStopsDemandWithoutFailingSession() throws Exception {
+        try (SabrSmokeHarness harness = SabrSmokeHarness.create()) {
+            harness.downloader.enqueue(new UmpFixture()
+                    .segment(1, SMOKE_VIDEO_ITAG, 1, 0, 30_000)
+                    .bytes());
+            harness.downloader.enqueue(() -> new InputStream() {
+                @Override
+                public int read() throws IOException {
+                    throw new InterruptedIOException("Interrupted while reading UMP stream");
+                }
+            });
+
+            final SabrSegmentRequest request =
+                    SabrSegmentRequest.media(harness.videoFormat, 2);
+            final SabrSegmentDataSource dataSource = new SabrSegmentDataSource(
+                    harness.holder, harness.readerOwner, request.getFormat(),
+                    new Localization("en", "US"), false);
+            final AtomicReference<Throwable> failure = new AtomicReference<>();
+            final CountDownLatch done = new CountDownLatch(1);
+            final Thread loader = new Thread(() -> {
+                try {
+                    dataSource.open(new DataSpec(harness.segmentUri(request)));
+                } catch (final Throwable e) {
+                    failure.set(e);
+                } finally {
+                    done.countDown();
+                }
+            }, "SabrSmokeInterruptedDemand");
+            loader.start();
+
+            final boolean completed;
+            try {
+                completed = done.await(1_500, TimeUnit.MILLISECONDS);
+            } finally {
+                dataSource.close();
+                loader.interrupt();
+                done.await(2, TimeUnit.SECONDS);
+            }
+
+            final String trace = harness.holder.session.getDiagnosticTrace();
+            assertTrue("Interrupted UMP read was retried until the watchdog: " + trace,
+                    completed);
+            assertTrue("Interrupted UMP read should surface as a recoverable load failure: "
+                            + failure.get(),
+                    failure.get() instanceof IOException);
+            assertTrue("Interrupted UMP read failed the shared SABR session: " + trace,
+                    !trace.contains("terminal_failure"));
         }
     }
 
@@ -314,7 +514,7 @@ public final class SabrPlaybackSmokeTest {
     }
 
     @Test
-    public void demandProtectedNoMediaBackoffDoesNotBlockLoader() throws Exception {
+    public void demandProtectedNoMediaBackoffRemainsBounded() throws Exception {
         try (SabrSmokeHarness harness = SabrSmokeHarness.create()) {
             harness.downloader.enqueue(new UmpFixture()
                     .segment(1, SMOKE_VIDEO_ITAG, 1, 0, 30_000)
@@ -333,9 +533,15 @@ public final class SabrPlaybackSmokeTest {
             final String trace = harness.holder.session.getDiagnosticTrace();
             assertTrue("Protected no-media response was not exercised: " + trace,
                     trace.contains("protection=3/7"));
-            assertTrue("Protected no-media backoff blocked demand retry: " + trace,
-                    trace.contains("skip_backoff waitTarget backoffMs=30000"));
-            assertTrue("Loader waited too long after protected no-media: elapsedMs=" + elapsedMs,
+            final List<Long> requestTimesMs = harness.downloader.requestTimesSnapshot();
+            assertTrue("Expected initial, protected, and target requests: " + requestTimesMs,
+                    requestTimesMs.size() >= 3);
+            final long retryDelayMs = requestTimesMs.get(2) - requestTimesMs.get(1);
+            assertTrue("Protected no-media retry ignored backoff: delayMs=" + retryDelayMs
+                            + " trace=" + trace,
+                    retryDelayMs >= 1_500);
+            assertTrue("Loader waited too long after bounded protected no-media backoff: elapsedMs="
+                            + elapsedMs,
                     elapsedMs < 5_000);
         }
     }
@@ -1784,6 +1990,13 @@ public final class SabrPlaybackSmokeTest {
             setPlayerTimeMs.invoke(holder, playerTimeMs);
         }
 
+        private void advanceReaderGeneration() throws Exception {
+            final Method advanceReaderGeneration = SabrSessionStore.Holder.class
+                    .getDeclaredMethod("advanceReaderGeneration", Object.class);
+            advanceReaderGeneration.setAccessible(true);
+            advanceReaderGeneration.invoke(holder, readerOwner);
+        }
+
         private long openMediaSegment(final SabrSegmentRequest request,
                                       final long timeoutMs) throws Exception {
             return openSegment(request, timeoutMs);
@@ -1866,6 +2079,7 @@ public final class SabrPlaybackSmokeTest {
                 new LinkedBlockingQueue<>();
         private final List<String> requestedUrls = new ArrayList<>();
         private final List<byte[]> requestBodies = new ArrayList<>();
+        private final List<Long> requestTimesMs = Collections.synchronizedList(new ArrayList<>());
 
         private void enqueue(final byte[] body) {
             responses.add(() -> new ByteArrayInputStream(body));
@@ -1873,6 +2087,12 @@ public final class SabrPlaybackSmokeTest {
 
         private void enqueue(final QueuedStreamingBody body) {
             responses.add(body);
+        }
+
+        private List<Long> requestTimesSnapshot() {
+            synchronized (requestTimesMs) {
+                return new ArrayList<>(requestTimesMs);
+            }
         }
 
         @Override
@@ -1889,6 +2109,7 @@ public final class SabrPlaybackSmokeTest {
                 throws IOException {
             requestedUrls.add(url);
             requestBodies.add(dataToSend.clone());
+            requestTimesMs.add(System.currentTimeMillis());
             final QueuedStreamingBody body = responses.poll();
             if (body == null) {
                 throw new IOException("No queued SABR smoke response for " + url);

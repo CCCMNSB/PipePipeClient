@@ -15,6 +15,7 @@ import org.schabi.newpipe.extractor.services.youtube.sabr.YoutubeSabrFormat;
 import org.schabi.newpipe.extractor.services.youtube.sabr.YoutubeSabrSession;
 
 import java.io.IOException;
+import java.io.InterruptedIOException;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.LockSupport;
@@ -128,8 +129,7 @@ final class SabrStreamPump {
     }
 
     boolean canRecover() {
-        return state != State.REQUESTING && state != State.REPOSITIONING
-                && state != State.TERMINAL;
+        return state == State.IDLE || state == State.THROTTLED;
     }
 
     String getStateName() {
@@ -164,10 +164,12 @@ final class SabrStreamPump {
         }
         activateSeekMode();
         final DemandKey key = DemandKey.from(request, readerOwner, readerGeneration);
-        activeDemands.computeIfAbsent(key, ignored -> new SegmentDemand(
-                request, readerOwner, readerGeneration, System.currentTimeMillis()));
+        final boolean added = activeDemands.putIfAbsent(key, new SegmentDemand(
+                request, readerOwner, readerGeneration, System.currentTimeMillis())) == null;
         ensureStarted();
-        wake();
+        if (added) {
+            wake();
+        }
     }
 
     void clearSegmentDemand(@NonNull final SabrSegmentRequest request,
@@ -292,12 +294,16 @@ final class SabrStreamPump {
                                         + " startMs=" + demandStartMs
                                         + " edgeMs=" + edgeMs);
                                 session.prepareForRewind(demand.request);
-                                pumpOnceStreamingUntilCached(demand.request);
+                                final int segmentCount = pumpOnceStreamingUntilCached(
+                                        demand.request);
                                 if (session.getCachedSegment(demand.request) != null) {
                                     clearDemand(demand);
                                 }
                                 state = State.IDLE;
                                 consecutiveIoErrors = 0;
+                                if (segmentCount == 0) {
+                                    awaitDemandRetry();
+                                }
                                 continue;
                             } else if (demandStartMs > edgeMs + DEMAND_FORWARD_JUMP_MS) {
                                 state = State.REPOSITIONING;
@@ -307,12 +313,16 @@ final class SabrStreamPump {
                                         + " startMs=" + demandStartMs
                                         + " edgeMs=" + edgeMs);
                                 session.prepareForForwardJump(demand.request);
-                                pumpOnceStreamingUntilCached(demand.request);
+                                final int segmentCount = pumpOnceStreamingUntilCached(
+                                        demand.request);
                                 if (session.getCachedSegment(demand.request) != null) {
                                     clearDemand(demand);
                                 }
                                 state = State.IDLE;
                                 consecutiveIoErrors = 0;
+                                if (segmentCount == 0) {
+                                    awaitDemandRetry();
+                                }
                                 continue;
                             } else {
                                 state = State.REQUESTING;
@@ -336,7 +346,7 @@ final class SabrStreamPump {
                                 state = State.IDLE;
                                 consecutiveIoErrors = 0;
                                 if (segmentCount == 0) {
-                                    awaitWake(IDLE_POLL_MS);
+                                    awaitDemandRetry();
                                 }
                                 continue;
                             }
@@ -376,6 +386,16 @@ final class SabrStreamPump {
                         awaitWake(IDLE_POLL_MS);
                     }
                 } catch (final IOException e) {
+                    if (stopped || holder.isInvalidated()) {
+                        session.addDiagnosticEvent("pump_canceled invalidated="
+                                + holder.isInvalidated() + " message=" + e.getMessage());
+                        break;
+                    }
+                    if (isInterruptedRead(e)) {
+                        networkFailure = e;
+                        state = State.NETWORK_FAILED;
+                        break;
+                    }
                     consecutiveIoErrors++;
                     if (consecutiveIoErrors >= MAX_CONSECUTIVE_IO_ERRORS) {
                         Log.w(TAG, "SABR pump network failure "
@@ -435,16 +455,22 @@ final class SabrStreamPump {
 
     private int pumpOnceStreamingUntilCached(@NonNull final SabrSegmentRequest request)
             throws IOException, ExtractionException {
+        final int segmentCount;
         try {
-            final int segmentCount = session.pumpOnceStreamingUntilCached(localization, request);
+            segmentCount = session.pumpOnceStreamingUntilCached(localization, request);
             holder.recordDiagnosticsThrottled("pump_until_cached itag="
                     + request.getFormat().getItag()
                     + " seq=" + request.getSequenceNumber()
                     + " segments=" + segmentCount);
-            return segmentCount;
         } finally {
             lastRequestMs = System.currentTimeMillis();
         }
+        return segmentCount;
+    }
+
+    private void awaitDemandRetry() {
+        final long remainingBackoffMs = session.getDemandBackoffRemainingMs();
+        awaitWake(remainingBackoffMs > 0 ? remainingBackoffMs : IDLE_POLL_MS);
     }
 
     private long targetReadaheadCushionMs() {
@@ -656,6 +682,15 @@ final class SabrStreamPump {
         } catch (final InterruptedException e) {
             Thread.currentThread().interrupt();
         }
+    }
+
+    private static boolean isInterruptedRead(@NonNull final IOException error) {
+        if (!(error instanceof InterruptedIOException)) {
+            return false;
+        }
+        final String message = error.getMessage();
+        return Thread.currentThread().isInterrupted()
+                || message != null && message.startsWith("Interrupted");
     }
 
     private void wake() {
