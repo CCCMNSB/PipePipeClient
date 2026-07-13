@@ -387,6 +387,22 @@ public final class DownloaderImpl extends Downloader {
     }
 
     @Override
+    public StreamingResponse getStreaming(final String url,
+                                          @Nullable final Map<String, List<String>> headers,
+                                          @Nullable final Localization localization,
+                                          final long timeoutMs)
+            throws IOException, ReCaptchaException {
+        final long boundedTimeoutMs = Math.max(1, timeoutMs);
+        final OkHttpClient boundedClient = client.newBuilder()
+                .callTimeout(boundedTimeoutMs, TimeUnit.MILLISECONDS)
+                .connectTimeout(boundedTimeoutMs, TimeUnit.MILLISECONDS)
+                .readTimeout(boundedTimeoutMs, TimeUnit.MILLISECONDS)
+                .build();
+        return executeStreaming(Request.newBuilder().get(url).headers(headers)
+                .localization(localization).build(), boundedClient);
+    }
+
+    @Override
     public StreamingResponse postStreaming(final String url,
                                            @Nullable final Map<String, List<String>> headers,
                                            @Nullable final byte[] dataToSend,
@@ -397,6 +413,12 @@ public final class DownloaderImpl extends Downloader {
     }
 
     private StreamingResponse executeStreaming(@NonNull final Request request)
+            throws IOException, ReCaptchaException {
+        return executeStreaming(request, client);
+    }
+
+    private StreamingResponse executeStreaming(@NonNull final Request request,
+                                                @NonNull final OkHttpClient requestClient)
             throws IOException, ReCaptchaException {
         final String url = request.url();
         final Map<String, List<String>> headers = request.headers();
@@ -424,7 +446,7 @@ public final class DownloaderImpl extends Downloader {
                 requestBuilder.header(pair.getKey(), values.get(0));
             }
         }
-        final okhttp3.Response response = client.newCall(requestBuilder.build()).execute();
+        final okhttp3.Response response = requestClient.newCall(requestBuilder.build()).execute();
         if (response.code() == 429) {
             response.close();
             throw new ReCaptchaException("reCaptcha Challenge requested", url);

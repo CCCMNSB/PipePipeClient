@@ -426,6 +426,30 @@ public final class SabrPlaybackSmokeTest {
     }
 
     @Test
+    public void sourceCreationBoundsInitializationRangeFetches() throws Exception {
+        final YoutubeSabrFormat audioFormat = smokeFormat(
+                SMOKE_AUDIO_ITAG, true, "https://media.test/audio-init", 0, 31);
+        final YoutubeSabrFormat videoFormat = smokeFormat(
+                SMOKE_VIDEO_ITAG, false, "https://media.test/video-init", 0, 63);
+        try (SabrSmokeHarness harness = SabrSmokeHarness.create(audioFormat, videoFormat)) {
+            final int requestsBefore = harness.downloader.requestedUrls.size();
+
+            final SabrSourceSpec spec = SabrSessionStore.createSourceSpec(
+                    "smoke-video", SMOKE_VIDEO_ITAG, harness.holder.info);
+            new SabrDashMediaSource(
+                    InstrumentationRegistry.getInstrumentation().getTargetContext(),
+                    new MediaItem.Builder()
+                            .setUri(Uri.parse("sabr://smoke-video"))
+                            .build(), spec);
+
+            assertEquals("SABR source resolution did not attempt both initialization ranges",
+                    requestsBefore + 2, harness.downloader.requestedUrls.size());
+            assertEquals("Initialization range requests did not use bounded deadlines",
+                    Arrays.asList(2_000L, 2_000L), harness.downloader.streamingTimeoutsMs);
+        }
+    }
+
+    @Test
     public void demandIncompleteMediaResponseRetriesThroughPump() throws Exception {
         try (SabrSmokeHarness harness = SabrSmokeHarness.create()) {
             harness.downloader.enqueue(new UmpFixture()
@@ -579,6 +603,30 @@ public final class SabrPlaybackSmokeTest {
             assertEquals("Initialization metadata did not derive segment time",
                     50_000, harness.holder.session.getStreamState()
                             .getSegmentStartMs(harness.videoFormat, 11));
+        }
+    }
+
+    @Test
+    public void fallbackManifestSequenceRemapsAfterInitializationMetadata() throws Exception {
+        try (SabrSmokeHarness harness = SabrSmokeHarness.create()) {
+            harness.downloader.enqueue(new UmpFixture()
+                    .part(SabrResponseDecoder.FORMAT_INITIALIZATION_METADATA,
+                            initializationMetadata(SMOKE_VIDEO_ITAG, 57, 300_000, "video/webm"))
+                    .bytes());
+            assertEquals(0, harness.holder.session.pumpOnceStreaming(
+                    new Localization("en", "US")));
+
+            final SabrSegmentRequest fallbackRequest =
+                    SabrSegmentRequest.media(harness.videoFormat, 60);
+            final Method remap = SabrSegmentDataSource.class.getDeclaredMethod(
+                    "remapFallbackSequence", SabrSessionStore.Holder.class,
+                    SabrSegmentRequest.class, long.class);
+            remap.setAccessible(true);
+            final int mappedSequence = (int) remap.invoke(null, harness.holder,
+                    fallbackRequest, 295_000L);
+
+            assertEquals("Fallback manifest sequence was not remapped to the SABR timeline",
+                    57, mappedSequence);
         }
     }
 
@@ -781,6 +829,168 @@ public final class SabrPlaybackSmokeTest {
                     trace.contains("compression=1"));
             assertEquals("Demand path did not cache decompressed media length",
                     raw.length, harness.holder.session.getCachedSegment(request).getLength());
+        }
+    }
+
+    @Test
+    public void growingMediaSegmentReadsBeforeMediaEndAndCompletesAtEof() throws Exception {
+        try (SabrSmokeHarness harness = SabrSmokeHarness.create()) {
+            final byte[] firstMediaBytes = filledBytes(64 * 1024, 10);
+            final byte[] remainingMediaBytes = new byte[0];
+            final byte[] expectedMediaBytes = concatBytes(firstMediaBytes, remainingMediaBytes);
+            final GatedMediaResponse response = new GatedMediaResponse(
+                    1, SMOKE_VIDEO_ITAG, 1, 0, 5_000,
+                    firstMediaBytes, remainingMediaBytes, 0, false, null);
+            harness.downloader.enqueue(response);
+
+            final AsyncSegmentReader reader = new AsyncSegmentReader(
+                    harness.holder, harness.readerOwner,
+                    SabrSegmentRequest.media(harness.videoFormat, 1),
+                    firstMediaBytes.length - 1);
+            reader.start();
+            try {
+                assertTrue("Producer did not reach the MEDIA payload gate",
+                        response.awaitGate(2_000));
+                assertTrue("DataSource did not expose initial media bytes before MEDIA_END",
+                        reader.awaitFirstBytes(1_000));
+                assertEquals("DataSource did not hold its final byte for MEDIA_END validation",
+                        firstMediaBytes.length - 1, reader.bytesSnapshot().length);
+                assertTrue("DataSource reached EOF while MEDIA_END was still blocked",
+                        !reader.isEofObserved());
+            } finally {
+                response.release();
+            }
+
+            assertTrue("DataSource did not finish after MEDIA_END was released",
+                    reader.awaitDone(2_000));
+            assertNull("Growing media read failed", reader.getFailure());
+            assertTrue("Growing media read did not observe EOF", reader.isEofObserved());
+            assertTrue("Growing media read returned incomplete bytes",
+                    Arrays.equals(expectedMediaBytes, reader.bytesSnapshot()));
+        }
+    }
+
+    @Test
+    public void growingMediaSegmentFailureWakesReaderWithIOException() throws Exception {
+        try (SabrSmokeHarness harness = SabrSmokeHarness.create()) {
+            final byte[] firstMediaBytes = filledBytes(64 * 1024, 20);
+            final GatedMediaResponse response = new GatedMediaResponse(
+                    1, SMOKE_VIDEO_ITAG, 1, 0, 5_000,
+                    firstMediaBytes, new byte[0], 0, false,
+                    new IOException("gated SABR media failure"));
+            harness.downloader.enqueue(response);
+
+            final AsyncSegmentReader reader = new AsyncSegmentReader(
+                    harness.holder, harness.readerOwner,
+                    SabrSegmentRequest.media(harness.videoFormat, 1),
+                    firstMediaBytes.length - 1);
+            reader.start();
+            try {
+                assertTrue("Producer did not reach the failing MEDIA payload gate",
+                        response.awaitGate(2_000));
+                assertTrue("DataSource did not expose bytes before the producer failure",
+                        reader.awaitFirstBytes(1_000));
+            } finally {
+                response.release();
+            }
+
+            assertTrue("Producer failure did not wake the DataSource reader",
+                    reader.awaitDone(2_000));
+            assertTrue("Producer failure did not end as IOException: " + reader.getFailure(),
+                    reader.getFailure() instanceof IOException);
+            assertTrue("Failed growing media unexpectedly reached EOF",
+                    !reader.isEofObserved());
+            assertNull("Failed growing media left a readable stale segment",
+                    harness.holder.session.getReadableSegment(
+                            SabrSegmentRequest.media(harness.videoFormat, 1)));
+        }
+    }
+
+    @Test
+    public void closingGrowingMediaReadWakesBlockedReader() throws Exception {
+        try (SabrSmokeHarness harness = SabrSmokeHarness.create()) {
+            final byte[] mediaBytes = filledBytes(64 * 1024, 50);
+            final GatedMediaResponse response = new GatedMediaResponse(
+                    1, SMOKE_VIDEO_ITAG, 1, 0, 5_000,
+                    mediaBytes, new byte[0], 0, false, null);
+            harness.downloader.enqueue(response);
+            final AsyncSegmentReader reader = new AsyncSegmentReader(
+                    harness.holder, harness.readerOwner,
+                    SabrSegmentRequest.media(harness.videoFormat, 1), mediaBytes.length - 1);
+            reader.start();
+            try {
+                assertTrue("Producer did not reach MEDIA_END gate", response.awaitGate(2_000));
+                assertTrue("Reader did not consume the growing prefix",
+                        reader.awaitFirstBytes(1_000));
+                reader.closeDataSource();
+                assertTrue("Closing DataSource did not wake its growing-file read",
+                        reader.awaitDone(1_000));
+                assertTrue("Closed growing read did not fail with IOException: "
+                                + reader.getFailure(),
+                        reader.getFailure() instanceof IOException);
+            } finally {
+                response.release();
+            }
+        }
+    }
+
+    @Test
+    public void clearingSessionDoesNotResurrectGrowingSegment() throws Exception {
+        try (SabrSmokeHarness harness = SabrSmokeHarness.create()) {
+            final byte[] mediaBytes = filledBytes(64 * 1024, 70);
+            final SabrSegmentRequest request =
+                    SabrSegmentRequest.media(harness.videoFormat, 1);
+            final GatedMediaResponse response = new GatedMediaResponse(
+                    1, SMOKE_VIDEO_ITAG, 1, 0, 5_000,
+                    mediaBytes, new byte[0], 0, false, null);
+            harness.downloader.enqueue(response);
+            final AsyncSegmentReader reader = new AsyncSegmentReader(
+                    harness.holder, harness.readerOwner, request, mediaBytes.length - 1);
+            reader.start();
+            try {
+                assertTrue("Producer did not reach MEDIA_END gate", response.awaitGate(2_000));
+                assertTrue("Reader did not consume the growing prefix",
+                        reader.awaitFirstBytes(1_000));
+                harness.holder.session.clearCache();
+                assertTrue("Clearing the session did not wake the growing-file reader",
+                        reader.awaitDone(1_000));
+                assertNull("Cleared session retained a readable in-flight segment",
+                        harness.holder.session.getReadableSegment(request));
+            } finally {
+                response.release();
+            }
+            waitForTrace(harness, "response n=0", 2_000);
+            assertNull("Completed producer resurrected a cleared segment",
+                    harness.holder.session.getCachedSegment(request));
+        }
+    }
+
+    @Test
+    public void compressedAndInitializationSegmentsRemainCompletionOnly() throws Exception {
+        final byte[] rawCompressedMedia = new byte[]{30, 31, 32, 33, 34, 35};
+        final byte[] compressedMedia = gzip(rawCompressedMedia);
+        final int compressedSplit = Math.max(1, compressedMedia.length / 2);
+        try (SabrSmokeHarness harness = SabrSmokeHarness.create()) {
+            final GatedMediaResponse response = new GatedMediaResponse(
+                    1, SMOKE_VIDEO_ITAG, 1, 0, 5_000,
+                    Arrays.copyOfRange(compressedMedia, 0, compressedSplit),
+                    Arrays.copyOfRange(compressedMedia, compressedSplit, compressedMedia.length),
+                    1, false, null);
+            verifyCompletionOnly(harness,
+                    SabrSegmentRequest.media(harness.videoFormat, 1),
+                    response, rawCompressedMedia, "compressed media");
+        }
+
+        final byte[] initializationBytes = new byte[]{40, 41, 42, 43};
+        try (SabrSmokeHarness harness = SabrSmokeHarness.create()) {
+            final GatedMediaResponse response = new GatedMediaResponse(
+                    1, SMOKE_VIDEO_ITAG, 0, 0, 0,
+                    Arrays.copyOfRange(initializationBytes, 0, 2),
+                    Arrays.copyOfRange(initializationBytes, 2, initializationBytes.length),
+                    0, true, null);
+            verifyInitializationCompletionOnly(harness,
+                    SabrSegmentRequest.initialization(harness.videoFormat),
+                    response, initializationBytes, "initialization segment");
         }
     }
 
@@ -1538,6 +1748,68 @@ public final class SabrPlaybackSmokeTest {
         return trace;
     }
 
+    private static void verifyCompletionOnly(final SabrSmokeHarness harness,
+                                             final SabrSegmentRequest request,
+                                             final GatedMediaResponse response,
+                                             final byte[] expectedBytes,
+                                             final String description) throws Exception {
+        harness.downloader.enqueue(response);
+        final AsyncSegmentReader reader = new AsyncSegmentReader(
+                harness.holder, harness.readerOwner, request, 1);
+        reader.start();
+        try {
+            assertTrue(description + " producer did not reach the MEDIA payload gate",
+                    response.awaitGate(2_000));
+            assertTrue(description + " became readable before completion",
+                    !reader.awaitOpened(300));
+        } finally {
+            response.release();
+        }
+        assertTrue(description + " did not finish after completion",
+                reader.awaitDone(2_000));
+        assertNull(description + " read failed", reader.getFailure());
+        assertTrue(description + " did not reach EOF", reader.isEofObserved());
+        assertTrue(description + " returned unexpected bytes",
+                Arrays.equals(expectedBytes, reader.bytesSnapshot()));
+    }
+
+    private static void verifyInitializationCompletionOnly(
+            final SabrSmokeHarness harness,
+            final SabrSegmentRequest request,
+            final GatedMediaResponse response,
+            final byte[] expectedBytes,
+            final String description) throws Exception {
+        harness.downloader.enqueue(response);
+        final AtomicReference<Throwable> failure = new AtomicReference<>();
+        final CountDownLatch done = new CountDownLatch(1);
+        final Thread pump = new Thread(() -> {
+            try {
+                harness.holder.session.pumpOnceStreaming(new Localization("en", "US"));
+            } catch (final Throwable e) {
+                failure.set(e);
+            } finally {
+                done.countDown();
+            }
+        }, "SabrSmokeInitializationCompletion");
+        pump.setDaemon(true);
+        pump.start();
+        try {
+            assertTrue(description + " producer did not reach the MEDIA payload gate",
+                    response.awaitGate(2_000));
+            assertNull(description + " became readable before completion",
+                    harness.holder.session.getReadableSegment(request));
+        } finally {
+            response.release();
+        }
+        assertTrue(description + " pump did not finish after completion",
+                done.await(2_000, TimeUnit.MILLISECONDS));
+        assertNull(description + " pump failed", failure.get());
+        final SabrMediaSegment segment = harness.holder.session.getCachedSegment(request);
+        assertNotNull(description + " was not cached after completion", segment);
+        assertTrue(description + " returned unexpected bytes",
+                Arrays.equals(expectedBytes, segment.getData()));
+    }
+
     private static long usedHeapBytes() {
         final Runtime runtime = Runtime.getRuntime();
         return runtime.totalMemory() - runtime.freeMemory();
@@ -2013,6 +2285,10 @@ public final class SabrPlaybackSmokeTest {
                         false);
                 try {
                     dataSource.open(new DataSpec(segmentUri(request)));
+                    final byte[] buffer = new byte[8_192];
+                    while (dataSource.read(buffer, 0, buffer.length) != C.RESULT_END_OF_INPUT) {
+                        // Drain the DataSource: growing segments may return from open at the header.
+                    }
                 } catch (final Throwable e) {
                     failure.set(e);
                 } finally {
@@ -2080,6 +2356,8 @@ public final class SabrPlaybackSmokeTest {
         private final List<String> requestedUrls = new ArrayList<>();
         private final List<byte[]> requestBodies = new ArrayList<>();
         private final List<Long> requestTimesMs = Collections.synchronizedList(new ArrayList<>());
+        private final List<Long> streamingTimeoutsMs =
+                Collections.synchronizedList(new ArrayList<>());
 
         private void enqueue(final byte[] body) {
             responses.add(() -> new ByteArrayInputStream(body));
@@ -2097,8 +2375,19 @@ public final class SabrPlaybackSmokeTest {
 
         @Override
         public Response execute(final Request request) throws IOException {
+            requestedUrls.add(request.url());
             throw new IOException("Unexpected buffered request in SABR smoke: "
                     + request.httpMethod() + " " + request.url());
+        }
+
+        @Override
+        public StreamingResponse getStreaming(final String url,
+                                              final Map<String, List<String>> headers,
+                                              final Localization localization,
+                                              final long timeoutMs)
+                throws IOException, ReCaptchaException {
+            streamingTimeoutsMs.add(timeoutMs);
+            return super.getStreaming(url, headers, localization, timeoutMs);
         }
 
         @Override
@@ -2132,6 +2421,199 @@ public final class SabrPlaybackSmokeTest {
     @FunctionalInterface
     private interface QueuedStreamingBody {
         InputStream open() throws IOException;
+    }
+
+    private static final class GatedMediaResponse implements QueuedStreamingBody {
+        private final byte[] prefix;
+        private final byte[] suffix;
+        private final IOException failureAfterGate;
+        private final CountDownLatch gateReached = new CountDownLatch(1);
+        private final CountDownLatch released = new CountDownLatch(1);
+
+        private GatedMediaResponse(final int headerId,
+                                   final int itag,
+                                   final int sequence,
+                                   final long startMs,
+                                   final long durationMs,
+                                   final byte[] firstMediaBytes,
+                                   final byte[] remainingMediaBytes,
+                                   final int compressionAlgorithm,
+                                   final boolean initialization,
+                                   final IOException failureAfterGate) {
+            final byte[] mediaHeader = new UmpFixture()
+                    .mediaHeader(headerId, itag, sequence, startMs, durationMs,
+                            firstMediaBytes.length + remainingMediaBytes.length,
+                            compressionAlgorithm, initialization)
+                    .bytes();
+            this.prefix = concatBytes(mediaHeader,
+                    umpPartPrefix(SabrResponseDecoder.MEDIA,
+                            firstMediaBytes.length + remainingMediaBytes.length + 1),
+                    new byte[]{(byte) headerId}, firstMediaBytes);
+            this.suffix = concatBytes(remainingMediaBytes,
+                    new UmpFixture().mediaEnd(headerId).bytes());
+            this.failureAfterGate = failureAfterGate;
+        }
+
+        private boolean awaitGate(final long timeoutMs) throws InterruptedException {
+            return gateReached.await(timeoutMs, TimeUnit.MILLISECONDS);
+        }
+
+        private void release() {
+            released.countDown();
+        }
+
+        @Override
+        public InputStream open() {
+            return new InputStream() {
+                private int prefixOffset;
+                private int suffixOffset;
+
+                @Override
+                public int read() throws IOException {
+                    final byte[] one = new byte[1];
+                    final int read = read(one, 0, 1);
+                    return read < 0 ? -1 : one[0] & 0xff;
+                }
+
+                @Override
+                public int read(final byte[] buffer, final int offset, final int length)
+                        throws IOException {
+                    if (length == 0) {
+                        return 0;
+                    }
+                    if (prefixOffset < prefix.length) {
+                        final int count = Math.min(length, prefix.length - prefixOffset);
+                        System.arraycopy(prefix, prefixOffset, buffer, offset, count);
+                        prefixOffset += count;
+                        if (prefixOffset == prefix.length) {
+                            gateReached.countDown();
+                        }
+                        // Return the available prefix now instead of blocking this read for release.
+                        return count;
+                    }
+                    gateReached.countDown();
+                    awaitRelease();
+                    if (failureAfterGate != null) {
+                        throw failureAfterGate;
+                    }
+                    if (suffixOffset >= suffix.length) {
+                        return -1;
+                    }
+                    final int count = Math.min(length, suffix.length - suffixOffset);
+                    System.arraycopy(suffix, suffixOffset, buffer, offset, count);
+                    suffixOffset += count;
+                    return count;
+                }
+
+                private void awaitRelease() throws InterruptedIOException {
+                    try {
+                        released.await();
+                    } catch (final InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        throw new InterruptedIOException(
+                                "Interrupted awaiting gated SABR media release");
+                    }
+                }
+            };
+        }
+    }
+
+    private static final class AsyncSegmentReader {
+        private final SabrSessionStore.Holder holder;
+        private final Object readerOwner;
+        private final SabrSegmentRequest request;
+        private final int firstBytesTarget;
+        private final ByteArrayOutputStream output = new ByteArrayOutputStream();
+        private final AtomicReference<Throwable> failure = new AtomicReference<>();
+        private final AtomicReference<SabrSegmentDataSource> dataSource = new AtomicReference<>();
+        private final CountDownLatch opened = new CountDownLatch(1);
+        private final CountDownLatch firstBytesRead = new CountDownLatch(1);
+        private final CountDownLatch done = new CountDownLatch(1);
+        private final AtomicBoolean eofObserved = new AtomicBoolean();
+        private Thread thread;
+
+        private AsyncSegmentReader(final SabrSessionStore.Holder holder,
+                                   final Object readerOwner,
+                                   final SabrSegmentRequest request,
+                                   final int firstBytesTarget) {
+            this.holder = holder;
+            this.readerOwner = readerOwner;
+            this.request = request;
+            this.firstBytesTarget = firstBytesTarget;
+        }
+
+        private void start() {
+            thread = new Thread(() -> {
+                final SabrSegmentDataSource currentDataSource = new SabrSegmentDataSource(
+                        holder, readerOwner, request.getFormat(),
+                        new Localization("en", "US"), false);
+                dataSource.set(currentDataSource);
+                try {
+                    currentDataSource.open(new DataSpec(Uri.parse("sabr://"
+                            + request.getFormat().getItag() + '/'
+                            + (request.isInitializationSegment()
+                            ? "init" : String.valueOf(request.getSequenceNumber())))));
+                    opened.countDown();
+                    final byte[] buffer = new byte[64];
+                    while (true) {
+                        final int read = currentDataSource.read(buffer, 0, buffer.length);
+                        if (read == C.RESULT_END_OF_INPUT) {
+                            eofObserved.set(true);
+                            break;
+                        }
+                        if (read > 0) {
+                            synchronized (output) {
+                                output.write(buffer, 0, read);
+                                if (output.size() >= firstBytesTarget) {
+                                    firstBytesRead.countDown();
+                                }
+                            }
+                        }
+                    }
+                } catch (final Throwable e) {
+                    failure.set(e);
+                } finally {
+                    currentDataSource.close();
+                    dataSource.compareAndSet(currentDataSource, null);
+                    done.countDown();
+                }
+            }, "SabrSmokeAsyncSegmentRead");
+            thread.setDaemon(true);
+            thread.start();
+        }
+
+        private boolean awaitOpened(final long timeoutMs) throws InterruptedException {
+            return opened.await(timeoutMs, TimeUnit.MILLISECONDS);
+        }
+
+        private boolean awaitFirstBytes(final long timeoutMs) throws InterruptedException {
+            return firstBytesRead.await(timeoutMs, TimeUnit.MILLISECONDS);
+        }
+
+        private boolean awaitDone(final long timeoutMs) throws InterruptedException {
+            return done.await(timeoutMs, TimeUnit.MILLISECONDS);
+        }
+
+        private void closeDataSource() {
+            final SabrSegmentDataSource current = dataSource.get();
+            if (current != null) {
+                current.close();
+            }
+        }
+
+        private byte[] bytesSnapshot() {
+            synchronized (output) {
+                return output.toByteArray();
+            }
+        }
+
+        private Throwable getFailure() {
+            return failure.get();
+        }
+
+        private boolean isEofObserved() {
+            return eofObserved.get();
+        }
     }
 
     private static final class GeneratedLargeMediaResponse implements QueuedStreamingBody {
@@ -2419,6 +2901,22 @@ public final class SabrPlaybackSmokeTest {
         writeUmpInt(output, type);
         writeUmpInt(output, size);
         return output.toByteArray();
+    }
+
+    private static byte[] concatBytes(final byte[]... values) {
+        final ByteArrayOutputStream output = new ByteArrayOutputStream();
+        for (final byte[] value : values) {
+            output.write(value, 0, value.length);
+        }
+        return output.toByteArray();
+    }
+
+    private static byte[] filledBytes(final int length, final int seed) {
+        final byte[] bytes = new byte[length];
+        for (int i = 0; i < bytes.length; i++) {
+            bytes[i] = (byte) (seed + i);
+        }
+        return bytes;
     }
 
     private static void writeUmpInt(final ByteArrayOutputStream output, final int value) {

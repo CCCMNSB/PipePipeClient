@@ -80,6 +80,16 @@ public final class SabrSourceSpec {
         return null;
     }
 
+    boolean usesFallbackTimeline(@NonNull final YoutubeSabrFormat format) {
+        if (format.getItag() == audioFormat.getItag()) {
+            return audioInitializationData == null;
+        }
+        if (format.getItag() == videoFormat.getItag()) {
+            return videoInitializationData == null;
+        }
+        return false;
+    }
+
     long getDurationMs() {
         return Math.max(audioFormat.getApproxDurationMs(), videoFormat.getApproxDurationMs());
     }

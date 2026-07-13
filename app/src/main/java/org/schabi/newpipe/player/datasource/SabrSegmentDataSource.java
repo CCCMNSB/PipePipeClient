@@ -29,6 +29,8 @@ public final class SabrSegmentDataSource implements DataSource {
     private static final long RECOVERY_RETRY_MS = 10_000;
     private static final long RECOVERY_FAILURE_MS = 30_000;
     private static final long FORWARD_SEEK_AHEAD_MS = 30_000;
+    private static final long FALLBACK_AUDIO_SEGMENT_MS = 10_000;
+    private static final long FALLBACK_VIDEO_SEGMENT_MS = 5_000;
 
     @Nullable
     private SabrSessionStore.Holder holder;
@@ -46,6 +48,10 @@ public final class SabrSegmentDataSource implements DataSource {
     private byte[] data;
     @Nullable
     private InputStream dataStream;
+    @Nullable
+    private SabrMediaSegment progressiveSegment;
+    private long progressiveReaderGeneration = -1;
+    private int progressiveDataEndPosition = -1;
     private long bytesRemaining;
     private int pos;
     private boolean opened;
@@ -104,8 +110,12 @@ public final class SabrSegmentDataSource implements DataSource {
         this.canceled = false;
         closeDataStream();
         this.data = null;
+        this.progressiveSegment = null;
+        this.progressiveReaderGeneration = -1;
+        this.progressiveDataEndPosition = -1;
         this.pos = (int) Math.max(0, dataSpec.position);
-        final SabrSegmentRequest request = requestFromUri(dataSpec.uri);
+        SabrSegmentRequest request = requestFromUri(dataSpec.uri);
+        request = remapFallbackTimelineRequest(request);
         final YoutubeSabrFormat format = request.getFormat();
         final long availableRemaining;
         final int openedBytes;
@@ -125,6 +135,9 @@ public final class SabrSegmentDataSource implements DataSource {
             System.arraycopy(init, 0, both, 0, init.length);
             System.arraycopy(media, 0, both, init.length, media.length);
             this.data = both;
+            if (progressiveSegment != null) {
+                progressiveDataEndPosition = both.length;
+            }
             availableRemaining = Math.max(0, data.length - pos);
             openedBytes = data.length;
         } else {
@@ -135,6 +148,9 @@ public final class SabrSegmentDataSource implements DataSource {
                 openedBytes = 0;
             } else {
                 this.dataStream = segment.openStream();
+                if (progressiveSegment != null) {
+                    progressiveDataEndPosition = segment.getLength();
+                }
                 final long skipped = skipFully(dataStream, Math.max(0, dataSpec.position));
                 this.pos = (int) Math.min(Integer.MAX_VALUE, skipped);
                 availableRemaining = Math.max(0, segment.getLength() - skipped);
@@ -149,6 +165,36 @@ public final class SabrSegmentDataSource implements DataSource {
                 + " bytes=" + openedBytes
                 + " remaining=" + availableRemaining);
         return bytesRemaining;
+    }
+
+    private SabrSegmentRequest remapFallbackTimelineRequest(
+            final SabrSegmentRequest request) {
+        if (request.isInitializationSegment() || sessionHandle == null || holder == null
+                || !sessionHandle.usesFallbackTimeline(request.getFormat())) {
+            return request;
+        }
+        final long fallbackDurationMs = request.getFormat().isAudio()
+                ? FALLBACK_AUDIO_SEGMENT_MS : FALLBACK_VIDEO_SEGMENT_MS;
+        final long targetStartMs = Math.max(0, request.getSequenceNumber() - 1L)
+                * fallbackDurationMs;
+        final int mappedSequence = remapFallbackSequence(holder, request, targetStartMs);
+        if (mappedSequence <= 0 || mappedSequence == request.getSequenceNumber()) {
+            return request;
+        }
+        holder.session.addDiagnosticEvent("manifest_remap itag="
+                + request.getFormat().getItag()
+                + " manifestSeq=" + request.getSequenceNumber()
+                + " targetMs=" + targetStartMs
+                + " sabrSeq=" + mappedSequence);
+        return SabrSegmentRequest.media(request.getFormat(), mappedSequence);
+    }
+
+    private static int remapFallbackSequence(
+            final SabrSessionStore.Holder holder,
+            final SabrSegmentRequest request,
+            final long targetStartMs) {
+        return holder.session.getStreamState()
+                .getSegmentNumberAtOrAfterTimeMs(request.getFormat(), targetStartMs);
     }
 
     private byte[] getInitializationData(final YoutubeSabrFormat format) throws IOException {
@@ -185,6 +231,7 @@ public final class SabrSegmentDataSource implements DataSource {
             System.arraycopy(data, pos, target, offset, toCopy);
             pos += toCopy;
             bytesRemaining -= toCopy;
+            maybeAdvanceProgressiveReader();
             return toCopy;
         }
         if (dataStream == null) {
@@ -198,7 +245,23 @@ public final class SabrSegmentDataSource implements DataSource {
         }
         pos = (int) Math.min(Integer.MAX_VALUE, (long) pos + read);
         bytesRemaining -= read;
+        maybeAdvanceProgressiveReader();
         return read;
+    }
+
+    private void maybeAdvanceProgressiveReader() {
+        final SabrMediaSegment segment = progressiveSegment;
+        if (segment == null || progressiveDataEndPosition < 0
+                || pos < progressiveDataEndPosition || !segment.isComplete() || holder == null) {
+            return;
+        }
+        final YoutubeSabrFormat format = segment.getHeader().getItag()
+                == holder.videoFormat.getItag() ? holder.videoFormat : holder.audioFormat;
+        holder.setReaderPositionMs(readerOwner, progressiveReaderGeneration, format.getItag(),
+                segment.getHeader().getStartMs() + segment.getHeader().getDurationMs());
+        progressiveSegment = null;
+        progressiveReaderGeneration = -1;
+        progressiveDataEndPosition = -1;
     }
 
     private SabrSegmentRequest requestFromUri(final Uri u) throws IOException {
@@ -298,7 +361,7 @@ public final class SabrSegmentDataSource implements DataSource {
                 segment = pump.getCached(request);
             } else {
                 try {
-                    segment = holder.session.awaitCachedSegment(request, WAIT_MS);
+                    segment = holder.session.awaitReadableSegment(request, WAIT_MS);
                 } catch (final InterruptedException e) {
                     Thread.currentThread().interrupt();
                     throw new IOException("Interrupted waiting for SABR segment", e);
@@ -312,8 +375,14 @@ public final class SabrSegmentDataSource implements DataSource {
                         + " bytes=" + segment.getLength()
                         + " disk=" + segment.isDiskBacked());
                 if (!segment.getHeader().isInitSegment()) {
-                    holder.setReaderPositionMs(readerOwner, readerGeneration, format.getItag(),
-                            segment.getHeader().getStartMs() + segment.getHeader().getDurationMs());
+                    if (segment.isComplete()) {
+                        holder.setReaderPositionMs(readerOwner, readerGeneration, format.getItag(),
+                                segment.getHeader().getStartMs()
+                                        + segment.getHeader().getDurationMs());
+                    } else {
+                        progressiveSegment = segment;
+                        progressiveReaderGeneration = readerGeneration;
+                    }
                 }
                 return segment;
             }

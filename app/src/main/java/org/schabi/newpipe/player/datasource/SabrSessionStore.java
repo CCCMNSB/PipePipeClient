@@ -21,11 +21,16 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.IdentityHashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -39,7 +44,23 @@ public final class SabrSessionStore {
     // therefore do not prevent old sessions from being trimmed.
     // Mutated only under the class lock.
     private static final int MAX_SESSIONS = 3;
+    private static final int MAX_INITIALIZATION_CACHE_ENTRIES = 32;
+    private static final long INITIALIZATION_FETCH_TIMEOUT_MS = 2_000;
     private static final java.util.Deque<SessionKey> ORDER = new java.util.ArrayDeque<>();
+    private static final ExecutorService INITIALIZATION_EXECUTOR = Executors.newFixedThreadPool(2,
+            runnable -> {
+                final Thread thread = new Thread(runnable, "SabrInitializationPrefetch");
+                thread.setDaemon(true);
+                return thread;
+            });
+    private static final Map<String, byte[]> INITIALIZATION_CACHE =
+            Collections.synchronizedMap(new LinkedHashMap<String, byte[]>(
+                    MAX_INITIALIZATION_CACHE_ENTRIES + 1, 0.75f, true) {
+                @Override
+                protected boolean removeEldestEntry(final Map.Entry<String, byte[]> eldest) {
+                    return size() > MAX_INITIALIZATION_CACHE_ENTRIES;
+                }
+            });
     private static volatile LocalDomPoTokenProvider sharedProvider;
 
     private SabrSessionStore() {
@@ -500,28 +521,75 @@ public final class SabrSessionStore {
         if (audioFormat == null || videoFormat == null) {
             throw new IOException("SABR: could not select audio/video formats for " + videoId);
         }
-        final YoutubeSabrSession initializationSession = new YoutubeSabrSession(
-                info, audioFormat, videoFormat, null, null);
-        final byte[] videoInitializationData = fetchInitializationData(
-                initializationSession, videoFormat, localization, videoId);
-        final byte[] audioInitializationData = fetchInitializationData(
-                initializationSession, audioFormat, localization, videoId);
+        final Future<byte[]> videoInitialization = INITIALIZATION_EXECUTOR.submit(
+                () -> fetchInitializationData(info, audioFormat, videoFormat, videoFormat,
+                        localization, videoId));
+        final Future<byte[]> audioInitialization = INITIALIZATION_EXECUTOR.submit(
+                () -> fetchInitializationData(info, audioFormat, videoFormat, audioFormat,
+                        localization, videoId));
         return new SabrSourceSpec(videoId, info, audioFormat, videoFormat, localization,
-                audioInitializationData, videoInitializationData);
+                awaitInitializationData(audioInitialization, audioFormat, videoId),
+                awaitInitializationData(videoInitialization, videoFormat, videoId));
     }
 
     @Nullable
-    private static byte[] fetchInitializationData(@NonNull final YoutubeSabrSession session,
-                                                  @NonNull final YoutubeSabrFormat format,
+    private static byte[] fetchInitializationData(@NonNull final YoutubeSabrInfo info,
+                                                  @NonNull final YoutubeSabrFormat audioFormat,
+                                                  @NonNull final YoutubeSabrFormat videoFormat,
+                                                  @NonNull final YoutubeSabrFormat targetFormat,
                                                   @NonNull final Localization localization,
                                                   @NonNull final String videoId) {
+        final String cacheKey = initializationCacheKey(targetFormat);
+        if (cacheKey != null) {
+            final byte[] cached = INITIALIZATION_CACHE.get(cacheKey);
+            if (cached != null) {
+                return cached.clone();
+            }
+        }
         try {
-            return session.fetchInitializationDataFallback(format, localization);
+            final YoutubeSabrSession initializationSession = new YoutubeSabrSession(
+                    info, audioFormat, videoFormat, null, null);
+            final byte[] data = initializationSession.fetchInitializationDataFallback(
+                    targetFormat, localization, INITIALIZATION_FETCH_TIMEOUT_MS);
+            if (cacheKey != null) {
+                INITIALIZATION_CACHE.put(cacheKey, data.clone());
+            }
+            return data;
         } catch (final IOException e) {
             Log.d(TAG, "Initialization metadata unavailable video=" + videoId
-                    + " itag=" + format.getItag() + " message=" + e.getMessage());
+                    + " itag=" + targetFormat.getItag() + " message=" + e.getMessage());
             return null;
         }
+    }
+
+    @Nullable
+    private static byte[] awaitInitializationData(@NonNull final Future<byte[]> future,
+                                                  @NonNull final YoutubeSabrFormat format,
+                                                  @NonNull final String videoId) {
+        try {
+            return future.get();
+        } catch (final InterruptedException e) {
+            Thread.currentThread().interrupt();
+            future.cancel(true);
+            Log.d(TAG, "Initialization metadata interrupted video=" + videoId
+                    + " itag=" + format.getItag());
+            return null;
+        } catch (final ExecutionException e) {
+            Log.d(TAG, "Initialization metadata failed video=" + videoId
+                    + " itag=" + format.getItag() + " message=" + e.getCause());
+            return null;
+        }
+    }
+
+    @Nullable
+    private static String initializationCacheKey(@NonNull final YoutubeSabrFormat format) {
+        final String url = format.getInitializationUrl();
+        final long start = format.getInitRangeStart();
+        final long end = format.getInitRangeEnd();
+        if (url == null || url.isEmpty() || start < 0 || end < start) {
+            return null;
+        }
+        return url + '#' + start + '-' + end;
     }
 
     @NonNull

@@ -5,6 +5,8 @@ import android.content.Context;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import org.schabi.newpipe.extractor.services.youtube.sabr.YoutubeSabrFormat;
+
 import java.io.IOException;
 import java.util.IdentityHashMap;
 import java.util.Map;
@@ -38,6 +40,10 @@ final class SabrSessionHandle {
             playerTimeMs = startPositionMs;
             pendingSeekMs = startPositionMs;
         }
+    }
+
+    boolean usesFallbackTimeline(@NonNull final YoutubeSabrFormat format) {
+        return spec.usesFallbackTimeline(format);
     }
 
     void onPeriodReleased() {

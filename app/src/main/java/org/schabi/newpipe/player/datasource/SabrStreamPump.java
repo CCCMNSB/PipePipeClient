@@ -423,6 +423,22 @@ final class SabrStreamPump {
                     state = State.TERMINAL;
                     holder.failTerminal(new SabrLogicException("SABR logic failure", e));
                     break;
+                } catch (final Exception e) {
+                    // OkHttp's Kotlin internals can propagate a checked InterruptedException via
+                    // a sneaky throw while an in-flight connect is canceled. Java does not include
+                    // it in the declared downloader signature, so handle it at the pump boundary.
+                    if (stopped || holder.isInvalidated()
+                            || Thread.currentThread().isInterrupted()) {
+                        Log.i(TAG, "SABR pump canceled video=" + holder.videoId
+                                + " invalidated=" + holder.isInvalidated()
+                                + " type=" + e.getClass().getSimpleName());
+                        break;
+                    }
+                    Log.e(TAG, "SABR pump unexpected failure " + holder.videoId, e);
+                    state = State.TERMINAL;
+                    holder.failTerminal(new SabrLogicException(
+                            "SABR unexpected pump failure", e));
+                    break;
                 } catch (final OutOfMemoryError e) {
                     Log.e(TAG, "SABR pump OOM; evicting session " + holder.videoId, e);
                     state = State.TERMINAL;
