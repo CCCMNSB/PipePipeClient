@@ -202,6 +202,9 @@ public final class YoutubePlaybackBenchmarkTest {
         // Constructing PlayerDataSource opens any persistent cache from an earlier app run; clear it
         // afterwards so the first trial is cold too, while the in-memory StreamInfo remains intact.
         PlayerDataSource.clearMediaCacheForBenchmark();
+        // Measure from the point where the real player starts resolving its MediaSource. SABR
+        // session/PO-token acquisition happens below and must be part of click-to-first-frame.
+        final long prepareNs = SystemClock.elapsedRealtimeNanos();
         final SelectingQualityResolver selector = new SelectingQualityResolver(
                 path.sourceDelivery, maxHeight, targetCodec);
         final long resolveStart = SystemClock.elapsedRealtimeNanos();
@@ -244,7 +247,6 @@ public final class YoutubePlaybackBenchmarkTest {
 
         final long uidRxBefore = TrafficStats.getUidRxBytes(Process.myUid());
         final long cpuBefore = Process.getElapsedCpuTime();
-        final long prepareNs = SystemClock.elapsedRealtimeNanos();
         if (startPositionMs >= 0) {
             transfers.startSeekTrace();
         }
