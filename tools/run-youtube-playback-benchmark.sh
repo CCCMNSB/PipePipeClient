@@ -106,5 +106,10 @@ $adb logcat -d -v brief \
   | rg 'YoutubePlayerCache|PIPEPIPE_BENCHMARK_' \
   | tee -a "$output"
 
-rg --no-filename 'PIPEPIPE_BENCHMARK_' "$output" \
-  | sed -E 's/^.*PIPEPIPE_BENCHMARK_[A-Z_]+ (\{.*\})$/\1/' | tee "$jsonl"
+benchmark_pid="$(rg 'PIPEPIPE_BENCHMARK_CONFIG' "$output" | tail -1 \
+  | sed -nE 's/^.*System\.out\( *([0-9]+)\).*$/\1/p')"
+if [[ -n "$benchmark_pid" ]]; then
+  rg --no-filename "System\\.out\\( *${benchmark_pid}\\).*PIPEPIPE_BENCHMARK_" "$output"
+else
+  rg --no-filename 'PIPEPIPE_BENCHMARK_' "$output"
+fi | sed -E 's/^.*PIPEPIPE_BENCHMARK_[A-Z_]+ (\{.*\})$/\1/' | tee "$jsonl"

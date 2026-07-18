@@ -48,6 +48,7 @@ import org.schabi.newpipe.extractor.stream.DeliveryMethod;
 import org.schabi.newpipe.extractor.stream.StreamInfo;
 import org.schabi.newpipe.extractor.stream.VideoStream;
 import org.schabi.newpipe.player.datasource.SabrSessionStore;
+import org.schabi.newpipe.player.datasource.SabrPolicyRuntime;
 import org.schabi.newpipe.player.helper.LegacySubtitleRenderersFactory;
 import org.schabi.newpipe.player.helper.LoadController;
 import org.schabi.newpipe.player.helper.PlayerDataSource;
@@ -140,6 +141,10 @@ public final class YoutubePlaybackBenchmarkTest {
 
         final List<Path> paths = filterPaths(Arrays.asList(
                 new Path("sabr", "mweb", DeliveryMethod.SABR),
+                new Path("sabr_builtin", "mweb", DeliveryMethod.SABR,
+                        SabrPolicyRuntime.BenchmarkPolicyMode.BUILTIN),
+                new Path("sabr_cloud", "mweb", DeliveryMethod.SABR,
+                        SabrPolicyRuntime.BenchmarkPolicyMode.CLOUD),
                 new Path("hls", "web_safari", DeliveryMethod.HLS),
                 new Path("tv_downgraded_generated_dash", "tv_downgraded",
                         DeliveryMethod.PROGRESSIVE_HTTP),
@@ -210,10 +215,16 @@ public final class YoutubePlaybackBenchmarkTest {
             Collections.rotate(roundOrder, Math.floorMod(round, roundOrder.size()));
             for (final Path path : roundOrder) {
                 final boolean warmup = round < 0;
-                final Result result = runTrial(context, path, extractions.get(path).info,
-                        round, warmup, playSeconds, startPositionMs, seekTargetMs,
-                        maxHeight, targetCodec, url, warmWebViewRuntime,
-                        diagnosticDetails, coldSabrCachesEachTrial);
+                final Result result;
+                try {
+                    result = runTrial(context, path, extractions.get(path).info,
+                            round, warmup, playSeconds, startPositionMs, seekTargetMs,
+                            maxHeight, targetCodec, url, warmWebViewRuntime,
+                            diagnosticDetails, coldSabrCachesEachTrial);
+                } finally {
+                    SabrPolicyRuntime.setBenchmarkPolicyMode(
+                            SabrPolicyRuntime.BenchmarkPolicyMode.AUTO);
+                }
                 emit("PIPEPIPE_BENCHMARK_RESULT", result.toJson());
                 emitTrialDetails(result);
                 if (!warmup) {
@@ -237,6 +248,7 @@ public final class YoutubePlaybackBenchmarkTest {
                                    final boolean diagnosticDetails,
                                    final boolean coldSabrCachesEachTrial) throws Exception {
         NewPipe.setYoutubePlayerClient(path.client);
+        SabrPolicyRuntime.setBenchmarkPolicyMode(path.policyMode);
         if (coldSabrCachesEachTrial && path.sourceDelivery == DeliveryMethod.SABR) {
             SabrSessionStore.clearBenchmarkCaches(context, info.getId());
         } else {
@@ -696,7 +708,7 @@ public final class YoutubePlaybackBenchmarkTest {
     private static void verifyComparableFormats(final List<Result> results,
                                                 final String targetCodec) {
         for (final Result sabr : results) {
-            if (!"sabr".equals(sabr.path.name)) {
+            if (!sabr.path.name.startsWith("sabr")) {
                 continue;
             }
             Result tv = null;
@@ -1063,9 +1075,18 @@ public final class YoutubePlaybackBenchmarkTest {
     }
 
     private static final class Path {
-        private final String name; private final String client; private final DeliveryMethod sourceDelivery;
+        private final String name; private final String client;
+        private final DeliveryMethod sourceDelivery;
+        private final SabrPolicyRuntime.BenchmarkPolicyMode policyMode;
         private Path(final String name, final String client, final DeliveryMethod sourceDelivery) {
-            this.name = name; this.client = client; this.sourceDelivery = sourceDelivery;
+            this(name, client, sourceDelivery, SabrPolicyRuntime.BenchmarkPolicyMode.AUTO);
+        }
+        private Path(final String name, final String client, final DeliveryMethod sourceDelivery,
+                     final SabrPolicyRuntime.BenchmarkPolicyMode policyMode) {
+            this.name = name;
+            this.client = client;
+            this.sourceDelivery = sourceDelivery;
+            this.policyMode = policyMode;
         }
     }
     private static final class CachedExtraction {

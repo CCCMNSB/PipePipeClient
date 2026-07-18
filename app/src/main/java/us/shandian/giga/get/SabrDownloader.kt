@@ -9,6 +9,7 @@ import org.schabi.newpipe.extractor.services.youtube.sabr.SabrSegmentRequest
 import org.schabi.newpipe.extractor.services.youtube.sabr.YoutubeSabrInfo
 import org.schabi.newpipe.extractor.services.youtube.sabr.YoutubeSabrSession
 import org.schabi.newpipe.player.datasource.LocalDomPoTokenProvider
+import org.schabi.newpipe.player.datasource.SabrPolicyRuntime
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
@@ -95,6 +96,8 @@ internal class SabrDownloader(
             SabrDownloadFormatResolver.selectedAudioFormat(info, recoveries),
             SabrDownloadFormatResolver.selectedVideoFormat(info, recoveries),
             LocalDomPoTokenProvider(mission.context),
+            null,
+            SabrPolicyRuntime.createSessionHost(),
         )
         val workDir = prepareWorkDirectory()
         val targets = SabrDownloadFormatResolver.buildTargets(info, recoveries, workDir)

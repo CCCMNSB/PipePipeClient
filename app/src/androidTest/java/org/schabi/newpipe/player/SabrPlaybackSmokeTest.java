@@ -194,7 +194,7 @@ public final class SabrPlaybackSmokeTest {
     }
 
     @Test
-    public void companionOnlyResponseDoesNotConsumeTargetMissBudget() throws Exception {
+    public void companionOnlyResponseTriggersDemandRecovery() throws Exception {
         try (SabrSmokeHarness harness = SabrSmokeHarness.create()) {
             harness.downloader.enqueue(new UmpFixture()
                     .segment(1, SMOKE_VIDEO_ITAG, 1, 0, 5_000)
@@ -210,11 +210,11 @@ public final class SabrPlaybackSmokeTest {
                     SabrSegmentRequest.media(harness.videoFormat, 3), 5_000);
 
             final String trace = harness.holder.session.getDiagnosticTrace();
-            assertTrue("Companion-only response was treated as a target-track miss: " + trace,
-                    !trace.contains("pump_demand_target_miss itag="
-                            + SMOKE_VIDEO_ITAG + " seq=3"));
-            assertTrue("Companion-only response triggered target repositioning: " + trace,
-                    !trace.contains("pump_demand_reposition itag="
+            assertTrue("Companion-only response did not record exact target omission: " + trace,
+                    trace.contains("pump_demand_omission itag="
+                            + SMOKE_VIDEO_ITAG + " seq=3 omissions=1"));
+            assertTrue("Companion-only response did not trigger target recovery: " + trace,
+                    trace.contains("pump_demand_reposition itag="
                             + SMOKE_VIDEO_ITAG + " seq=3"));
         }
     }
@@ -237,9 +237,9 @@ public final class SabrPlaybackSmokeTest {
                     SabrSegmentRequest.media(harness.videoFormat, 3), 5_000);
 
             final String trace = harness.holder.session.getDiagnosticTrace();
-            assertTrue("Demand did not record the bounded third target miss: " + trace,
-                    trace.contains("pump_demand_target_miss itag="
-                            + SMOKE_VIDEO_ITAG + " seq=3 misses=3"));
+            assertTrue("Demand did not record the bounded third target omission: " + trace,
+                    trace.contains("pump_demand_omission itag="
+                            + SMOKE_VIDEO_ITAG + " seq=3 omissions=3"));
             assertTrue("Demand exceeded its response budget plus one resumed prefetch: requests="
                             + harness.downloader.requestBodies.size() + " trace=" + trace,
                     harness.downloader.requestBodies.size() <= 5);
@@ -762,7 +762,8 @@ public final class SabrPlaybackSmokeTest {
     public void redirectUpdatesFollowUpSabrStreamingUrl() throws Exception {
         try (SabrSmokeHarness harness = SabrSmokeHarness.create()) {
             harness.downloader.enqueue(new UmpFixture()
-                    .part(SabrResponseDecoder.SABR_REDIRECT, redirect("https://redirect.test/sabr"))
+                    .part(SabrResponseDecoder.SABR_REDIRECT,
+                            redirect("https://redirect.googlevideo.com/sabr"))
                     .bytes());
             harness.downloader.enqueue(new UmpFixture()
                     .segment(1, SMOKE_VIDEO_ITAG, 1)
@@ -776,7 +777,8 @@ public final class SabrPlaybackSmokeTest {
                     harness.downloader.requestedUrls.get(0).contains("https://sabr.test"));
             assertTrue("Follow-up SABR request did not use redirect URL: "
                             + harness.downloader.requestedUrls,
-                    harness.downloader.requestedUrls.get(1).contains("https://redirect.test/sabr"));
+                    harness.downloader.requestedUrls.get(1)
+                            .contains("https://redirect.googlevideo.com/sabr"));
         }
     }
 

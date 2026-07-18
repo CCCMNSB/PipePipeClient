@@ -548,7 +548,8 @@ public final class SabrSessionStore {
         }
         try {
             final YoutubeSabrSession initializationSession = new YoutubeSabrSession(
-                    info, audioFormat, videoFormat, null, null);
+                    info, audioFormat, videoFormat, null, null,
+                    SabrPolicyRuntime.createSessionHost());
             final byte[] data = initializationSession.fetchInitializationDataFallback(
                     targetFormat, localization, INITIALIZATION_FETCH_TIMEOUT_MS);
             if (cacheKey != null) {
@@ -608,7 +609,8 @@ public final class SabrSessionStore {
             final File spoolDirectory = new File(context.getApplicationContext().getCacheDir(),
                     "sabr-segments/" + spec.getVideoId() + '-' + System.nanoTime());
             final YoutubeSabrSession session = new YoutubeSabrSession(spec.getInfo(),
-                    spec.getAudioFormat(), spec.getVideoFormat(), provider, spoolDirectory);
+                    spec.getAudioFormat(), spec.getVideoFormat(), provider, spoolDirectory,
+                    SabrPolicyRuntime.createSessionHost());
             attachPoToken(spec.getVideoId(), spec.getInfo(), provider, session);
             final Holder holder = new Holder(context, spec, session);
             seedInitializationData(holder, spec, spec.getAudioFormat());

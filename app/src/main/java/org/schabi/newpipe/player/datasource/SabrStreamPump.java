@@ -11,6 +11,7 @@ import org.schabi.newpipe.extractor.services.youtube.sabr.SabrMediaSegment;
 import org.schabi.newpipe.extractor.services.youtube.sabr.SabrNextRequestPolicy;
 import org.schabi.newpipe.extractor.services.youtube.sabr.SabrRecoverableException;
 import org.schabi.newpipe.extractor.services.youtube.sabr.SabrSegmentRequest;
+import org.schabi.newpipe.extractor.services.youtube.sabr.SabrSessionPolicy;
 import org.schabi.newpipe.extractor.services.youtube.sabr.YoutubeSabrFormat;
 import org.schabi.newpipe.extractor.services.youtube.sabr.YoutubeSabrSession;
 
@@ -48,9 +49,6 @@ final class SabrStreamPump {
     private static final long SEEK_READAHEAD_CUSHION_MS = 5_000;
     private static final long SEEK_MODE_MS = 8_000;
     private static final long MIN_SERVER_READAHEAD_CUSHION_MS = 3_000;
-    private static final long DEMAND_FORWARD_JUMP_MS = 30_000;
-    private static final int MAX_DEMAND_RESPONSES_WITHOUT_TARGET = 3;
-    private static final long DEMAND_TARGET_DEADLINE_MS = 15_000;
     // Use the session's cache ceiling as the single source of truth. A lower pump threshold leaves a
     // byte range where the pump is throttled but the session cannot evict, forcing demand-time fetches.
     private static final long MAX_AHEAD_BYTES = YoutubeSabrSession.getMaxCacheBytes();
@@ -300,19 +298,27 @@ final class SabrStreamPump {
                             final long demandStartMs = session.getStreamState()
                                     .getSegmentStartMs(demand.request.getFormat(),
                                             demand.request.getSequenceNumber());
-                            if (demand.shouldReposition()) {
+                            final SabrSessionPolicy.DemandRoute route =
+                                    session.evaluateDemandRoute(demand.routeEvent(
+                                            demandStartMs, edgeMs, System.currentTimeMillis()));
+                            if (route == SabrSessionPolicy.DemandRoute.RECOVER_REWIND
+                                    || route == SabrSessionPolicy.DemandRoute.RECOVER_FORWARD
+                                    || route == SabrSessionPolicy.DemandRoute.RECOVER_MISSING) {
                                 state = State.REPOSITIONING;
-                                demand.repositioned = true;
+                                demand.recoveryCount++;
                                 session.addDiagnosticEvent("pump_demand_reposition itag="
                                         + demand.request.getFormat().getItag()
                                         + " seq=" + demand.request.getSequenceNumber()
                                         + " startMs=" + demandStartMs
                                         + " edgeMs=" + edgeMs
-                                        + " misses=" + demand.responsesWithoutTarget);
-                                if (demandStartMs < edgeMs) {
+                                        + " omissions="
+                                        + demand.responsesWithoutDemandedSegment
+                                        + " recovery=" + demand.recoveryCount
+                                        + " route=" + route);
+                                if (route == SabrSessionPolicy.DemandRoute.RECOVER_REWIND) {
                                     session.prepareForRewind(demand.request);
-                                } else if (demandStartMs
-                                        > edgeMs + DEMAND_FORWARD_JUMP_MS) {
+                                } else if (route
+                                        == SabrSessionPolicy.DemandRoute.RECOVER_FORWARD) {
                                     session.prepareForForwardJump(demand.request);
                                 } else {
                                     session.prepareForMissingSegment(demand.request);
@@ -324,12 +330,11 @@ final class SabrStreamPump {
                                 state = State.IDLE;
                                 consecutiveIoErrors = 0;
                                 if (!demandCompleted) {
-                                    awaitDemandRetry();
+                                    awaitDemandRetry(demand);
                                 }
                                 continue;
-                            } else if (demandStartMs < edgeMs) {
+                            } else if (route == SabrSessionPolicy.DemandRoute.REWIND) {
                                 state = State.REPOSITIONING;
-                                demand.repositioned = true;
                                 session.addDiagnosticEvent("pump_demand_rewind itag="
                                         + demand.request.getFormat().getItag()
                                         + " seq=" + demand.request.getSequenceNumber()
@@ -343,12 +348,11 @@ final class SabrStreamPump {
                                 state = State.IDLE;
                                 consecutiveIoErrors = 0;
                                 if (!demandCompleted) {
-                                    awaitDemandRetry();
+                                    awaitDemandRetry(demand);
                                 }
                                 continue;
-                            } else if (demandStartMs > edgeMs + DEMAND_FORWARD_JUMP_MS) {
+                            } else if (route == SabrSessionPolicy.DemandRoute.FORWARD) {
                                 state = State.REPOSITIONING;
-                                demand.repositioned = true;
                                 session.addDiagnosticEvent("pump_demand_forward itag="
                                         + demand.request.getFormat().getItag()
                                         + " seq=" + demand.request.getSequenceNumber()
@@ -362,10 +366,10 @@ final class SabrStreamPump {
                                 state = State.IDLE;
                                 consecutiveIoErrors = 0;
                                 if (!demandCompleted) {
-                                    awaitDemandRetry();
+                                    awaitDemandRetry(demand);
                                 }
                                 continue;
-                            } else {
+                            } else if (route == SabrSessionPolicy.DemandRoute.STREAM) {
                                 state = State.REQUESTING;
                                 session.addDiagnosticEvent("pump_demand itag="
                                         + demand.request.getFormat().getItag()
@@ -374,7 +378,7 @@ final class SabrStreamPump {
                                         + " edgeMs=" + edgeMs
                                         + " sinceMs=" + Math.max(0,
                                                 System.currentTimeMillis()
-                                                        - demand.sinceMs));
+                                                        - demand.createdAtMs));
                                 final long playerTimeMs = holder.getPlayerTimeMs();
                                 final long requestPlayerTimeMs = cappedServerAheadPlayerTimeMs(
                                         playerTimeMs, edgeMs);
@@ -386,10 +390,11 @@ final class SabrStreamPump {
                                 state = State.IDLE;
                                 consecutiveIoErrors = 0;
                                 if (!demandCompleted) {
-                                    awaitDemandRetry();
+                                    awaitDemandRetry(demand);
                                 }
                                 continue;
                             }
+                            throw new IllegalStateException("Unhandled SABR demand route " + route);
                         }
                     }
                     final long readaheadCushionMs = targetReadaheadCushionMs();
@@ -526,9 +531,10 @@ final class SabrStreamPump {
         return result;
     }
 
-    private void awaitDemandRetry() {
+    private void awaitDemandRetry(@NonNull final SegmentDemand demand) {
         final long remainingBackoffMs = session.getDemandBackoffRemainingMs();
-        awaitWake(remainingBackoffMs > 0 ? remainingBackoffMs : IDLE_POLL_MS);
+        awaitWake(Math.max(remainingBackoffMs,
+                demand.retryDelayMs > 0 ? demand.retryDelayMs : IDLE_POLL_MS));
     }
 
     private long targetReadaheadCushionMs() {
@@ -652,7 +658,8 @@ final class SabrStreamPump {
             final long startMs = session.getStreamState().getSegmentStartMs(
                     demand.request.getFormat(), demand.request.getSequenceNumber());
             if (selected == null || startMs < selectedStartMs
-                    || (startMs == selectedStartMs && demand.sinceMs < selected.sinceMs)) {
+                    || (startMs == selectedStartMs
+                    && demand.createdAtMs < selected.createdAtMs)) {
                 selected = demand;
                 selectedStartMs = startMs;
             }
@@ -667,41 +674,93 @@ final class SabrStreamPump {
 
     private boolean finishDemandAttempt(
             @NonNull final SegmentDemand demand,
-            @NonNull final YoutubeSabrSession.DemandResponseResult result) {
+            @NonNull final YoutubeSabrSession.DemandResponseResult result)
+            throws ExtractionException {
         if (!isDemandActive(demand)) {
             return true;
+        }
+        if (!result.wasRequestPerformed()) {
+            demand.retryDelayMs = 0;
+            return false;
         }
         if (session.getCachedSegment(demand.request) != null) {
             clearDemand(demand);
             return true;
         }
-        final long elapsedMs = Math.max(0, System.currentTimeMillis() - demand.sinceMs);
-        if (result.getTargetTrackSegmentCount() > 0) {
-            demand.responsesWithoutTarget++;
-            session.addDiagnosticEvent("pump_demand_target_miss itag="
+        // A control-only response is pacing/protocol state, not evidence that the server omitted
+        // a demanded media segment. The ordinary response policy has already handled it; keeping
+        // the demand counters unchanged also preserves the bounded server backoff.
+        if (result.getSegmentCount() == 0 && result.getReturnedSegments().isEmpty()) {
+            demand.retryDelayMs = 0;
+            session.addDiagnosticEvent("pump_demand_no_media itag="
                     + demand.request.getFormat().getItag()
                     + " seq=" + demand.request.getSequenceNumber()
-                    + " misses=" + demand.responsesWithoutTarget
-                    + " segments=" + result.getSegmentCount()
-                    + " elapsedMs=" + elapsedMs);
-            if (demand.responsesWithoutTarget >= MAX_DEMAND_RESPONSES_WITHOUT_TARGET
-                    || elapsedMs >= DEMAND_TARGET_DEADLINE_MS) {
-                failDemand(demand, new IOException(
-                        "SABR response repeatedly omitted demanded segment itag="
-                                + demand.request.getFormat().getItag()
-                                + ", seq=" + demand.request.getSequenceNumber()
-                                + ", responses=" + demand.responsesWithoutTarget
-                                + ", elapsedMs=" + elapsedMs));
-                return true;
-            }
-        } else if (elapsedMs >= DEMAND_TARGET_DEADLINE_MS) {
+                    + " backoffMs=" + session.getDemandBackoffRemainingMs());
+            return false;
+        }
+        final long nowMs = System.currentTimeMillis();
+        demand.responsesWithoutDemandedSegment++;
+        final long targetStartMs = session.getStreamState().getSegmentStartMs(
+                demand.request.getFormat(), demand.request.getSequenceNumber());
+        final long edgeMs = session.getStreamState().getMinBufferedEndMs();
+        final SabrSessionPolicy.DemandResponseDecision decision =
+                session.evaluateDemandResponse(new SabrSessionPolicy.DemandResponseEvent(
+                        demand.request.getFormat().getItag(),
+                        demand.request.getSequenceNumber(), targetStartMs, edgeMs,
+                        demand.policyState(nowMs), result.getSegmentCount(),
+                        result.getTargetTrackSegmentCount(), result.getReturnedSegments(),
+                        result.areReturnedSegmentsTruncated()));
+        demand.retryDelayMs = decision.getRetryDelayMs();
+        final long elapsedMs = Math.max(0, nowMs - demand.createdAtMs);
+        session.addDiagnosticEvent("pump_demand_omission itag="
+                + demand.request.getFormat().getItag()
+                + " seq=" + demand.request.getSequenceNumber()
+                + " omissions=" + demand.responsesWithoutDemandedSegment
+                + " targetTrackSegments=" + result.getTargetTrackSegmentCount()
+                + " segments=" + result.getSegmentCount()
+                + " returned=" + summarizeReturnedSegments(result)
+                + " elapsedMs=" + elapsedMs
+                + " outcome=" + decision.getOutcome()
+                + " retryDelayMs=" + decision.getRetryDelayMs());
+        if (decision.getOutcome()
+                == SabrSessionPolicy.DemandOutcome.FAIL_REPEATED_TARGET_OMISSION) {
+            failDemand(demand, new IOException(
+                    "SABR response repeatedly omitted demanded segment itag="
+                            + demand.request.getFormat().getItag()
+                            + ", seq=" + demand.request.getSequenceNumber()
+                            + ", responses=" + demand.responsesWithoutDemandedSegment
+                            + ", elapsedMs=" + elapsedMs));
+            return true;
+        }
+        if (decision.getOutcome() == SabrSessionPolicy.DemandOutcome.FAIL_NO_TARGET_MEDIA) {
             failDemand(demand, new IOException("SABR demand timed out without target-track media"
                     + " itag=" + demand.request.getFormat().getItag()
                     + ", seq=" + demand.request.getSequenceNumber()
                     + ", elapsedMs=" + elapsedMs));
             return true;
         }
+        if (decision.getOutcome() != SabrSessionPolicy.DemandOutcome.CONTINUE) {
+            throw new IllegalStateException("Unhandled SABR demand outcome "
+                    + decision.getOutcome());
+        }
         return false;
+    }
+
+    @NonNull
+    private static String summarizeReturnedSegments(
+            @NonNull final YoutubeSabrSession.DemandResponseResult result) {
+        final StringBuilder summary = new StringBuilder("[");
+        for (final SabrSessionPolicy.DemandReturnedSegment segment
+                : result.getReturnedSegments()) {
+            if (summary.length() > 1) {
+                summary.append(',');
+            }
+            summary.append(segment.getItag()).append(':').append(segment.getSequenceNumber());
+        }
+        if (result.areReturnedSegmentsTruncated()) {
+            summary.append(",...");
+        }
+        return summary.append(']').toString();
     }
 
     private boolean isDemandActive(@NonNull final SegmentDemand demand) {
@@ -730,9 +789,10 @@ final class SabrStreamPump {
         @NonNull
         private final Object readerOwner;
         private final long readerGeneration;
-        private final long sinceMs;
-        private int responsesWithoutTarget;
-        private boolean repositioned;
+        private final long createdAtMs;
+        private int responsesWithoutDemandedSegment;
+        private int recoveryCount;
+        private int retryDelayMs;
 
         private SegmentDemand(@NonNull final SabrSegmentRequest request,
                               @NonNull final Object readerOwner,
@@ -741,11 +801,22 @@ final class SabrStreamPump {
             this.request = request;
             this.readerOwner = readerOwner;
             this.readerGeneration = readerGeneration;
-            this.sinceMs = sinceMs;
+            this.createdAtMs = sinceMs;
         }
 
-        private boolean shouldReposition() {
-            return responsesWithoutTarget > 0 && !repositioned;
+        @NonNull
+        private SabrSessionPolicy.DemandState policyState(final long nowMs) {
+            return new SabrSessionPolicy.DemandState(createdAtMs, nowMs,
+                    responsesWithoutDemandedSegment, recoveryCount);
+        }
+
+        @NonNull
+        private SabrSessionPolicy.DemandRouteEvent routeEvent(final long targetStartMs,
+                                                               final long bufferedEdgeMs,
+                                                               final long nowMs) {
+            return new SabrSessionPolicy.DemandRouteEvent(request.getFormat().getItag(),
+                    request.getSequenceNumber(), targetStartMs, bufferedEdgeMs,
+                    policyState(nowMs));
         }
     }
 
