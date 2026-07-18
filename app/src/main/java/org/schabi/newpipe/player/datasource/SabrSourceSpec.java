@@ -8,6 +8,9 @@ import org.schabi.newpipe.extractor.services.youtube.sabr.YoutubeSabrFormat;
 import org.schabi.newpipe.extractor.services.youtube.sabr.YoutubeSabrInfo;
 import org.schabi.newpipe.extractor.services.youtube.sabr.YoutubeSabrStreamState;
 
+import java.io.IOException;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicLong;
 
 /** Immutable metadata needed to construct a SABR MediaSource without owning a live session. */
@@ -20,8 +23,12 @@ public final class SabrSourceSpec {
     @NonNull private final YoutubeSabrFormat audioFormat;
     @NonNull private final YoutubeSabrFormat videoFormat;
     @NonNull private final Localization localization;
-    @Nullable private final byte[] audioInitializationData;
-    @Nullable private final byte[] videoInitializationData;
+    @Nullable private final Future<byte[]> audioInitialization;
+    @Nullable private final Future<byte[]> videoInitialization;
+    @Nullable private volatile byte[] audioInitializationData;
+    @Nullable private volatile byte[] videoInitializationData;
+    private volatile boolean audioUsesFallbackTimeline;
+    private volatile boolean videoUsesFallbackTimeline;
 
     SabrSourceSpec(@NonNull final String videoId,
                    @NonNull final YoutubeSabrInfo info,
@@ -36,8 +43,29 @@ public final class SabrSourceSpec {
         this.audioFormat = audioFormat;
         this.videoFormat = videoFormat;
         this.localization = localization;
+        this.audioInitialization = null;
+        this.videoInitialization = null;
         this.audioInitializationData = cloneOrNull(audioInitializationData);
         this.videoInitializationData = cloneOrNull(videoInitializationData);
+    }
+
+    SabrSourceSpec(@NonNull final String videoId,
+                   @NonNull final YoutubeSabrInfo info,
+                   @NonNull final YoutubeSabrFormat audioFormat,
+                   @NonNull final YoutubeSabrFormat videoFormat,
+                   @NonNull final Localization localization,
+                   @NonNull final Future<byte[]> audioInitialization,
+                   @NonNull final Future<byte[]> videoInitialization) {
+        this.sourceId = NEXT_SOURCE_ID.incrementAndGet();
+        this.videoId = videoId;
+        this.info = info;
+        this.audioFormat = audioFormat;
+        this.videoFormat = videoFormat;
+        this.localization = localization;
+        this.audioInitialization = audioInitialization;
+        this.videoInitialization = videoInitialization;
+        this.audioInitializationData = resolveIfDone(audioInitialization);
+        this.videoInitializationData = resolveIfDone(videoInitialization);
     }
 
     @NonNull
@@ -72,9 +100,32 @@ public final class SabrSourceSpec {
     @Nullable
     byte[] getInitializationData(final int itag) {
         if (itag == audioFormat.getItag()) {
+            if (audioInitializationData == null) {
+                audioInitializationData = resolveIfDone(audioInitialization);
+            }
             return cloneOrNull(audioInitializationData);
         }
         if (itag == videoFormat.getItag()) {
+            if (videoInitializationData == null) {
+                videoInitializationData = resolveIfDone(videoInitialization);
+            }
+            return cloneOrNull(videoInitializationData);
+        }
+        return null;
+    }
+
+    @Nullable
+    byte[] awaitInitializationData(@NonNull final YoutubeSabrFormat format) throws IOException {
+        if (format.getItag() == audioFormat.getItag()) {
+            if (audioInitializationData == null) {
+                audioInitializationData = await(audioInitialization);
+            }
+            return cloneOrNull(audioInitializationData);
+        }
+        if (format.getItag() == videoFormat.getItag()) {
+            if (videoInitializationData == null) {
+                videoInitializationData = await(videoInitialization);
+            }
             return cloneOrNull(videoInitializationData);
         }
         return null;
@@ -82,10 +133,10 @@ public final class SabrSourceSpec {
 
     boolean usesFallbackTimeline(@NonNull final YoutubeSabrFormat format) {
         if (format.getItag() == audioFormat.getItag()) {
-            return audioInitializationData == null;
+            return audioUsesFallbackTimeline;
         }
         if (format.getItag() == videoFormat.getItag()) {
-            return videoInitializationData == null;
+            return videoUsesFallbackTimeline;
         }
         return false;
     }
@@ -97,13 +148,49 @@ public final class SabrSourceSpec {
     @NonNull
     YoutubeSabrStreamState newStreamState() {
         final YoutubeSabrStreamState state = new YoutubeSabrStreamState(audioFormat, videoFormat);
-        if (audioInitializationData != null) {
-            state.ingestInitializationData(audioFormat, audioInitializationData);
+        final byte[] audioData = getInitializationData(audioFormat.getItag());
+        final byte[] videoData = getInitializationData(videoFormat.getItag());
+        audioUsesFallbackTimeline = audioData == null;
+        videoUsesFallbackTimeline = videoData == null;
+        if (audioData != null) {
+            state.ingestInitializationData(audioFormat, audioData);
         }
-        if (videoInitializationData != null) {
-            state.ingestInitializationData(videoFormat, videoInitializationData);
+        if (videoData != null) {
+            state.ingestInitializationData(videoFormat, videoData);
         }
         return state;
+    }
+
+    @Nullable
+    private static byte[] resolveIfDone(@Nullable final Future<byte[]> future) {
+        if (future == null || !future.isDone() || future.isCancelled()) {
+            return null;
+        }
+        try {
+            return cloneOrNull(future.get());
+        } catch (final InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return null;
+        } catch (final ExecutionException e) {
+            return null;
+        }
+    }
+
+    @Nullable
+    private static byte[] await(@Nullable final Future<byte[]> future) throws IOException {
+        if (future == null) {
+            return null;
+        }
+        try {
+            return cloneOrNull(future.get());
+        } catch (final InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IOException("Interrupted awaiting SABR initialization", e);
+        } catch (final ExecutionException e) {
+            // Preserve the existing fallback path: the session can still fetch initialization
+            // metadata through SABR if this best-effort prefetch fails.
+            return null;
+        }
     }
 
     @Nullable

@@ -46,6 +46,11 @@ final class SabrSessionHandle {
         return spec.usesFallbackTimeline(format);
     }
 
+    @Nullable
+    byte[] awaitInitializationData(@NonNull final YoutubeSabrFormat format) throws IOException {
+        return spec.awaitInitializationData(format);
+    }
+
     void onPeriodReleased() {
         final SabrSessionStore.Lease leaseToClose;
         synchronized (this) {

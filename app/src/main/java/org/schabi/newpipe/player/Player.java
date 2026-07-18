@@ -293,6 +293,7 @@ public final class Player implements
     private boolean isFullscreen = false;
     private boolean isVerticalVideo = false;
     private boolean fragmentIsVisible = false;
+    private long startupTraceId;
 
     private boolean isFullscreenGestureEnabled = true;
 
@@ -759,6 +760,11 @@ public final class Player implements
 
     @SuppressWarnings("MethodLength")
     public void handleIntent(@NonNull final Intent intent) {
+        final long intentStartupTraceId = PlaybackStartupTrace.fromIntent(intent);
+        if (intentStartupTraceId > 0) {
+            startupTraceId = intentStartupTraceId;
+            PlaybackStartupTrace.mark(startupTraceId, "service_intent_received");
+        }
         // fail fast if no play queue was provided
         final String queueCache = intent.getStringExtra(PLAY_QUEUE_KEY);
         if (queueCache == null) {
@@ -947,12 +953,14 @@ public final class Player implements
                               final boolean playbackSkipSilence,
                               final boolean playOnReady,
                               final boolean isMuted) {
+        PlaybackStartupTrace.mark(startupTraceId, "player_init_started");
         destroyPlayer();
         initPlayer(playOnReady);
 
         playQueue = queue;
         playQueue.init();
         reloadPlayQueueManager();
+        PlaybackStartupTrace.mark(startupTraceId, "media_source_manager_ready");
 
         if (playQueueAdapter != null) {
             playQueueAdapter.dispose();
@@ -2344,6 +2352,7 @@ public final class Player implements
                 }
                 break;
             case androidx.media3.common.Player.STATE_READY: //3
+                PlaybackStartupTrace.mark(startupTraceId, "player_ready");
                 if (!isPrepared) {
                     isPrepared = true;
                     onPrepared(playWhenReady);
@@ -2404,6 +2413,7 @@ public final class Player implements
         if (currentState == STATE_BLOCKED) {
             changeState(STATE_BUFFERING);
         }
+        PlaybackStartupTrace.mark(startupTraceId, "media_source_attached");
         simpleExoPlayer.setMediaSource(mediaSource, false);
         simpleExoPlayer.prepare();
     }
@@ -3074,6 +3084,7 @@ public final class Player implements
 
     @Override
     public void onRenderedFirstFrame() {
+        PlaybackStartupTrace.finish(startupTraceId);
         //TODO check if this causes black screen when switching to fullscreen
         animate(binding.surfaceForeground, false, DEFAULT_CONTROLS_DURATION);
     }
@@ -4041,8 +4052,13 @@ case ERROR_CODE_DECODER_INIT_FAILED: {
     @Override // own playback listener
     @Nullable
     public MediaSource sourceOf(final PlayQueueItem item, final StreamInfo info) {
+        PlaybackStartupTrace.mark(startupTraceId, "resolver_started");
+        final MediaSource resolved;
         if (audioPlayerSelected()) {
-            return Optional.ofNullable(audioResolver.resolve(info)).orElse(videoResolver.resolve(info)) ;
+            resolved = Optional.ofNullable(audioResolver.resolve(info))
+                    .orElse(videoResolver.resolve(info));
+            PlaybackStartupTrace.mark(startupTraceId, "resolver_finished");
+            return resolved;
         }
 
         if (isAudioOnly && videoResolver.getStreamSourceType().orElse(
@@ -4051,7 +4067,10 @@ case ERROR_CODE_DECODER_INIT_FAILED: {
             // If the current info has only video streams with audio and if the stream is played as
             // audio, we need to use the audio resolver, otherwise the video stream will be played
             // in background.
-            return Optional.ofNullable(audioResolver.resolve(info)).orElse(videoResolver.resolve(info)) ;
+            resolved = Optional.ofNullable(audioResolver.resolve(info))
+                    .orElse(videoResolver.resolve(info));
+            PlaybackStartupTrace.mark(startupTraceId, "resolver_finished");
+            return resolved;
         }
 
         // Even if the stream is played in background, we need to use the video resolver if the
@@ -4061,7 +4080,9 @@ case ERROR_CODE_DECODER_INIT_FAILED: {
         // Note that the video is not fetched when the app is in background because the video
         // renderer is fully disabled (see useVideoSource method), except for HLS streams
         // (see https://github.com/google/ExoPlayer/issues/9282).
-        return videoResolver.resolve(info);
+        resolved = videoResolver.resolve(info);
+        PlaybackStartupTrace.mark(startupTraceId, "resolver_finished");
+        return resolved;
     }
 
     public void disablePreloadingOfCurrentTrack() {

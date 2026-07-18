@@ -75,8 +75,8 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * End-to-end online playback benchmark. Each client is extracted once per instrumentation run;
- * repetitions reuse that StreamInfo but start with empty media/session caches.
+ * Media-pipeline playback benchmark. Extraction happens once per instrumentation run and trials
+ * directly create ExoPlayer, so firstFrameMs is resolver-to-frame, not detail-click-to-frame.
  */
 @RunWith(AndroidJUnit4.class)
 @LargeTest
@@ -167,7 +167,11 @@ public final class YoutubePlaybackBenchmarkTest {
                 .put("playerMediaCacheClearedEachTrial", true)
                 .put("sabrSessionEvictedEachTrial", true)
                 .put("coldSabrCachesEachTrial", coldSabrCachesEachTrial)
-                .put("cachedExtractionAcrossTrials", true));
+                .put("cachedExtractionAcrossTrials", true)
+                .put("firstFrameMetricScope", "media_source_resolve_to_rendered_frame")
+                .put("excludedFromFirstFrameMs", new JSONArray(Arrays.asList(
+                        "detail_click", "player_service_start_or_bind", "play_queue_transfer",
+                        "stream_info_cache_lookup_or_extraction"))));
         final Map<Path, CachedExtraction> extractions = new LinkedHashMap<>();
         for (final Path path : paths) {
             final int maxAttempts = path.sourceDelivery == DeliveryMethod.HLS
@@ -675,6 +679,7 @@ public final class YoutubePlaybackBenchmarkTest {
         }
         return new JSONObject().put("path", path.name).put("client", path.client)
                 .put("samples", values.size()).put("cachedExtractionMs", extractionMs)
+                .put("firstFrameMetricScope", "media_source_resolve_to_rendered_frame")
                 .put("firstFrameMsP50", percentile(values, r -> r.firstFrameMs, 0.50))
                 .put("firstFrameMsP95", percentile(values, r -> r.firstFrameMs, 0.95))
                 .put("seekRecoveryMsP50", percentile(values, r -> r.seekRecoveryMs, 0.50))
@@ -1169,6 +1174,7 @@ public final class YoutubePlaybackBenchmarkTest {
                     .put("warmWebViewRuntime",warmWebViewRuntime)
                     .put("diagnosticDetails",diagnosticDetails)
                     .put("coldSabrCachesEachTrial",coldSabrCachesEachTrial)
+                    .put("firstFrameMetricScope", "media_source_resolve_to_rendered_frame")
                     .put("height",SelectingQualityResolver.effectiveHeight(stream))
                     .put("itag",stream.getItag()).put("codec",String.valueOf(stream.getCodec()))
                     .put("sourceDelivery",stream.getDeliveryMethod().name())

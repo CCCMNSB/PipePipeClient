@@ -87,6 +87,8 @@ import org.schabi.newpipe.local.dialog.PlaylistDialog;
 import org.schabi.newpipe.local.history.HistoryRecordManager;
 import org.schabi.newpipe.player.PlayerService.PlayerType;
 import org.schabi.newpipe.player.Player;
+import org.schabi.newpipe.player.PlaybackStartupTrace;
+import org.schabi.newpipe.player.datasource.SabrSessionStore;
 import org.schabi.newpipe.player.event.OnKeyDownListener;
 import org.schabi.newpipe.player.event.PlayerServiceExtendedEventListener;
 import org.schabi.newpipe.player.helper.PlayerHelper;
@@ -221,6 +223,7 @@ public final class VideoDetailFragment
 
     private List<VideoStream> sortedVideoStreams;
     private int selectedVideoStreamIndex = -1;
+    private long pendingStartupTraceId;
     private BottomSheetBehavior<FrameLayout> bottomSheetBehavior;
     private BroadcastReceiver broadcastReceiver;
 
@@ -586,6 +589,10 @@ public final class VideoDetailFragment
                         currentInfo.getSubChannelName());
             }
         } else if (id == R.id.detail_thumbnail_root_layout) {
+            if (currentInfo != null) {
+                pendingStartupTraceId = PlaybackStartupTrace.begin(
+                        currentInfo.getId(), currentInfo.getUrl());
+            }
             autoPlayEnabled = true; // forcefully start playing
             // FIXME Workaround #7427
             if (isPlayerAvailable()) {
@@ -602,6 +609,10 @@ public final class VideoDetailFragment
                 player.hideControls(0, 0);
                 showSystemUi();
             } else {
+                if (currentInfo != null) {
+                    pendingStartupTraceId = PlaybackStartupTrace.begin(
+                            currentInfo.getId(), currentInfo.getUrl());
+                }
                 autoPlayEnabled = true; // forcefully start playing
                 openVideoPlayer(false);
             }
@@ -1417,6 +1428,7 @@ public final class VideoDetailFragment
 
     private void openMainPlayer() {
         if (!(isPlayerServiceAvailable() && playerHolder.getListener() != null)) {
+            PlaybackStartupTrace.mark(pendingStartupTraceId, "waiting_for_player_service");
             playerHolder.startService(autoPlayEnabled, this);
             return;
         }
@@ -1425,6 +1437,7 @@ public final class VideoDetailFragment
         }
 
         final PlayQueue queue = setupPlayQueueForIntent(false);
+        PlaybackStartupTrace.mark(pendingStartupTraceId, "play_queue_ready");
 
         // Video view can have elements visible from popup,
         // We hide it here but once it ready the view will be shown in handleIntent()
@@ -1435,6 +1448,7 @@ public final class VideoDetailFragment
         Context context = requireContext();
         final Intent playerIntent = NavigationHelper.getPlayerIntent(context,
                 DeviceUtils.getPlayerServiceClass(), queue, true, autoPlayEnabled);
+        PlaybackStartupTrace.attach(playerIntent, pendingStartupTraceId);
         ContextCompat.startForegroundService(activity, playerIntent);
     }
 
@@ -1919,6 +1933,11 @@ public final class VideoDetailFragment
                 false);
         selectedVideoStreamIndex = ListHelper
                 .getDefaultResolutionIndex(activity, sortedVideoStreams);
+        if (selectedVideoStreamIndex >= 0
+                && selectedVideoStreamIndex < sortedVideoStreams.size()) {
+            SabrSessionStore.prewarm(requireContext(), info,
+                    sortedVideoStreams.get(selectedVideoStreamIndex));
+        }
         updateProgressInfo(info);
         initThumbnailViews(info);
         showMetaInfoInTextView(info.getMetaInfo(), binding.detailMetaInfoTextView,

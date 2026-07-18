@@ -203,6 +203,13 @@ public final class SabrSegmentDataSource implements DataSource {
         if (cached != null) {
             return cached;
         }
+        final byte[] prefetched = sessionHandle == null
+                ? null : sessionHandle.awaitInitializationData(format);
+        if (prefetched != null) {
+            holder.setInitializationData(itag, prefetched);
+            holder.session.getStreamState().ingestInitializationData(format, prefetched);
+            return prefetched;
+        }
         final SabrMediaSegment segment =
                 holder.session.getCachedSegment(SabrSegmentRequest.initialization(format));
         if (segment != null) {
