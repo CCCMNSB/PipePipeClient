@@ -34,7 +34,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -620,7 +619,9 @@ public final class SabrSessionStore {
         if (cached != null) {
             PlaybackStartupTrace.markForVideoId(info.getVideoId(), "sabr_audio_init_ready");
             PlaybackStartupTrace.markForVideoId(info.getVideoId(), "sabr_video_init_ready");
-            return CompletableFuture.completedFuture(cached);
+            final FutureTask<BootstrapResult> completed = new FutureTask<>(() -> cached);
+            completed.run();
+            return completed;
         }
         final FutureTask<BootstrapResult> created = new FutureTask<BootstrapResult>(() ->
                 cacheBootstrap(key, createBootstrap(context, info, audioFormat, videoFormat,
