@@ -47,13 +47,13 @@ public final class AndroidWebViewAvailabilityChecker implements WebViewAvailabil
         final PackageInfo info = packageInfo;
         if (info == null) {
             unavailableException = new WebViewUnavailableException(
-                    "Android WebView provider failed to initialize",
+                    "Android WebView runtime failed to become ready",
                     throwable);
             return;
         }
         unavailableException = new WebViewUnavailableException(
-                "Android WebView provider " + info.packageName + " version "
-                        + info.versionName + " failed to initialize",
+                "Android WebView runtime using provider " + info.packageName + " version "
+                        + info.versionName + " failed to become ready",
                 throwable);
     }
 

@@ -24,7 +24,7 @@ public final class WebViewRuntimeColdStartTest {
         final Context context = InstrumentationRegistry.getInstrumentation()
                 .getTargetContext().getApplicationContext();
         final Bundle arguments = InstrumentationRegistry.getArguments();
-        final long timeoutMs = Long.parseLong(arguments.getString("timeoutMs", "10000"));
+        final long timeoutMs = Long.parseLong(arguments.getString("timeoutMs", "15000"));
         final long startedAtMs = SystemClock.elapsedRealtime();
         Log.i(TAG, "await start timeoutMs=" + timeoutMs);
         try {

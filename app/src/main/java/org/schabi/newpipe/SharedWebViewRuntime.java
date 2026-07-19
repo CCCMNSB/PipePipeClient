@@ -5,6 +5,7 @@ import android.content.Context;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.SystemClock;
 import android.util.Log;
 import android.webkit.ConsoleMessage;
 import android.webkit.JavascriptInterface;
@@ -59,7 +60,7 @@ public final class SharedWebViewRuntime {
 
     private static final String TAG = "SharedWebViewRuntime";
     private static final long DEFAULT_TIMEOUT_MS = 30_000L;
-    private static final long READY_CALLBACK_ATTEMPT_TIMEOUT_MS = 1_000L;
+    private static final long READY_CALLBACK_ATTEMPT_TIMEOUT_MS = 5_000L;
     private static final int MAX_READY_CALLBACK_ATTEMPTS = 2;
     private static final String USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
             + "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.3";
@@ -276,8 +277,12 @@ public final class SharedWebViewRuntime {
             return;
         }
         try {
+            Log.i(TAG, "creating WebView attempt=" + attempt.number + " elapsedMs="
+                    + attempt.elapsedMs());
             final WebView view = new WebView(appContext);
             attempt.view = view;
+            Log.i(TAG, "created WebView attempt=" + attempt.number + " elapsedMs="
+                    + attempt.elapsedMs());
             if (!isActiveInitializationAttempt(attempt)) {
                 destroyWebView(view);
                 return;
@@ -310,9 +315,8 @@ public final class SharedWebViewRuntime {
                 public void onPageFinished(final WebView view, final String url) {
                     // WebView 44/83 occasionally misses this callback for a headless local page.
                     // Readiness is therefore determined only by the local document's bridge call.
-                    if (BuildConfig.DEBUG) {
-                        Log.d(TAG, "page finished url=" + url + " attempt=" + attempt.number);
-                    }
+                    Log.i(TAG, "page finished url=" + url + " attempt=" + attempt.number
+                            + " elapsedMs=" + attempt.elapsedMs());
                 }
 
                 @Override
@@ -329,8 +333,11 @@ public final class SharedWebViewRuntime {
             view.loadDataWithBaseURL("https://www.youtube.com/",
                     runtimeDocument(attempt.id),
                     "text/html", "UTF-8", null);
+            Log.i(TAG, "load dispatched attempt=" + attempt.number + " elapsedMs="
+                    + attempt.elapsedMs());
             mainHandler.postDelayed(() -> retryOrFail(attempt, new IllegalStateException(
-                    "WebView runtime ready callback timed out")),
+                    "WebView runtime ready callback timed out after "
+                            + READY_CALLBACK_ATTEMPT_TIMEOUT_MS + " ms")),
                     READY_CALLBACK_ATTEMPT_TIMEOUT_MS);
         } catch (final Throwable throwable) {
             retryOrFail(attempt, throwable);
@@ -361,7 +368,8 @@ public final class SharedWebViewRuntime {
             destroyWebView(attempt.view);
             return;
         }
-        Log.i(TAG, "ready source=bridge attempt=" + attempt.number + " mainThread="
+        Log.i(TAG, "ready source=bridge attempt=" + attempt.number + " elapsedMs="
+                + attempt.elapsedMs() + " mainThread="
                 + (Looper.myLooper() == Looper.getMainLooper()));
         attempt.latch.countDown();
     }
@@ -386,8 +394,8 @@ public final class SharedWebViewRuntime {
                         attempt.number + 1, attempt.latch, attempt.error);
                 activeInitializationAttempt = retry;
             }
-            Log.w(TAG, "retrying WebView runtime ready callback after attempt " + attempt.number,
-                    throwable);
+            Log.w(TAG, "retrying WebView runtime ready callback after attempt " + attempt.number
+                    + " elapsedMs=" + attempt.elapsedMs(), throwable);
             if (!mainHandler.post(() -> createWebView(retry))) {
                 retryOrFail(retry, new IllegalStateException("Could not post WebView retry"));
             }
@@ -400,7 +408,8 @@ public final class SharedWebViewRuntime {
             activeInitializationAttempt = null;
             attempt.error.compareAndSet(null, throwable);
         }
-        Log.e(TAG, "WebView runtime ready callback failed", throwable);
+        Log.e(TAG, "WebView runtime ready callback failed attempt=" + attempt.number
+                + " elapsedMs=" + attempt.elapsedMs(), throwable);
         attempt.latch.countDown();
         notifyInitializationFailure(throwable);
     }
@@ -440,6 +449,7 @@ public final class SharedWebViewRuntime {
         private final CountDownLatch latch;
         private final AtomicReference<Throwable> error;
         private final AtomicBoolean completed = new AtomicBoolean();
+        private final long startedAtMs = SystemClock.elapsedRealtime();
         @Nullable
         private WebView view;
 
@@ -449,6 +459,10 @@ public final class SharedWebViewRuntime {
             this.number = number;
             this.latch = latch;
             this.error = error;
+        }
+
+        private long elapsedMs() {
+            return SystemClock.elapsedRealtime() - startedAtMs;
         }
     }
 

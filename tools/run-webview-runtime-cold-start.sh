@@ -2,7 +2,7 @@
 set -euo pipefail
 
 samples="${SAMPLES:-20}"
-timeout_ms="${TIMEOUT_MS:-3000}"
+timeout_ms="${TIMEOUT_MS:-15000}"
 adb="${ADB:-adb}"
 
 ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest
