@@ -31,7 +31,7 @@ class SabrPolicyUpdateWorker(
                 200 -> {
                     val body = response.rawResponseBody()
                         ?: throw IOException("SABR policy response had no body")
-                    SabrPolicyRuntime.installEnvelope(body, System.currentTimeMillis())
+                    SabrPolicyRuntime.installDocument(body, System.currentTimeMillis())
                     Result.success()
                 }
                 204, 304 -> Result.success()

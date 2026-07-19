@@ -3,13 +3,34 @@
 Release builds enable SABR cloud policies with two build environment variables:
 
 - `SABR_POLICY_PUBLIC_KEY_BASE64`: raw 32-byte Ed25519 public key encoded as Base64.
-- `SABR_POLICY_URL`: HTTPS endpoint serving the binary envelope accepted by
-  `SabrPolicyRuntime.installEnvelope`.
+- `SABR_POLICY_URL`: HTTPS endpoint serving the UTF-8 JSON document accepted by
+  `SabrPolicyRuntime.installDocument`.
 
 When both values are present, the client restores the last verified policy at startup, requests an
 update immediately, and schedules a connected-network refresh every six hours. The endpoint must
-return the encoded policy envelope as the response body with HTTP 200. HTTP 204 is treated as no
+return the signed policy document as the response body with HTTP 200. HTTP 204 is treated as no
 update. Policies are signature checked, time bounded, and revision monotonic before activation.
+
+The document is deliberately human-readable and suitable for publication in a public source
+repository:
+
+```json
+{
+  "format": 1,
+  "revision": 1001,
+  "validFromMs": 1784390400000,
+  "validUntilMs": 1792166400000,
+  "source": "function createSabrPolicy(sabr) { /* ... */ }",
+  "signature": "base64-encoded Ed25519 signature"
+}
+```
+
+The Ed25519 signature covers the canonical `SabrScriptPolicy` payload reconstructed from revision,
+validity bounds, and source. JSON whitespace and key order are not signed and may be changed without
+invalidating the document. Numeric metadata must use exact JSON integers; fractions, scientific
+notation, strings, and values outside the signed 64-bit range are rejected rather than coerced. The
+client keeps its verified cache in a private binary format; that cache is never downloaded or
+executed as a binary.
 
 If a policy throws while building requests, interpreting responses, routing demanded segments, or
 decoding media headers, the client removes that cached policy, retains its highest revision to

@@ -11,6 +11,7 @@ import androidx.test.platform.app.InstrumentationRegistry;
 
 import org.schabi.newpipe.BuildConfig;
 import org.schabi.newpipe.extractor.services.youtube.sabr.SabrScriptPolicy;
+import org.schabi.newpipe.extractor.services.youtube.sabr.SabrScriptPolicyDocument;
 import org.schabi.newpipe.extractor.services.youtube.sabr.SabrSessionPolicyHost;
 import org.schabi.newpipe.extractor.services.youtube.sabr.SabrSessionPolicy;
 import org.schabi.newpipe.extractor.services.youtube.sabr.BuiltinSabrSessionPolicy;
@@ -113,8 +114,8 @@ public final class SabrPolicyRuntimeTest {
         final String publicKey = android.util.Base64.encodeToString(
                 privateKey.generatePublicKey().getEncoded(), android.util.Base64.NO_WRAP);
         SabrPolicyRuntime.initialize(context, publicKey, 0);
-        SabrPolicyRuntime.installEnvelope(SabrPolicyRuntime.encodeEnvelope(
-                payload, signer.generateSignature()), now);
+        SabrPolicyRuntime.installDocument(SabrScriptPolicyDocument.encode(
+                policy, signer.generateSignature()), now);
         SabrPolicyRuntime.initialize(context, publicKey, 0);
 
         assertEquals(120, SabrPolicyRuntime.createSessionHost()
@@ -127,8 +128,8 @@ public final class SabrPolicyRuntimeTest {
         final Ed25519Signer rollbackSigner = new Ed25519Signer();
         rollbackSigner.init(true, privateKey);
         rollbackSigner.update(rollbackPayload, 0, rollbackPayload.length);
-        assertThrows(IllegalArgumentException.class, () -> SabrPolicyRuntime.installEnvelope(
-                SabrPolicyRuntime.encodeEnvelope(rollbackPayload,
+        assertThrows(IllegalArgumentException.class, () -> SabrPolicyRuntime.installDocument(
+                SabrScriptPolicyDocument.encode(rollback,
                         rollbackSigner.generateSignature()), now));
     }
 

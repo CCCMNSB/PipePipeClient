@@ -13,6 +13,7 @@ import org.schabi.newpipe.extractor.services.youtube.sabr.SabrProtocolException;
 import org.schabi.newpipe.extractor.services.youtube.sabr.SabrMediaHeader;
 import org.schabi.newpipe.extractor.services.youtube.sabr.SabrMediaProtocol;
 import org.schabi.newpipe.extractor.services.youtube.sabr.SabrScriptPolicy;
+import org.schabi.newpipe.extractor.services.youtube.sabr.SabrScriptPolicyDocument;
 import org.schabi.newpipe.extractor.services.youtube.sabr.SabrScriptPolicyManager;
 import org.schabi.newpipe.extractor.services.youtube.sabr.SabrSessionPolicy;
 import org.schabi.newpipe.extractor.services.youtube.sabr.SabrSessionPolicyHost;
@@ -159,11 +160,16 @@ public final class SabrPolicyRuntime {
         manager.activate(verified);
     }
 
-    /** Installs the bounded envelope format used by both remote delivery and local persistence. */
-    public static void installEnvelope(@NonNull final byte[] encoded, final long nowMs)
+    /** Installs a signed, human-readable JSON policy document received from remote delivery. */
+    public static void installDocument(@NonNull final byte[] encoded, final long nowMs)
             throws IOException {
-        final Envelope envelope = decodeEnvelope(encoded);
-        install(envelope.payload, envelope.signature, nowMs);
+        final SabrScriptPolicyDocument.Parsed document;
+        try {
+            document = SabrScriptPolicyDocument.decode(encoded);
+        } catch (final IllegalArgumentException error) {
+            throw new IOException("Invalid SABR cloud policy document", error);
+        }
+        install(document.getPayload(), document.getSignature(), nowMs);
     }
 
     @NonNull
