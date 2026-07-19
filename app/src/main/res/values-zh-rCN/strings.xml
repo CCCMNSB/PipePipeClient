@@ -815,7 +815,7 @@
 <string name="sponsor_promote">成为支持者</string>
 <string name="random_play_order_title">随机顺序</string>
 <string name="random_play_order_summary">在后台播放时自动随机播放您的本地播放列表</string>
-<string name="update_log">- 进一步提升了 YouTube 视频信息加载和播放启动速度\n- 修复了在某些情况下可能导致 SABR 播放错误的几个问题\n- 修复了在某些情况下 WebView 被错误地报告为不可用的问题\n- 修复了在某些情况下 IP 地址被错误地报告为被 YouTube 封锁的问题\n- 提升了应用的整体稳定性</string>
+<string name="update_log">- 修复了在特定条件下导致 SABR 播放出现频繁缓冲、网络错误、无限加载及意外崩溃的问题。\n\n- 全面显著提升了 SABR 的播放性能，包括更快的加载和跳转速度，并大幅减少了流量消耗。</string>
 <string name="speeding_playback_title">长按以加快播放</string>
 <string name="view_on_github">在GitHub上查看</string>
 <string name="donation_dialog_title">支持该项目</string>

@@ -926,7 +926,7 @@
 <string name="sponsor_promote">Become a supporter</string>
 <string name="random_play_order_title">Random Order</string>
 <string name="random_play_order_summary">Automatically shuffle your local playlists when playing in the background</string>
-<string name="update_log">- Further improved YouTube video information loading and playback startup speed\n- Fixed several issues that could cause SABR playback errors under certain conditions\n- Fixed WebView being incorrectly reported as unavailable in some cases\n- Fixed IP addresses being incorrectly reported as blocked by YouTube in some cases\n- Improved overall app stability</string>
+<string name="update_log">- Fixed SABR playback issues that caused frequent buffering, network errors, infinite loading, and unexpected crashes under certain conditions.\n\n- Significantly improved SABR playback performance across the board, including much faster loading and seeking, as well as substantially reduced data usage.</string>
 <string name="speeding_playback_title">Long-press to speeding the playback</string>
 <string name="view_on_github">View on GitHub</string>
 <string name="donation_dialog_title">Support the Project</string>

@@ -770,7 +770,7 @@
 <string name="sponsor_promote">サポーターになる</string>
 <string name="random_play_order_title">ランダムな順序</string>
 <string name="random_play_order_summary">バックグラウンドで再生する際にローカルプレイリストを自動的にシャッフルします</string>
-<string name="update_log">### 新機能\n\n- YouTube動画情報の読み込みと再生開始速度をさらに向上\n- 特定の条件下でSABR再生エラーを引き起こす可能性のある複数の問題を修正\n- 一部のケースでWebViewが利用不可と誤って報告される問題を修正\n- 一部のケースでIPアドレスがYouTubeによってブロックされていると誤って報告される問題を修正\n- アプリ全体の安定性を向上</string>
+<string name="update_log">- 特定の条件下で頻繁なバッファリング、ネットワークエラー、無限ローディング、および予期せぬクラッシュを引き起こしていたSABR再生の問題を修正しました。\n\n- 読み込みとシークの大幅な高速化、およびデータ使用量の大幅な削減など、SABR再生のパフォーマンスを全面的に大幅に改善しました。</string>
 <string name="speeding_playback_title">長時間押は再生速度を速めることができます</string>
 <string name="view_on_github">GitHubで表示</string>
 <string name="donation_dialog_title">プロジェクトをサポートする</string>
