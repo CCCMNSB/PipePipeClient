@@ -129,6 +129,10 @@ android {
     namespace 'org.schabi.newpipe'
 }
 
+tasks.withType(com.android.build.gradle.internal.tasks.ExtractVersionControlInfoTask).configureEach {
+    enabled = false
+}
+
 tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
     kotlinOptions {
         jvmTarget = '25'
