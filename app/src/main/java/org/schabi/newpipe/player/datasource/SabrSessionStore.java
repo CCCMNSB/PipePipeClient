@@ -170,7 +170,7 @@ public final class SabrSessionStore {
             synchronized (SabrSessionStore.class) {
                 p = sharedProvider;
                 if (p == null) {
-                    p = new LocalDomPoTokenProvider(context.getApplicationContext());
+                    p = LocalDomPoTokenProvider.shared(context.getApplicationContext());
                     sharedProvider = p;
                 }
             }

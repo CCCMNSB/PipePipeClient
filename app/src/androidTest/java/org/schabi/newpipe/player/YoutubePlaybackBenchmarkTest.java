@@ -103,6 +103,11 @@ public final class YoutubePlaybackBenchmarkTest {
                 args.getString("diagnosticDetails", "false"));
         final boolean coldSabrCachesEachTrial = Boolean.parseBoolean(
                 args.getString("coldSabrCachesEachTrial", "false"));
+        final boolean disableSessionPoToken = Boolean.parseBoolean(
+                args.getString("disableSessionPoToken", "false"));
+        if (disableSessionPoToken) {
+            NewPipe.setYoutubeSessionPoTokenProvider(null);
+        }
         if (warmWebViewRuntime) {
             SharedWebViewRuntime.get(context).ensureReady(120_000L, "benchmark WebView warmup");
         }
