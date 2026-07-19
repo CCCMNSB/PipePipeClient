@@ -705,7 +705,7 @@ Voulez-vous continuer?</string>
 <string name="sponsor_promote">Devenez un supporter</string>
 <string name="random_play_order_title">Ordre aléatoire</string>
 <string name="random_play_order_summary">Mélangez automatiquement vos listes de lecture locales lorsque vous jouez en arrière-plan</string>
-<string name="update_log">- Correction des problèmes de lecture SABR qui entraînaient des mises en mémoire tampon fréquentes, des erreurs réseau, des chargements infinis et des plantages inattendus dans certaines conditions.\n\n- Amélioration significative des performances de lecture SABR à tous les niveaux, y compris des temps de chargement et de recherche beaucoup plus rapides, ainsi qu\'une réduction substantielle de la consommation de données.</string>
+<string name="update_log">- Amélioration supplémentaire de la vitesse de chargement des informations des vidéos YouTube et du démarrage de la lecture\n- Correction de plusieurs problèmes pouvant entraîner des erreurs de lecture SABR sous certaines conditions\n- Correction du signalement incorrect de WebView comme étant indisponible dans certains cas\n- Correction des adresses IP signalées à tort comme bloquées par YouTube dans certains cas\n- Amélioration de la stabilité globale de l\'application</string>
 <string name="speeding_playback_title">Appuyer longuement pour accélérer la lecture</string>
 <string name="view_on_github">Voir sur GitHub</string>
 <string name="donation_dialog_title">Soutenez le projet</string>

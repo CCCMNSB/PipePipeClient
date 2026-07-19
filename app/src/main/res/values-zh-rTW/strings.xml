@@ -803,7 +803,7 @@
 <string name="sponsor_promote">成為支持者</string>
 <string name="random_play_order_title">隨機順序</string>
 <string name="random_play_order_summary">在背景播放時自動隨機播放您的本地播放列表</string>
-<string name="update_log">- 修復了在特定情況下導致頻繁緩衝、網路錯誤、無限載入及意外閃退的 SABR 播放問題。\n\n- 全面大幅提升 SABR 播放效能，包含更快的載入與跳轉速度，並大幅降低數據流量消耗。</string>
+<string name="update_log">### 最新消息\n\n- 進一步提升了 YouTube 影片資訊載入與播放啟動速度\n- 修復了在特定情況下可能導致 SABR 播放錯誤的幾個問題\n- 修復了在某些情況下 WebView 被錯誤回報為無法使用的問題\n- 修復了在某些情況下 IP 位址被錯誤回報為遭 YouTube 封鎖的問題\n- 改善了應用程式的整體穩定性</string>
 <string name="speeding_playback_title">按住以加速播放</string>
 <string name="view_on_github">在 GitHub 上查看</string>
 <string name="donation_dialog_title">支持這項計畫</string>

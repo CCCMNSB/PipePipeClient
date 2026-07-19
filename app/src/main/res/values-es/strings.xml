@@ -811,7 +811,7 @@
 <string name="sponsor_promote">Conviértete en un patrocinador</string>
 <string name="random_play_order_title">Orden aleatorio</string>
 <string name="random_play_order_summary">Baraja automáticamente tus listas de reproducción locales cuando se reproduzcan en segundo plano</string>
-<string name="update_log">- Se corrigieron problemas de reproducción de SABR que causaban almacenamiento en búfer frecuente, errores de red, carga infinita y fallos inesperados bajo ciertas condiciones.\n\n- Se mejoró significativamente el rendimiento de reproducción de SABR en general, incluyendo carga y búsqueda mucho más rápidas, así como una reducción sustancial en el uso de datos.</string>
+<string name="update_log">- Se ha mejorado aún más la carga de información de los videos de YouTube y la velocidad de inicio de reproducción\n- Se han solucionado varios problemas que podían causar errores de reproducción SABR bajo ciertas condiciones\n- Se ha solucionado el problema por el que WebView se notificaba incorrectamente como no disponible en algunos casos\n- Se ha solucionado el problema por el que las direcciones IP se notificaban incorrectamente como bloqueadas por YouTube en algunos casos\n- Se ha mejorado la estabilidad general de la aplicación</string>
 <string name="speeding_playback_title">Mantener presionado para acelerar la reproducción</string>
 <string name="view_on_github">Ver en GitHub</string>
 <string name="donation_dialog_title">Apoya el proyecto</string>
