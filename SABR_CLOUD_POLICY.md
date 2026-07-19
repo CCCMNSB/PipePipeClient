@@ -1,10 +1,18 @@
 # SABR cloud policy delivery
 
-Release builds enable SABR cloud policies with two build environment variables:
+Release builds use the PipePipe policy repository by default. Deployments can override it with two
+build environment variables:
 
 - `SABR_POLICY_PUBLIC_KEY_BASE64`: raw 32-byte Ed25519 public key encoded as Base64.
 - `SABR_POLICY_URL`: HTTPS endpoint serving the UTF-8 JSON document accepted by
   `SabrPolicyRuntime.installDocument`.
+
+The production defaults are:
+
+- Repository: `https://github.com/InfinityLoop1308/PipePipeSabrPolicies`
+- Policy URL:
+  `https://raw.githubusercontent.com/InfinityLoop1308/PipePipeSabrPolicies/main/policy.json`
+- Raw Ed25519 public key: `Yyi5q4s0ikpgAitzw+62H8+ggPt+dTILJ0Of4vSIcrU=`
 
 When both values are present, the client restores the last verified policy at startup, requests an
 update immediately, and schedules a connected-network refresh every six hours. The endpoint must

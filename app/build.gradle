@@ -10,8 +10,10 @@ def keyPath = System.getenv("KEY_PATH")
 def keyStorePassword = System.getenv("KEY_STORE_PASSWORD")
 def signingKeyAlias = System.getenv("KEY_ALIAS")
 def signingKeyPassword = System.getenv("KEY_PASSWORD")
-def sabrPolicyPublicKey = System.getenv("SABR_POLICY_PUBLIC_KEY_BASE64") ?: ""
-def sabrPolicyUrl = System.getenv("SABR_POLICY_URL") ?: ""
+def sabrPolicyPublicKey = System.getenv("SABR_POLICY_PUBLIC_KEY_BASE64")
+        ?: "Yyi5q4s0ikpgAitzw+62H8+ggPt+dTILJ0Of4vSIcrU="
+def sabrPolicyUrl = System.getenv("SABR_POLICY_URL")
+        ?: "https://raw.githubusercontent.com/InfinityLoop1308/PipePipeSabrPolicies/main/policy.json"
 
 android {
     compileSdk 37
