@@ -58,6 +58,11 @@ public final class SabrDashMediaSource extends CompositeMediaSource<Integer> {
         this.spec = spec;
         this.localization = spec.getLocalization();
         this.manifestState = spec.newStreamState();
+        if (!manifestState.hasSegmentIndex(spec.getAudioFormat())
+                || !manifestState.hasSegmentIndex(spec.getVideoFormat())) {
+            throw new IOException("Refusing to publish guessed SABR DASH timeline for "
+                    + spec.getVideoId());
+        }
         this.sessionHandle = new SabrSessionHandle(context, spec);
         this.playbackState.setReaderOwner(this);
         final long durationMs = spec.getDurationMs();
@@ -174,19 +179,17 @@ public final class SabrDashMediaSource extends CompositeMediaSource<Integer> {
         }
         builder.append(">")
                 .append("<BaseURL>sabrseg://").append(format.getItag()).append("/</BaseURL>")
-                .append(segmentTemplate(state, format, trackType))
+                .append(segmentTemplate(state, format))
                 .append("</Representation></AdaptationSet>");
         return builder.toString();
     }
 
     private static String segmentTemplate(final YoutubeSabrStreamState state,
-                                          final YoutubeSabrFormat format,
-                                          final int trackType) {
+                                          final YoutubeSabrFormat format) {
         final long endSegment = state.getEndSegment(format);
         if (endSegment <= 0 || endSegment > 10_000) {
-            final int segmentDurationMs = trackType == C.TRACK_TYPE_AUDIO ? 10_000 : 5_000;
-            return "<SegmentTemplate timescale=\"1000\" startNumber=\"1\" duration=\""
-                    + segmentDurationMs + "\" initialization=\"init\" media=\"$Number$\"/>";
+            throw new IllegalStateException("Invalid exact SABR segment count: itag="
+                    + format.getItag() + ", count=" + endSegment);
         }
         final StringBuilder builder = new StringBuilder()
                 .append("<SegmentTemplate timescale=\"1000\" startNumber=\"1\" ")

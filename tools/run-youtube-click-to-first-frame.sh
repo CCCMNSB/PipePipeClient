@@ -6,6 +6,10 @@ repetitions="${REPETITIONS:-5}"
 detail_timeout_seconds="${DETAIL_TIMEOUT_SECONDS:-90}"
 frame_timeout_seconds="${FRAME_TIMEOUT_SECONDS:-30}"
 build_install="${BUILD_INSTALL:-true}"
+youtube_client="${YOUTUBE_CLIENT:-mweb}"
+benchmark_path="${BENCHMARK_PATH:-$youtube_client}"
+cookie_file="${COOKIE_FILE:-/tmp/token.txt}"
+device_cookie_file="${DEVICE_COOKIE_FILE:-/data/local/tmp/pipepipe-click-benchmark-token.txt}"
 readonly adb_command="${ADB:-adb}"
 output="${OUTPUT:-../log/youtube-click-to-first-frame-$(date +%Y%m%d-%H%M%S).log}"
 jsonl="${JSONL_OUTPUT:-${output%.log}.jsonl}"
@@ -19,20 +23,46 @@ case "${build_install,,}" in
 esac
 
 if [[ "$build_install" == true ]]; then
-  ./gradlew assembleDebug
+  ./gradlew assembleDebug assembleDebugAndroidTest
 fi
 
 abi="$($adb_command shell getprop ro.product.cpu.abi | tr -d '\r')"
 app_apk="$(find app/build/outputs/apk/debug -name "*-${abi}-debug.apk" -print -quit)"
 app_metadata="app/build/outputs/apk/debug/output-metadata.json"
+test_apk="app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk"
+test_metadata="app/build/outputs/apk/androidTest/debug/output-metadata.json"
 app_id="$(sed -n 's/.*"applicationId": "\([^"]*\)".*/\1/p' "$app_metadata" | head -1)"
-if [[ -z "$app_apk" || -z "$app_id" ]]; then
-  echo "Could not locate the debug APK or application ID" >&2
+test_id="$(sed -n 's/.*"applicationId": "\([^"]*\)".*/\1/p' "$test_metadata" | head -1)"
+if [[ -z "$app_apk" || -z "$app_id" || ! -f "$test_apk" || -z "$test_id" ]]; then
+  echo "Could not locate the benchmark APKs or application IDs" >&2
   exit 2
 fi
 if [[ "$build_install" == true ]]; then
   $adb_command install -r "$app_apk" >/dev/null
+  $adb_command install -r -t "$test_apk" >/dev/null
 fi
+
+setup_cookie_file=""
+if [[ -n "$cookie_file" ]]; then
+  if [[ ! -f "$cookie_file" ]]; then
+    echo "Cookie/token file does not exist: $cookie_file" >&2
+    exit 2
+  fi
+  $adb_command push "$cookie_file" "$device_cookie_file" >/dev/null
+  setup_cookie_file="$device_cookie_file"
+fi
+setup_output="$($adb_command shell am instrument -w -r \
+  -e class org.schabi.newpipe.player.YoutubeClickBenchmarkSetupTest \
+  -e youtubeClient "$youtube_client" \
+  -e cookieFile "$setup_cookie_file" \
+  "$test_id/androidx.test.runner.AndroidJUnitRunner")"
+$adb_command shell rm -f "$device_cookie_file" >/dev/null 2>&1 || true
+if ! printf '%s\n' "$setup_output" | rg -q 'OK \(1 test\)'; then
+  printf '%s\n' "$setup_output" >&2
+  echo "Could not configure click benchmark inputs" >&2
+  exit 1
+fi
+$adb_command shell am force-stop "$app_id"
 
 dump_ui() {
   $adb_command exec-out uiautomator dump /dev/tty 2>/dev/null \
@@ -122,6 +152,9 @@ for ((round=0; round<repetitions; round++)); do
     if ((after_count > before_count)); then
       summary="$(printf '%s\n' "$summaries" | tail -1 \
         | sed -E 's/^.*PIPEPIPE_PLAYBACK_STARTUP (\{.*\})$/\1/')"
+      summary="$(printf '%s\n' "$summary" | jq -c \
+        --arg path "$benchmark_path" --arg client "$youtube_client" \
+        '. + {benchmarkPath: $path, youtubeClient: $client}')"
       break
     fi
     sleep 0.25

@@ -42,8 +42,8 @@ import java.util.concurrent.atomic.AtomicReference;
 public final class SabrSponsorBlockStallProbeTest {
     private static final int AUDIO_ITAG = 251;
     private static final int VIDEO_ITAG = 137;
-    private static final byte[] AUDIO_INIT = new byte[]{5, 6, 7, 8};
-    private static final byte[] VIDEO_INIT = new byte[]{1, 2, 3, 4};
+    private static final byte[] AUDIO_INIT = mp4Sidx(20_001, 20_000, 19_999);
+    private static final byte[] VIDEO_INIT = mp4Sidx(5_000, 5_000, 5_000, 5_000);
 
     @Test
     public void discardedSourcesDoNotCreateSessions() throws Exception {
@@ -227,10 +227,8 @@ public final class SabrSponsorBlockStallProbeTest {
         final YoutubeSabrFormat audio = format(AUDIO_ITAG, true);
         final YoutubeSabrFormat video = format(VIDEO_ITAG, false);
         final YoutubeSabrInfo info = info(videoId, audio, video);
-        final SabrSourceSpec firstSpec = new SabrSourceSpec(videoId, info, audio, video,
-                new Localization("en", "US"), AUDIO_INIT, VIDEO_INIT);
-        final SabrSourceSpec secondSpec = new SabrSourceSpec(videoId, info, audio, video,
-                new Localization("en", "US"), AUDIO_INIT, VIDEO_INIT);
+        final SabrSourceSpec firstSpec = spec(videoId, info, audio, video);
+        final SabrSourceSpec secondSpec = spec(videoId, info, audio, video);
         final SabrSessionStore.Holder firstHolder = holder(context, firstSpec);
         final SabrSessionStore.Holder secondHolder = holder(context, secondSpec);
         final SabrSessionHandle firstHandle = new SabrSessionHandle(context, firstSpec);
@@ -289,7 +287,14 @@ public final class SabrSponsorBlockStallProbeTest {
     private static SabrSourceSpec spec(final String videoId) throws Exception {
         final YoutubeSabrFormat audio = format(AUDIO_ITAG, true);
         final YoutubeSabrFormat video = format(VIDEO_ITAG, false);
-        return new SabrSourceSpec(videoId, info(videoId, audio, video), audio, video,
+        return spec(videoId, info(videoId, audio, video), audio, video);
+    }
+
+    private static SabrSourceSpec spec(final String videoId,
+                                       final YoutubeSabrInfo info,
+                                       final YoutubeSabrFormat audio,
+                                       final YoutubeSabrFormat video) {
+        return new SabrSourceSpec(videoId, info, audio, video,
                 new Localization("en", "US"), AUDIO_INIT, VIDEO_INIT);
     }
 
@@ -351,15 +356,34 @@ public final class SabrSponsorBlockStallProbeTest {
                 YoutubeSabrFormat.class.getDeclaredConstructor(int.class, long.class,
                         String.class, String.class, String.class, String.class, boolean.class,
                         String.class, String.class, boolean.class, int.class, int.class,
-                        int.class, long.class, long.class, String.class, long.class, long.class);
+                        int.class, long.class, long.class);
         constructor.setAccessible(true);
         return constructor.newInstance(itag, 123456L, null,
-                audio ? "audio/webm" : "video/mp4",
+                audio ? "audio/mp4" : "video/mp4",
                 audio ? "audio-track" : null, audio ? "Original" : null, audio,
                 audio ? null : "1080p", audio ? "AUDIO_QUALITY_MEDIUM" : null, false,
                 audio ? -1 : 1920, audio ? -1 : 1080,
-                audio ? 128_000 : 2_000_000, 100_000L, 300_000L,
-                "https://media.test/" + itag, 0L, 100L);
+                audio ? 128_000 : 2_000_000, 100_000L, 300_000L);
+    }
+
+    private static byte[] mp4Sidx(final int... durationsMs) {
+        final java.nio.ByteBuffer buffer = java.nio.ByteBuffer.allocate(32 + durationsMs.length * 12)
+                .order(java.nio.ByteOrder.BIG_ENDIAN);
+        buffer.putInt(buffer.capacity());
+        buffer.put(new byte[]{'s', 'i', 'd', 'x'});
+        buffer.putInt(0);
+        buffer.putInt(1);
+        buffer.putInt(1_000);
+        buffer.putInt(0);
+        buffer.putInt(0);
+        buffer.putShort((short) 0);
+        buffer.putShort((short) durationsMs.length);
+        for (final int durationMs : durationsMs) {
+            buffer.putInt(1);
+            buffer.putInt(durationMs);
+            buffer.putInt(0);
+        }
+        return buffer.array();
     }
 
     private static YoutubeSabrInfo info(final String videoId,

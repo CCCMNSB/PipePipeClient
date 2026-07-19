@@ -15,6 +15,7 @@ import org.schabi.newpipe.extractor.services.youtube.sabr.SabrMediaSegment;
 import org.schabi.newpipe.extractor.services.youtube.sabr.SabrSegmentRequest;
 import org.schabi.newpipe.extractor.services.youtube.sabr.YoutubeSabrFormat;
 
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InterruptedIOException;
@@ -29,8 +30,6 @@ public final class SabrSegmentDataSource implements DataSource {
     private static final long RECOVERY_RETRY_MS = 10_000;
     private static final long RECOVERY_FAILURE_MS = 30_000;
     private static final long FORWARD_SEEK_AHEAD_MS = 30_000;
-    private static final long FALLBACK_AUDIO_SEGMENT_MS = 10_000;
-    private static final long FALLBACK_VIDEO_SEGMENT_MS = 5_000;
 
     @Nullable
     private SabrSessionStore.Holder holder;
@@ -115,7 +114,6 @@ public final class SabrSegmentDataSource implements DataSource {
         this.progressiveDataEndPosition = -1;
         this.pos = (int) Math.max(0, dataSpec.position);
         SabrSegmentRequest request = requestFromUri(dataSpec.uri);
-        request = remapFallbackTimelineRequest(request);
         final YoutubeSabrFormat format = request.getFormat();
         final long availableRemaining;
         final int openedBytes;
@@ -141,13 +139,27 @@ public final class SabrSegmentDataSource implements DataSource {
             availableRemaining = Math.max(0, data.length - pos);
             openedBytes = data.length;
         } else {
-            final SabrMediaSegment segment = awaitSegment(request);
+            SabrMediaSegment segment = awaitSegment(request);
+            if (segment != null) {
+                try {
+                    this.dataStream = segment.openStream();
+                } catch (final FileNotFoundException e) {
+                    Log.w(TAG, "Spool file vanished before open; refetching video="
+                            + holder.videoId + " itag=" + format.getItag()
+                            + " seq=" + request.getSequenceNumber());
+                    holder.session.discardCachedSegment(request);
+                    progressiveSegment = null;
+                    segment = awaitSegment(request);
+                    if (segment != null) {
+                        this.dataStream = segment.openStream();
+                    }
+                }
+            }
             if (segment == null) {
                 this.data = new byte[0];
                 availableRemaining = 0;
                 openedBytes = 0;
             } else {
-                this.dataStream = segment.openStream();
                 if (progressiveSegment != null) {
                     progressiveDataEndPosition = segment.getLength();
                 }
@@ -167,48 +179,11 @@ public final class SabrSegmentDataSource implements DataSource {
         return bytesRemaining;
     }
 
-    private SabrSegmentRequest remapFallbackTimelineRequest(
-            final SabrSegmentRequest request) {
-        if (request.isInitializationSegment() || sessionHandle == null || holder == null
-                || !sessionHandle.usesFallbackTimeline(request.getFormat())) {
-            return request;
-        }
-        final long fallbackDurationMs = request.getFormat().isAudio()
-                ? FALLBACK_AUDIO_SEGMENT_MS : FALLBACK_VIDEO_SEGMENT_MS;
-        final long targetStartMs = Math.max(0, request.getSequenceNumber() - 1L)
-                * fallbackDurationMs;
-        final int mappedSequence = remapFallbackSequence(holder, request, targetStartMs);
-        if (mappedSequence <= 0 || mappedSequence == request.getSequenceNumber()) {
-            return request;
-        }
-        holder.session.addDiagnosticEvent("manifest_remap itag="
-                + request.getFormat().getItag()
-                + " manifestSeq=" + request.getSequenceNumber()
-                + " targetMs=" + targetStartMs
-                + " sabrSeq=" + mappedSequence);
-        return SabrSegmentRequest.media(request.getFormat(), mappedSequence);
-    }
-
-    private static int remapFallbackSequence(
-            final SabrSessionStore.Holder holder,
-            final SabrSegmentRequest request,
-            final long targetStartMs) {
-        return holder.session.getStreamState()
-                .getSegmentNumberAtOrAfterTimeMs(request.getFormat(), targetStartMs);
-    }
-
     private byte[] getInitializationData(final YoutubeSabrFormat format) throws IOException {
         final int itag = format.getItag();
         final byte[] cached = holder.getInitializationData(itag);
         if (cached != null) {
             return cached;
-        }
-        final byte[] prefetched = sessionHandle == null
-                ? null : sessionHandle.awaitInitializationData(format);
-        if (prefetched != null) {
-            holder.setInitializationData(itag, prefetched);
-            holder.session.getStreamState().ingestInitializationData(format, prefetched);
-            return prefetched;
         }
         final SabrMediaSegment segment =
                 holder.session.getCachedSegment(SabrSegmentRequest.initialization(format));

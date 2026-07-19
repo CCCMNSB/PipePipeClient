@@ -70,6 +70,7 @@ final class SabrStreamPump {
     private volatile long lastReadMs;
     private volatile long lastRequestMs;
     private volatile SabrSegmentRequest pendingRefetch;
+    private volatile long pendingRefetchPositionMs = -1;
     private volatile SabrSegmentRequest pendingForwardSeek;
     private volatile long pendingForwardSeekPositionMs = -1;
     private final Map<DemandKey, SegmentDemand> activeDemands = new ConcurrentHashMap<>();
@@ -147,6 +148,7 @@ final class SabrStreamPump {
     void requestRefetchFrom(@NonNull final SabrSegmentRequest request) {
         activateSeekMode();
         pendingRefetch = request;
+        pendingRefetchPositionMs = -1;
         ensureStarted();
         wake();
     }
@@ -201,8 +203,10 @@ final class SabrStreamPump {
             pendingForwardSeek = null;
             pendingForwardSeekPositionMs = -1;
             pendingRefetch = request;
+            pendingRefetchPositionMs = positionMs;
         } else {
             pendingRefetch = null;
+            pendingRefetchPositionMs = -1;
             pendingForwardSeek = request;
             pendingForwardSeekPositionMs = positionMs;
         }
@@ -255,12 +259,18 @@ final class SabrStreamPump {
                     }
                     final SabrSegmentRequest refetch = pendingRefetch;
                     if (refetch != null) {
+                        final long refetchPositionMs = pendingRefetchPositionMs;
                         pendingRefetch = null;
+                        pendingRefetchPositionMs = -1;
                         state = State.REPOSITIONING;
                         session.addDiagnosticEvent("pump_rewind itag="
                                 + refetch.getFormat().getItag()
                                 + " seq=" + refetch.getSequenceNumber());
-                        session.prepareForRewind(refetch);
+                        if (refetchPositionMs >= 0) {
+                            session.prepareForRewind(refetch, refetchPositionMs);
+                        } else {
+                            session.prepareForRewind(refetch);
+                        }
                         pumpOnceStreaming();
                         state = State.IDLE;
                         consecutiveIoErrors = 0;
@@ -284,7 +294,11 @@ final class SabrStreamPump {
                                 + forwardSeek.getFormat().getItag()
                                 + " init=" + forwardSeek.isInitializationSegment()
                                 + " seq=" + forwardSeek.getSequenceNumber());
-                        session.prepareForForwardJump(forwardSeek);
+                        if (forwardSeekPositionMs >= 0) {
+                            session.prepareForForwardJump(forwardSeek, forwardSeekPositionMs);
+                        } else {
+                            session.prepareForForwardJump(forwardSeek);
+                        }
                         pumpOnceStreaming();
                         state = State.IDLE;
                         consecutiveIoErrors = 0;
