@@ -264,7 +264,7 @@ public final class Player implements
 
     public ExoPlayer simpleExoPlayer;
     private AudioReactor audioReactor;
-    private MediaSessionManager mediaSessionManager;
+    @Nullable private MediaSessionManager mediaSessionManager;
     private PlayerMediaSession playerMediaSession;
     @Nullable private SurfaceHolderCallback surfaceHolderCallback;
 
@@ -5383,6 +5383,7 @@ case ERROR_CODE_DECODER_INIT_FAILED: {
         return prefs;
     }
 
+    @Nullable
     public MediaSessionManager getMediaSessionManager() {
         return mediaSessionManager;
     }

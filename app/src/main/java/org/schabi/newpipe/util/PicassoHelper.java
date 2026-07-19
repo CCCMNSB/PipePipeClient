@@ -164,10 +164,12 @@ public final class PicassoHelper {
         return loadScaledDownThumbnail(context, url, false);
     }
 
-    public static RequestCreator loadScaledDownThumbnail(final Context context, final String url, final boolean shouldSetTag) {
+    public static RequestCreator loadScaledDownThumbnail(final Context context, final String url,
+                                                         final boolean shouldSetTag) {
         // scale down the notification thumbnail for performance
-        return PicassoHelper.loadThumbnail(url)
+        final RequestCreator requestCreator = PicassoHelper.loadThumbnail(url)
                 .transform(transformation);
+        return shouldSetTag ? requestCreator.tag(PLAYER_THUMBNAIL_TAG) : requestCreator;
     }
 
     public static RequestCreator loadOrigin(final String url) {

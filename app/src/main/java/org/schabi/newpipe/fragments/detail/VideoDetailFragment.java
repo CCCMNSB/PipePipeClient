@@ -358,7 +358,7 @@ public final class VideoDetailFragment
         outState.putInt("serviceId", serviceId);
         outState.putString("title", title);
         outState.putString("url", url);
-        outState.putInt("bottomSheetState", bottomSheetState);
+        outState.putInt("bottomSheetState", sanitizeBottomSheetState(bottomSheetState));
         outState.putBoolean("autoPlayEnabled", autoPlayEnabled);
         outState.putString("currentSponsorBlockMode", currentSponsorBlockMode != null ? currentSponsorBlockMode.name() : null);
     }
@@ -369,7 +369,8 @@ public final class VideoDetailFragment
         serviceId = savedInstanceState.getInt("serviceId", Constants.NO_SERVICE_ID);
         title = savedInstanceState.getString("title", "");
         url = savedInstanceState.getString("url");
-        bottomSheetState = savedInstanceState.getInt("bottomSheetState", BottomSheetBehavior.STATE_EXPANDED);
+        bottomSheetState = sanitizeBottomSheetState(savedInstanceState.getInt(
+                "bottomSheetState", BottomSheetBehavior.STATE_EXPANDED));
         autoPlayEnabled = savedInstanceState.getBoolean("autoPlayEnabled", true);
         String modeStr = savedInstanceState.getString("currentSponsorBlockMode");
         currentSponsorBlockMode = modeStr != null ? SponsorBlockMode.valueOf(modeStr) : null;
@@ -2582,6 +2583,7 @@ public final class VideoDetailFragment
 
         final FrameLayout bottomSheetLayout = activity.findViewById(R.id.fragment_player_holder);
         bottomSheetBehavior = BottomSheetBehavior.from(bottomSheetLayout);
+        bottomSheetState = sanitizeBottomSheetState(bottomSheetState);
         bottomSheetBehavior.setState(bottomSheetState);
         final int peekHeight = getResources().getDimensionPixelSize(R.dimen.mini_player_height);
         if (bottomSheetState != BottomSheetBehavior.STATE_HIDDEN) {
@@ -2691,6 +2693,19 @@ public final class VideoDetailFragment
             }
 
         });
+    }
+
+    static boolean isStableBottomSheetState(final int state) {
+        return state == BottomSheetBehavior.STATE_COLLAPSED
+                || state == BottomSheetBehavior.STATE_EXPANDED
+                || state == BottomSheetBehavior.STATE_HALF_EXPANDED
+                || state == BottomSheetBehavior.STATE_HIDDEN;
+    }
+
+    static int sanitizeBottomSheetState(final int state) {
+        return isStableBottomSheetState(state)
+                ? state
+                : BottomSheetBehavior.STATE_COLLAPSED;
     }
 
     private boolean shouldTriggerCollapse(Fragment fragment) {
