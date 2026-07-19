@@ -654,6 +654,7 @@ public final class SabrSessionStore {
         final YoutubeSabrSession session = new YoutubeSabrSession(info, audioFormat, videoFormat,
                 sessionProvider, spoolDirectory, SabrPolicyRuntime.createSessionHost());
         try {
+            attachPoToken(info.getVideoId(), info, sessionProvider, session);
             try {
                 session.bootstrapInitialization(localization);
             } catch (final IOException firstFailure) {

@@ -573,6 +573,34 @@ public final class SabrPlaybackSmokeTest {
     }
 
     @Test
+    public void nativeBootstrapHonorsInitialBackoff() throws Exception {
+        final YoutubeSabrFormat audioFormat = smokeFormat(SMOKE_AUDIO_ITAG, true);
+        final YoutubeSabrFormat videoFormat = smokeFormat(SMOKE_VIDEO_ITAG, false);
+        final byte[] audioInit = mp4Sidx(20_000);
+        final byte[] videoInit = mp4Sidx(5_000);
+        try (SabrSmokeHarness harness = SabrSmokeHarness.create(audioFormat, videoFormat)) {
+            harness.downloader.enqueue(new UmpFixture()
+                    .part(SabrResponseDecoder.NEXT_REQUEST_POLICY, nextRequestPolicy(500))
+                    .bytes());
+            harness.downloader.enqueue(new UmpFixture()
+                    .part(SabrResponseDecoder.FORMAT_INITIALIZATION_METADATA,
+                            initializationMetadata(SMOKE_AUDIO_ITAG, 1, 20_000, "audio/mp4"))
+                    .part(SabrResponseDecoder.FORMAT_INITIALIZATION_METADATA,
+                            initializationMetadata(SMOKE_VIDEO_ITAG, 1, 5_000, "video/mp4"))
+                    .initSegment(1, SMOKE_AUDIO_ITAG, audioInit)
+                    .initSegment(2, SMOKE_VIDEO_ITAG, videoInit)
+                    .bytes());
+
+            harness.holder.session.bootstrapInitialization(new Localization("en", "US"));
+
+            final List<Long> requestTimesMs = harness.downloader.requestTimesSnapshot();
+            assertEquals(2, requestTimesMs.size());
+            assertTrue("Bootstrap ignored the initial SABR backoff: " + requestTimesMs,
+                    requestTimesMs.get(1) - requestTimesMs.get(0) >= 400);
+        }
+    }
+
+    @Test
     public void demandIncompleteMediaResponseRetriesThroughPump() throws Exception {
         try (SabrSmokeHarness harness = SabrSmokeHarness.create()) {
             harness.downloader.enqueue(new UmpFixture()
