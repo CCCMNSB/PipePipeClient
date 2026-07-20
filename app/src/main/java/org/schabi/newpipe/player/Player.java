@@ -307,6 +307,16 @@ public final class Player implements
     private PlayerBinding binding;
 
     private final Handler controlsVisibilityHandler = new Handler();
+    private final Handler sabrBackoffHandler = new Handler();
+    private final Runnable sabrBackoffUpdate = new Runnable() {
+        @Override
+        public void run() {
+            updateSabrBackoffCountdown();
+            if (currentState == STATE_BUFFERING) {
+                sabrBackoffHandler.postDelayed(this, 250L);
+            }
+        }
+    };
 
     // fullscreen player
     private boolean isQueueVisible = false;
@@ -998,6 +1008,7 @@ public final class Player implements
             Log.d(TAG, "destroyPlayer() called");
         }
 
+        stopSabrBackoffCountdown();
         cleanupVideoSurface();
 
         if (!exoPlayerIsNull()) {
@@ -2618,6 +2629,7 @@ public final class Player implements
         if (DEBUG) {
             Log.d(TAG, "onBlocked() called");
         }
+        stopSabrBackoffCountdown();
         if (!isProgressLoopRunning()) {
             startProgressLoop();
         }
@@ -2644,6 +2656,7 @@ public final class Player implements
         if (DEBUG) {
             Log.d(TAG, "onPlaying() called");
         }
+        stopSabrBackoffCountdown();
         if (!isProgressLoopRunning()) {
             startProgressLoop();
         }
@@ -2690,6 +2703,7 @@ public final class Player implements
         }
         binding.loadingPanel.setBackgroundColor(Color.TRANSPARENT);
         binding.loadingPanel.setVisibility(View.VISIBLE);
+        startSabrBackoffCountdown();
 
         binding.getRoot().setKeepScreenOn(true);
         if (NotificationUtil.getInstance().shouldUpdateBufferingSlot()) {
@@ -2701,6 +2715,7 @@ public final class Player implements
         if (DEBUG) {
             Log.d(TAG, "onPaused() called");
         }
+        stopSabrBackoffCountdown();
         if (isProgressLoopRunning()) {
             stopProgressLoop();
         }
@@ -2738,6 +2753,7 @@ public final class Player implements
             Log.d(TAG, "onPausedSeek() called");
         }
 
+        stopSabrBackoffCountdown();
         animatePlayButtons(false, 100);
         binding.getRoot().setKeepScreenOn(true);
 
@@ -2748,6 +2764,7 @@ public final class Player implements
         if (DEBUG) {
             Log.d(TAG, "onCompleted() called" + (playQueue == null ? ". playQueue is null" : ""));
         }
+        stopSabrBackoffCountdown();
         if (playQueue == null) {
             return;
         }
@@ -2777,6 +2794,35 @@ public final class Player implements
         animate(binding.currentDisplaySeek, false, 200, AnimationType.SCALE_AND_ALPHA);
         binding.loadingPanel.setVisibility(View.GONE);
         animate(binding.surfaceForeground, true, 100);
+    }
+
+    private void startSabrBackoffCountdown() {
+        SabrBackoffCoordinator.getInstance().setPlayerBuffering(context, true);
+        sabrBackoffHandler.removeCallbacks(sabrBackoffUpdate);
+        sabrBackoffUpdate.run();
+    }
+
+    private void stopSabrBackoffCountdown() {
+        SabrBackoffCoordinator.getInstance().setPlayerBuffering(context, false);
+        sabrBackoffHandler.removeCallbacks(sabrBackoffUpdate);
+        if (binding != null) {
+            binding.sabrBackoffCountdown.setVisibility(View.GONE);
+        }
+    }
+
+    private void updateSabrBackoffCountdown() {
+        if (binding == null) {
+            return;
+        }
+        final long remainingMs = SabrBackoffCoordinator.getInstance().getRemainingMs();
+        if (remainingMs <= 0L) {
+            binding.sabrBackoffCountdown.setVisibility(View.GONE);
+            return;
+        }
+        final int seconds = SabrBackoffCoordinator.remainingSeconds(remainingMs);
+        binding.sabrBackoffCountdown.setText(context.getResources().getQuantityString(
+                R.plurals.sabr_backoff_notification_content, seconds, seconds));
+        binding.sabrBackoffCountdown.setVisibility(View.VISIBLE);
     }
 
     private void animatePlayButtons(final boolean show, final int duration) {

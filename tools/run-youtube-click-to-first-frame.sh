@@ -140,9 +140,28 @@ for ((round=0; round<repetitions; round++)); do
     exit 1
   fi
 
+  sleep 0.5
   before_count="$($adb_command logcat -d -v raw -s PlaybackStartup:I '*:S' \
     | rg -c '"record":"click_to_first_frame"' || true)"
-  tap_bounds "$bounds"
+  before_click_count="$($adb_command logcat -d -v raw -s PlaybackStartup:I '*:S' \
+    | rg -c '"record":"stage".*"stage":"detail_click"' || true)"
+  click_registered=false
+  for ((click_attempt=0; click_attempt<5; click_attempt++)); do
+    tap_bounds "$bounds"
+    for ((confirm_attempt=0; confirm_attempt<10; confirm_attempt++)); do
+      after_click_count="$($adb_command logcat -d -v raw -s PlaybackStartup:I '*:S' \
+        | rg -c '"record":"stage".*"stage":"detail_click"' || true)"
+      if ((after_click_count > before_click_count)); then
+        click_registered=true
+        break 2
+      fi
+      sleep 0.1
+    done
+  done
+  if [[ "$click_registered" != true ]]; then
+    echo "Round $round: detail play click was not registered" | tee -a "$output" >&2
+    exit 1
+  fi
 
   summary=""
   for ((waited=0; waited<frame_timeout_seconds * 4; waited++)); do

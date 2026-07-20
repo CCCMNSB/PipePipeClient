@@ -14,6 +14,7 @@ import org.schabi.newpipe.extractor.services.youtube.sabr.SabrSegmentRequest;
 import org.schabi.newpipe.extractor.services.youtube.sabr.SabrSessionPolicy;
 import org.schabi.newpipe.extractor.services.youtube.sabr.YoutubeSabrFormat;
 import org.schabi.newpipe.extractor.services.youtube.sabr.YoutubeSabrSession;
+import org.schabi.newpipe.player.SabrBackoffCoordinator;
 
 import java.io.IOException;
 import java.io.InterruptedIOException;
@@ -547,6 +548,10 @@ final class SabrStreamPump {
 
     private void awaitDemandRetry(@NonNull final SegmentDemand demand) {
         final long remainingBackoffMs = session.getDemandBackoffRemainingMs();
+        if (remainingBackoffMs > 0L) {
+            SabrBackoffCoordinator.getInstance().begin(holder.getApplicationContext(), holder,
+                    android.os.SystemClock.elapsedRealtime() + remainingBackoffMs);
+        }
         awaitWake(Math.max(remainingBackoffMs,
                 demand.retryDelayMs > 0 ? demand.retryDelayMs : IDLE_POLL_MS));
     }
@@ -684,6 +689,9 @@ final class SabrStreamPump {
     private void clearDemand(@NonNull final SegmentDemand demand) {
         activeDemands.remove(DemandKey.from(demand.request, demand.readerOwner,
                 demand.readerGeneration));
+        if (activeDemands.isEmpty()) {
+            SabrBackoffCoordinator.getInstance().clear(holder.getApplicationContext(), holder);
+        }
     }
 
     private boolean finishDemandAttempt(

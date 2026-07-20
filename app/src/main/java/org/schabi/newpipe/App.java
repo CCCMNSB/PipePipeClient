@@ -417,6 +417,17 @@ public class App extends MultiDexApplication {
                 .setDescription(getString(R.string.streams_notification_channel_description))
                 .build());
 
+        notificationChannelCompats.add(new NotificationChannelCompat
+                .Builder(getString(R.string.sabr_backoff_notification_channel_id),
+                        NotificationManagerCompat.IMPORTANCE_DEFAULT)
+                .setName(getString(R.string.sabr_backoff_notification_channel_name))
+                .setDescription(getString(
+                        R.string.sabr_backoff_notification_channel_description))
+                .setSound(null, null)
+                .setVibrationEnabled(false)
+                .setShowBadge(false)
+                .build());
+
         final NotificationManagerCompat notificationManager = NotificationManagerCompat.from(this);
         notificationManager.createNotificationChannelsCompat(notificationChannelCompats);
     }

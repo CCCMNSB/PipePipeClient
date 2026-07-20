@@ -1,6 +1,7 @@
 package org.schabi.newpipe.player.datasource;
 
 import android.content.Context;
+import android.os.SystemClock;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
@@ -8,6 +9,7 @@ import androidx.annotation.Nullable;
 
 import org.schabi.newpipe.App;
 import org.schabi.newpipe.player.PlaybackStartupTrace;
+import org.schabi.newpipe.player.SabrBackoffCoordinator;
 import org.schabi.newpipe.extractor.exceptions.ExtractionException;
 import org.schabi.newpipe.extractor.localization.ContentCountry;
 import org.schabi.newpipe.extractor.localization.Localization;
@@ -67,6 +69,8 @@ public final class SabrSessionStore {
                 return thread;
             });
     private static final Map<String, Future<BootstrapResult>> BOOTSTRAP_IN_FLIGHT =
+            new ConcurrentHashMap<>();
+    private static final Map<String, BootstrapBackoffState> BOOTSTRAP_BACKOFFS =
             new ConcurrentHashMap<>();
     private static final Map<String, BootstrapResult> BOOTSTRAP_CACHE =
             Collections.synchronizedMap(new LinkedHashMap<String, BootstrapResult>(
@@ -136,6 +140,60 @@ public final class SabrSessionStore {
                         @NonNull final byte[] videoInitialization) {
             this.audioInitialization = audioInitialization.clone();
             this.videoInitialization = videoInitialization.clone();
+        }
+    }
+
+    private static final class BootstrapBackoffState
+            implements YoutubeSabrSession.BackoffListener {
+        @NonNull private final Context appContext;
+        @NonNull private final String videoId;
+        private long deadlineElapsedMs = SabrBackoffCoordinator.NO_DEADLINE;
+        private int waiters;
+
+        BootstrapBackoffState(@NonNull final Context context,
+                              @NonNull final String videoId) {
+            this.appContext = context.getApplicationContext();
+            this.videoId = videoId;
+        }
+
+        @Override
+        public synchronized void onBackoffStarted(final int durationMs) {
+            deadlineElapsedMs = SystemClock.elapsedRealtime() + durationMs;
+            Log.i(TAG, "bootstrap_backoff_start video=" + videoId
+                    + " durationMs=" + durationMs + " waiters=" + waiters);
+            if (waiters > 0) {
+                SabrBackoffCoordinator.getInstance().beginPlaybackWait(
+                        appContext, this, deadlineElapsedMs);
+            }
+        }
+
+        @Override
+        public synchronized void onBackoffFinished() {
+            Log.i(TAG, "bootstrap_backoff_finish video=" + videoId
+                    + " waiters=" + waiters);
+            deadlineElapsedMs = SabrBackoffCoordinator.NO_DEADLINE;
+            SabrBackoffCoordinator.getInstance().clear(appContext, this);
+        }
+
+        synchronized void beginWaiting() {
+            waiters++;
+            if (deadlineElapsedMs > SystemClock.elapsedRealtime()) {
+                SabrBackoffCoordinator.getInstance().beginPlaybackWait(
+                        appContext, this, deadlineElapsedMs);
+            }
+        }
+
+        synchronized void endWaiting() {
+            waiters = Math.max(0, waiters - 1);
+            if (waiters == 0) {
+                SabrBackoffCoordinator.getInstance().clear(appContext, this);
+            }
+        }
+
+        synchronized void cancel() {
+            waiters = 0;
+            deadlineElapsedMs = SabrBackoffCoordinator.NO_DEADLINE;
+            SabrBackoffCoordinator.getInstance().clear(appContext, this);
         }
     }
 
@@ -219,6 +277,7 @@ public final class SabrSessionStore {
             this.session = session;
             this.audioFormat = audioFormat;
             this.videoFormat = videoFormat;
+            attachBackoffListener();
         }
 
         Holder(@NonNull final Context appContext,
@@ -234,10 +293,34 @@ public final class SabrSessionStore {
             this.videoFormat = spec.getVideoFormat();
             retainBootstrapInitialization(spec, audioFormat);
             retainBootstrapInitialization(spec, videoFormat);
+            attachBackoffListener();
+        }
+
+        private void attachBackoffListener() {
+            session.setBackoffListener(new YoutubeSabrSession.BackoffListener() {
+                @Override
+                public void onBackoffStarted(final int durationMs) {
+                    Log.i(TAG, "backoff_start video=" + videoId
+                            + " durationMs=" + durationMs);
+                    SabrBackoffCoordinator.getInstance().begin(appContext, Holder.this,
+                            SystemClock.elapsedRealtime() + durationMs);
+                }
+
+                @Override
+                public void onBackoffFinished() {
+                    Log.i(TAG, "backoff_finish video=" + videoId);
+                    SabrBackoffCoordinator.getInstance().clear(appContext, Holder.this);
+                }
+            });
         }
 
         public long getPlayerTimeMs() {
             return playerTimeMs;
+        }
+
+        @NonNull
+        Context getApplicationContext() {
+            return appContext;
         }
 
         void setPlayerTimeMs(final long playerTimeMs) {
@@ -480,6 +563,8 @@ public final class SabrSessionStore {
         }
 
         void stop(@NonNull final String reason) {
+            SabrBackoffCoordinator.getInstance().clear(appContext, this);
+            session.setBackoffListener(null);
             Log.w(TAG, "stop video=" + videoId + " reason=" + reason
                     + " leases=" + leaseReferences.get() + " activeTracks=" + hasActiveTracks()
                     + " pump=" + (pump == null ? "none" : pump.getStateName()));
@@ -623,9 +708,11 @@ public final class SabrSessionStore {
             completed.run();
             return completed;
         }
+        final BootstrapBackoffState backoffState = new BootstrapBackoffState(
+                context, info.getVideoId());
         final FutureTask<BootstrapResult> created = new FutureTask<BootstrapResult>(() ->
                 cacheBootstrap(key, createBootstrap(context, info, audioFormat, videoFormat,
-                        localization))) {
+                        localization, backoffState))) {
             @Override
             protected void done() {
                 PlaybackStartupTrace.markForVideoId(info.getVideoId(), "sabr_audio_init_ready");
@@ -636,6 +723,7 @@ public final class SabrSessionStore {
         if (existing != null) {
             return existing;
         }
+        BOOTSTRAP_BACKOFFS.put(key, backoffState);
         PlaybackStartupTrace.markForVideoId(info.getVideoId(), "sabr_bootstrap_started");
         BOOTSTRAP_EXECUTOR.execute(created);
         return created;
@@ -646,13 +734,15 @@ public final class SabrSessionStore {
                                                    @NonNull final YoutubeSabrInfo info,
                                                    @NonNull final YoutubeSabrFormat audioFormat,
                                                    @NonNull final YoutubeSabrFormat videoFormat,
-                                                   @NonNull final Localization localization)
+                                                   @NonNull final Localization localization,
+                                                   @NonNull final BootstrapBackoffState backoffState)
             throws IOException, ExtractionException {
         final LocalDomPoTokenProvider sessionProvider = provider(context);
         final File spoolDirectory = new File(context.getApplicationContext().getCacheDir(),
                 "sabr-bootstrap/" + info.getVideoId() + '-' + System.nanoTime());
         final YoutubeSabrSession session = new YoutubeSabrSession(info, audioFormat, videoFormat,
                 sessionProvider, spoolDirectory, SabrPolicyRuntime.createSessionHost());
+        session.setBackoffListener(backoffState);
         try {
             attachPoToken(info.getVideoId(), info, sessionProvider, session);
             try {
@@ -671,6 +761,7 @@ public final class SabrSessionStore {
             }
             return new BootstrapResult(audio.getData(), video.getData());
         } finally {
+            session.setBackoffListener(null);
             session.clearCache();
         }
     }
@@ -680,6 +771,10 @@ public final class SabrSessionStore {
                                                    @NonNull final Future<BootstrapResult> future,
                                                    @NonNull final String videoId)
             throws IOException, ExtractionException {
+        final BootstrapBackoffState backoffState = BOOTSTRAP_BACKOFFS.get(key);
+        if (backoffState != null) {
+            backoffState.beginWaiting();
+        }
         try {
             return future.get();
         } catch (final InterruptedException e) {
@@ -695,6 +790,10 @@ public final class SabrSessionStore {
             }
             throw new IOException("Could not bootstrap SABR for " + videoId, cause);
         } finally {
+            if (backoffState != null) {
+                backoffState.endWaiting();
+                BOOTSTRAP_BACKOFFS.remove(key, backoffState);
+            }
             BOOTSTRAP_IN_FLIGHT.remove(key, future);
         }
     }
@@ -927,6 +1026,11 @@ public final class SabrSessionStore {
             if (entry.getKey().startsWith(videoId + '#')) {
                 entry.getValue().cancel(true);
                 BOOTSTRAP_IN_FLIGHT.remove(entry.getKey(), entry.getValue());
+                final BootstrapBackoffState backoffState =
+                        BOOTSTRAP_BACKOFFS.remove(entry.getKey());
+                if (backoffState != null) {
+                    backoffState.cancel();
+                }
             }
         }
         synchronized (BOOTSTRAP_CACHE) {

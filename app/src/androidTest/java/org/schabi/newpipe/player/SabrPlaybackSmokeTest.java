@@ -6,10 +6,13 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assume.assumeTrue;
 
+import android.app.NotificationManager;
 import android.content.Context;
 import android.graphics.SurfaceTexture;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.SystemClock;
+import android.service.notification.StatusBarNotification;
 import android.view.Surface;
 import android.view.accessibility.AccessibilityEvent;
 
@@ -307,6 +310,100 @@ public final class SabrPlaybackSmokeTest {
             assertTrue("Demand retry honored the full 30 second backoff instead of the bounded "
                             + "loader wait: elapsedMs=" + elapsedMs + " trace=" + trace,
                     elapsedMs < 5_000);
+        }
+    }
+
+    @Test
+    public void demandBackoffPublishesStandaloneNotificationWhileBuffering() throws Exception {
+        final Context context = InstrumentationRegistry.getInstrumentation()
+                .getTargetContext().getApplicationContext();
+        final SabrBackoffCoordinator coordinator = SabrBackoffCoordinator.getInstance();
+        coordinator.setPlayerBuffering(context, true);
+        try (SabrSmokeHarness harness = SabrSmokeHarness.create()) {
+            harness.downloader.enqueue(new UmpFixture()
+                    .segment(1, SMOKE_VIDEO_ITAG, 1, 0, 30_000)
+                    .bytes());
+            harness.downloader.enqueue(new UmpFixture()
+                    .part(SabrResponseDecoder.NEXT_REQUEST_POLICY, nextRequestPolicy(30_000))
+                    .bytes());
+            harness.downloader.enqueue(new UmpFixture()
+                    .segment(2, SMOKE_VIDEO_ITAG, 2, 30_000, 5_000)
+                    .bytes());
+
+            final AtomicReference<Throwable> failure = new AtomicReference<>();
+            final CountDownLatch completed = new CountDownLatch(1);
+            final Thread demand = new Thread(() -> {
+                try {
+                    harness.openMediaSegment(
+                            SabrSegmentRequest.media(harness.videoFormat, 2), 5_000);
+                } catch (final Throwable error) {
+                    failure.set(error);
+                } finally {
+                    completed.countDown();
+                }
+            }, "SabrBackoffNotificationSmoke");
+            demand.start();
+
+            final StatusBarNotification notification = awaitBackoffNotification(context, true);
+            assertNotNull("SABR demand backoff did not publish its standalone notification",
+                    notification);
+            assertTrue("Demand completed before the backoff notification was observed",
+                    completed.getCount() > 0);
+            assertTrue("SABR demand did not recover after its bounded backoff",
+                    completed.await(5, TimeUnit.SECONDS));
+            assertNull("SABR demand failed after its bounded backoff", failure.get());
+            assertNull("Backoff notification remained after the demanded segment recovered",
+                    awaitBackoffNotification(context, false));
+        } finally {
+            coordinator.setPlayerBuffering(context, false);
+        }
+    }
+
+    @Test
+    public void pumpBackoffPublishesStandaloneNotificationWhileBuffering() throws Exception {
+        final Context context = InstrumentationRegistry.getInstrumentation()
+                .getTargetContext().getApplicationContext();
+        final SabrBackoffCoordinator coordinator = SabrBackoffCoordinator.getInstance();
+        coordinator.setPlayerBuffering(context, true);
+        try (SabrSmokeHarness harness = SabrSmokeHarness.create()) {
+            harness.downloader.enqueue(new UmpFixture()
+                    .part(SabrResponseDecoder.NEXT_REQUEST_POLICY, nextRequestPolicy(1_500))
+                    .bytes());
+            harness.downloader.enqueue(new UmpFixture()
+                    .segment(1, SMOKE_VIDEO_ITAG, 1, 0, 30_000)
+                    .bytes());
+
+            final AtomicReference<Throwable> failure = new AtomicReference<>();
+            final CountDownLatch completed = new CountDownLatch(1);
+            final Thread reader = new Thread(() -> {
+                try {
+                    harness.openMediaSegment(
+                            SabrSegmentRequest.media(harness.videoFormat, 1), 5_000);
+                } catch (final Throwable error) {
+                    failure.set(error);
+                } finally {
+                    completed.countDown();
+                }
+            }, "SabrPumpBackoffNotificationSmoke");
+            reader.start();
+
+            final StatusBarNotification notification = awaitBackoffNotification(context, true);
+            assertNotNull("Initial SABR pump backoff did not publish its notification",
+                    notification);
+            assertTrue("Pump completed before the backoff notification was observed",
+                    completed.getCount() > 0);
+            assertTrue("SABR pump did not recover after the server backoff",
+                    completed.await(5, TimeUnit.SECONDS));
+            assertNull("SABR pump failed after the server backoff", failure.get());
+            final List<Long> requestTimesMs = harness.downloader.requestTimesSnapshot();
+            assertTrue("Expected policy-only and media requests: " + requestTimesMs,
+                    requestTimesMs.size() >= 2);
+            assertTrue("SABR pump ignored the server backoff: " + requestTimesMs,
+                    requestTimesMs.get(1) - requestTimesMs.get(0) >= 1_200);
+            assertNull("Backoff notification remained after the pump resumed",
+                    awaitBackoffNotification(context, false));
+        } finally {
+            coordinator.setPlayerBuffering(context, false);
         }
     }
 
@@ -1566,6 +1663,29 @@ public final class SabrPlaybackSmokeTest {
             }
         }
         return holder;
+    }
+
+    private static StatusBarNotification awaitBackoffNotification(
+            final Context context, final boolean expected) {
+        for (int attempt = 0; attempt < 100; attempt++) {
+            final StatusBarNotification notification = findBackoffNotification(context);
+            if ((notification != null) == expected) {
+                return notification;
+            }
+            SystemClock.sleep(20L);
+        }
+        return findBackoffNotification(context);
+    }
+
+    private static StatusBarNotification findBackoffNotification(final Context context) {
+        final NotificationManager manager = (NotificationManager) context
+                .getSystemService(Context.NOTIFICATION_SERVICE);
+        for (final StatusBarNotification notification : manager.getActiveNotifications()) {
+            if (notification.getId() == SabrBackoffCoordinator.NOTIFICATION_ID) {
+                return notification;
+            }
+        }
+        return null;
     }
 
     private static SabrSessionStore.Lease acquireSourceLease(
