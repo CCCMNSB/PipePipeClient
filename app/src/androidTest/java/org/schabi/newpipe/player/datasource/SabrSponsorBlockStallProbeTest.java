@@ -63,6 +63,51 @@ public final class SabrSponsorBlockStallProbeTest {
     }
 
     @Test
+    public void discardedSourceClearsPreparedSessionWithoutCreatingPeriod() throws Exception {
+        assumeProbeEnabled();
+        final Context context = context();
+        final String videoId = "discarded-prepared-source-probe";
+        final YoutubeSabrFormat audio = format(AUDIO_ITAG, true);
+        final YoutubeSabrFormat video = format(VIDEO_ITAG, false);
+        final YoutubeSabrInfo info = info(videoId, audio, video);
+        final YoutubeSabrSession session = session(context, videoId, info, audio, video);
+        final SabrSourceSpec spec = new SabrSourceSpec(videoId, info, audio, video,
+                new Localization("en", "US"), AUDIO_INIT, VIDEO_INIT, session);
+
+        final SabrDashMediaSource source = new SabrDashMediaSource(
+                context, mediaItem(videoId), spec);
+        source.releaseSourceInternal();
+
+        assertTrue("Discarding a source without a period left its prepared session open",
+                sessionCacheClosed(session));
+        assertEquals(0, sessionCount(videoId));
+    }
+
+    @Test
+    public void failedSourceConstructionClearsPreparedSession() throws Exception {
+        assumeProbeEnabled();
+        final Context context = context();
+        final String videoId = "failed-prepared-source-probe";
+        final YoutubeSabrFormat audio = format(AUDIO_ITAG, true);
+        final YoutubeSabrFormat video = format(VIDEO_ITAG, false);
+        final YoutubeSabrInfo info = info(videoId, audio, video);
+        final YoutubeSabrSession session = session(context, videoId, info, audio, video);
+        final SabrSourceSpec spec = new SabrSourceSpec(videoId, info, audio, video,
+                new Localization("en", "US"), new byte[0], new byte[0], session);
+
+        boolean failed = false;
+        try {
+            new SabrDashMediaSource(context, mediaItem(videoId), spec);
+        } catch (final IOException expected) {
+            failed = true;
+        }
+
+        assertTrue("Invalid initialization data unexpectedly created a SABR source", failed);
+        assertTrue("Failed source construction left its prepared session open",
+                sessionCacheClosed(session));
+    }
+
+    @Test
     public void concurrentLoadersShareOnePeriodLease() throws Exception {
         assumeProbeEnabled();
         final Context context = context();
@@ -300,14 +345,28 @@ public final class SabrSponsorBlockStallProbeTest {
 
     private static SabrSessionStore.Holder holder(final Context context,
                                                    final SabrSourceSpec spec) {
-        final File spoolDirectory = new File(context.getCacheDir(),
-                "sabr-lease-probe-" + spec.getVideoId() + '-' + System.nanoTime());
-        final YoutubeSabrSession session = new YoutubeSabrSession(spec.getInfo(),
-                spec.getAudioFormat(), spec.getVideoFormat(), null, spoolDirectory);
+        final YoutubeSabrSession session = session(context, spec.getVideoId(), spec.getInfo(),
+                spec.getAudioFormat(), spec.getVideoFormat());
         final SabrSessionStore.Holder holder = new SabrSessionStore.Holder(context, spec, session);
         holder.setInitializationData(AUDIO_ITAG, AUDIO_INIT);
         holder.setInitializationData(VIDEO_ITAG, VIDEO_INIT);
         return holder;
+    }
+
+    private static YoutubeSabrSession session(final Context context,
+                                              final String videoId,
+                                              final YoutubeSabrInfo info,
+                                              final YoutubeSabrFormat audio,
+                                              final YoutubeSabrFormat video) {
+        final File spoolDirectory = new File(context.getCacheDir(),
+                "sabr-lease-probe-" + videoId + '-' + System.nanoTime());
+        return new YoutubeSabrSession(info, audio, video, null, spoolDirectory);
+    }
+
+    private static boolean sessionCacheClosed(final YoutubeSabrSession session) throws Exception {
+        final Field field = YoutubeSabrSession.class.getDeclaredField("cacheClosed");
+        field.setAccessible(true);
+        return field.getBoolean(session);
     }
 
     private static void install(final SabrSessionStore.Holder holder) throws Exception {
@@ -356,14 +415,15 @@ public final class SabrSponsorBlockStallProbeTest {
                 YoutubeSabrFormat.class.getDeclaredConstructor(int.class, long.class,
                         String.class, String.class, String.class, String.class, boolean.class,
                         String.class, String.class, boolean.class, int.class, int.class,
-                        int.class, long.class, long.class);
+                        int.class, long.class, long.class, String.class, long.class, long.class);
         constructor.setAccessible(true);
         return constructor.newInstance(itag, 123456L, null,
                 audio ? "audio/mp4" : "video/mp4",
                 audio ? "audio-track" : null, audio ? "Original" : null, audio,
                 audio ? null : "1080p", audio ? "AUDIO_QUALITY_MEDIUM" : null, false,
                 audio ? -1 : 1920, audio ? -1 : 1080,
-                audio ? 128_000 : 2_000_000, 100_000L, 300_000L);
+                audio ? 128_000 : 2_000_000, 100_000L, 300_000L,
+                null, -1L, -1L);
     }
 
     private static byte[] mp4Sidx(final int... durationsMs) {

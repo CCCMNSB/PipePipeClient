@@ -43,6 +43,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 public final class SabrSessionStore {
 
@@ -62,6 +63,12 @@ public final class SabrSessionStore {
                 thread.setDaemon(true);
                 return thread;
             });
+    private static final ExecutorService INITIALIZATION_EXECUTOR = Executors.newFixedThreadPool(2,
+            runnable -> {
+                final Thread thread = new Thread(runnable, "SabrAdaptiveInitialization");
+                thread.setDaemon(true);
+                return thread;
+            });
     private static final ExecutorService TOKEN_EXECUTOR = Executors.newSingleThreadExecutor(
             runnable -> {
                 final Thread thread = new Thread(runnable, "SabrTokenPrewarm");
@@ -78,7 +85,11 @@ public final class SabrSessionStore {
                 @Override
                 protected boolean removeEldestEntry(
                         final Map.Entry<String, BootstrapResult> eldest) {
-                    return size() > MAX_BOOTSTRAP_CACHE_ENTRIES;
+                    if (size() > MAX_BOOTSTRAP_CACHE_ENTRIES) {
+                        eldest.getValue().discardPreparedSession();
+                        return true;
+                    }
+                    return false;
                 }
             });
     private static final Map<String, Future<byte[]>> TOKEN_IN_FLIGHT =
@@ -135,11 +146,26 @@ public final class SabrSessionStore {
     private static final class BootstrapResult {
         @NonNull private final byte[] audioInitialization;
         @NonNull private final byte[] videoInitialization;
+        @NonNull private final AtomicReference<YoutubeSabrSession> preparedSession;
 
         BootstrapResult(@NonNull final byte[] audioInitialization,
-                        @NonNull final byte[] videoInitialization) {
+                        @NonNull final byte[] videoInitialization,
+                        @Nullable final YoutubeSabrSession preparedSession) {
             this.audioInitialization = audioInitialization.clone();
             this.videoInitialization = videoInitialization.clone();
+            this.preparedSession = new AtomicReference<>(preparedSession);
+        }
+
+        @Nullable
+        YoutubeSabrSession takePreparedSession() {
+            return preparedSession.getAndSet(null);
+        }
+
+        void discardPreparedSession() {
+            final YoutubeSabrSession session = preparedSession.getAndSet(null);
+            if (session != null) {
+                session.clearCache();
+            }
         }
     }
 
@@ -665,7 +691,8 @@ public final class SabrSessionStore {
         final BootstrapResult bootstrap = awaitBootstrap(bootstrapKey, bootstrapFuture, videoId);
         PlaybackStartupTrace.markForVideoId(videoId, "sabr_source_spec_ready");
         return new SabrSourceSpec(videoId, info, audioFormat, videoFormat, localization,
-                bootstrap.audioInitialization, bootstrap.videoInitialization);
+                bootstrap.audioInitialization, bootstrap.videoInitialization,
+                bootstrap.takePreparedSession());
     }
 
     /** Starts expensive first-play work while the user is still reading the detail page. */
@@ -711,7 +738,7 @@ public final class SabrSessionStore {
         final BootstrapBackoffState backoffState = new BootstrapBackoffState(
                 context, info.getVideoId());
         final FutureTask<BootstrapResult> created = new FutureTask<BootstrapResult>(() ->
-                cacheBootstrap(key, createBootstrap(context, info, audioFormat, videoFormat,
+                cacheBootstrap(key, createPreparation(context, info, audioFormat, videoFormat,
                         localization, backoffState))) {
             @Override
             protected void done() {
@@ -743,6 +770,7 @@ public final class SabrSessionStore {
         final YoutubeSabrSession session = new YoutubeSabrSession(info, audioFormat, videoFormat,
                 sessionProvider, spoolDirectory, SabrPolicyRuntime.createSessionHost());
         session.setBackoffListener(backoffState);
+        boolean handedOff = false;
         try {
             attachPoToken(info.getVideoId(), info, sessionProvider, session);
             try {
@@ -759,10 +787,78 @@ public final class SabrSessionStore {
                 throw new SabrLogicException("SABR bootstrap completed without cached init segments"
                         + " video=" + info.getVideoId());
             }
-            return new BootstrapResult(audio.getData(), video.getData());
+            handedOff = true;
+            return new BootstrapResult(audio.getData(), video.getData(), session);
         } finally {
             session.setBackoffListener(null);
-            session.clearCache();
+            if (!handedOff) {
+                session.clearCache();
+            }
+        }
+    }
+
+    @NonNull
+    private static BootstrapResult createPreparation(@NonNull final Context context,
+                                                     @NonNull final YoutubeSabrInfo info,
+                                                     @NonNull final YoutubeSabrFormat audioFormat,
+                                                     @NonNull final YoutubeSabrFormat videoFormat,
+                                                     @NonNull final Localization localization,
+                                                     @NonNull final BootstrapBackoffState backoffState)
+            throws IOException, ExtractionException {
+        final LocalDomPoTokenProvider tokenProvider = provider(context);
+        final byte[] poToken = awaitWarmedToken(info.getVideoId(), info, tokenProvider,
+                new YoutubeSabrStreamState(audioFormat, videoFormat));
+        if (poToken == null || poToken.length == 0) {
+            throw new SabrLogicException("SABR PO token provider returned no token for video="
+                    + info.getVideoId());
+        }
+        try {
+            final BootstrapResult result = createAdaptiveInitialization(info, audioFormat,
+                    videoFormat, localization, poToken);
+            Log.i(TAG, "adaptive initialization ready video=" + info.getVideoId()
+                    + " audioItag=" + audioFormat.getItag()
+                    + " videoItag=" + videoFormat.getItag());
+            return result;
+        } catch (final IOException adaptiveFailure) {
+            Log.i(TAG, "adaptive initialization unavailable video=" + info.getVideoId()
+                    + ", falling back to native SABR: " + adaptiveFailure.getMessage());
+            return createBootstrap(context, info, audioFormat, videoFormat,
+                    localization, backoffState);
+        }
+    }
+
+    @NonNull
+    private static BootstrapResult createAdaptiveInitialization(
+            @NonNull final YoutubeSabrInfo info,
+            @NonNull final YoutubeSabrFormat audioFormat,
+            @NonNull final YoutubeSabrFormat videoFormat,
+            @NonNull final Localization localization,
+            @NonNull final byte[] poToken)
+            throws IOException, ExtractionException {
+        final YoutubeSabrSession session = new YoutubeSabrSession(info, audioFormat, videoFormat,
+                null, null, SabrPolicyRuntime.createSessionHost());
+        final Future<byte[]> audio = INITIALIZATION_EXECUTOR.submit(() ->
+                session.fetchInitializationData(audioFormat, localization, 2_000, poToken));
+        final Future<byte[]> video = INITIALIZATION_EXECUTOR.submit(() ->
+                session.fetchInitializationData(videoFormat, localization, 2_000, poToken));
+        try {
+            final byte[] audioData = audio.get();
+            final byte[] videoData = video.get();
+            return new BootstrapResult(audioData, videoData, null);
+        } catch (final InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IOException("Interrupted fetching adaptive SABR initialization", e);
+        } catch (final ExecutionException e) {
+            audio.cancel(true);
+            video.cancel(true);
+            final Throwable cause = e.getCause();
+            if (cause instanceof ExtractionException) {
+                throw (ExtractionException) cause;
+            }
+            if (cause instanceof IOException) {
+                throw (IOException) cause;
+            }
+            throw new IOException("Could not fetch adaptive SABR initialization", cause);
         }
     }
 
@@ -849,10 +945,17 @@ public final class SabrSessionStore {
             }
             final File spoolDirectory = new File(context.getApplicationContext().getCacheDir(),
                     "sabr-segments/" + spec.getVideoId() + '-' + System.nanoTime());
-            final YoutubeSabrSession session = new YoutubeSabrSession(spec.getInfo(),
-                    spec.getAudioFormat(), spec.getVideoFormat(), sessionProvider, spoolDirectory,
-                    SabrPolicyRuntime.createSessionHost());
-            attachPoToken(spec.getVideoId(), spec.getInfo(), sessionProvider, session);
+            final YoutubeSabrSession preparedSession = spec.takePreparedSession();
+            final YoutubeSabrSession session;
+            if (preparedSession != null) {
+                session = preparedSession;
+                session.addDiagnosticEvent("bootstrap_session_handoff");
+            } else {
+                session = new YoutubeSabrSession(spec.getInfo(), spec.getAudioFormat(),
+                        spec.getVideoFormat(), sessionProvider, spoolDirectory,
+                        SabrPolicyRuntime.createSessionHost());
+                attachPoToken(spec.getVideoId(), spec.getInfo(), sessionProvider, session);
+            }
             final Holder holder = new Holder(context, spec, session);
             seedInitializationData(holder, spec, spec.getAudioFormat());
             seedInitializationData(holder, spec, spec.getVideoFormat());
@@ -1034,7 +1137,15 @@ public final class SabrSessionStore {
             }
         }
         synchronized (BOOTSTRAP_CACHE) {
-            BOOTSTRAP_CACHE.keySet().removeIf(key -> key.startsWith(videoId + '#'));
+            final java.util.Iterator<Map.Entry<String, BootstrapResult>> iterator =
+                    BOOTSTRAP_CACHE.entrySet().iterator();
+            while (iterator.hasNext()) {
+                final Map.Entry<String, BootstrapResult> entry = iterator.next();
+                if (entry.getKey().startsWith(videoId + '#')) {
+                    entry.getValue().discardPreparedSession();
+                    iterator.remove();
+                }
+            }
         }
         final Future<byte[]> tokenFuture = TOKEN_IN_FLIGHT.remove(videoId);
         if (tokenFuture != null) {

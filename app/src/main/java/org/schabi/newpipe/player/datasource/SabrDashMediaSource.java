@@ -56,28 +56,33 @@ public final class SabrDashMediaSource extends CompositeMediaSource<Integer> {
                                @NonNull final SabrSourceSpec spec) throws IOException {
         this.mediaItem = mediaItem;
         this.spec = spec;
-        this.localization = spec.getLocalization();
-        this.manifestState = spec.newStreamState();
-        if (!manifestState.hasSegmentIndex(spec.getAudioFormat())
-                || !manifestState.hasSegmentIndex(spec.getVideoFormat())) {
-            throw new IOException("Refusing to publish guessed SABR DASH timeline for "
-                    + spec.getVideoId());
+        try {
+            this.localization = spec.getLocalization();
+            this.manifestState = spec.newStreamState();
+            if (!manifestState.hasSegmentIndex(spec.getAudioFormat())
+                    || !manifestState.hasSegmentIndex(spec.getVideoFormat())) {
+                throw new IOException("Refusing to publish guessed SABR DASH timeline for "
+                        + spec.getVideoId());
+            }
+            this.sessionHandle = new SabrSessionHandle(context, spec);
+            this.playbackState.setReaderOwner(this);
+            final long durationMs = spec.getDurationMs();
+            this.durationUs = durationMs > 0 ? durationMs * 1000L : C.TIME_UNSET;
+            final DataSource.Factory sabrDataSourceFactory =
+                    () -> new SabrSegmentDataSource(sessionHandle, playbackState.getReaderOwner(),
+                            localization, /* prependInit= */ false);
+            final DashManifest manifest = buildManifest(spec, manifestState, durationMs);
+            this.childSource = new DashMediaSource.Factory(
+                    new DefaultDashChunkSource.Factory(sabrDataSourceFactory),
+                    /* manifestDataSourceFactory= */ null)
+                    .createMediaSource(manifest, mediaItem);
+            Log.d(TAG, "create source video=" + spec.getVideoId()
+                    + " videoItag=" + spec.getVideoFormat().getItag()
+                    + " audioItag=" + spec.getAudioFormat().getItag());
+        } catch (final IOException | RuntimeException | Error e) {
+            spec.discardPreparedSession();
+            throw e;
         }
-        this.sessionHandle = new SabrSessionHandle(context, spec);
-        this.playbackState.setReaderOwner(this);
-        final long durationMs = spec.getDurationMs();
-        this.durationUs = durationMs > 0 ? durationMs * 1000L : C.TIME_UNSET;
-        final DataSource.Factory sabrDataSourceFactory =
-                () -> new SabrSegmentDataSource(sessionHandle, playbackState.getReaderOwner(),
-                        localization, /* prependInit= */ false);
-        final DashManifest manifest = buildManifest(spec, manifestState, durationMs);
-        this.childSource = new DashMediaSource.Factory(
-                new DefaultDashChunkSource.Factory(sabrDataSourceFactory),
-                /* manifestDataSourceFactory= */ null)
-                .createMediaSource(manifest, mediaItem);
-        Log.d(TAG, "create source video=" + spec.getVideoId()
-                + " videoItag=" + spec.getVideoFormat().getItag()
-                + " audioItag=" + spec.getAudioFormat().getItag());
     }
 
     @NonNull

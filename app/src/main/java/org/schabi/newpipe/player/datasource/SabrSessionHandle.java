@@ -218,5 +218,6 @@ final class SabrSessionHandle {
         if (leaseToClose != null) {
             leaseToClose.close();
         }
+        spec.discardPreparedSession();
     }
 }

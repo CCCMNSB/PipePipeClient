@@ -435,11 +435,22 @@ final class SabrStreamPump {
                         awaitWake(IDLE_POLL_MS);
                         continue;
                     }
+                    final boolean startupWait = holder.hasUnstartedActiveReader();
+                    final long startupBackoffMs = startupWait
+                            ? session.getDemandBackoffRemainingMs() : 0;
+                    if (startupBackoffMs > 0) {
+                        SabrBackoffCoordinator.getInstance().begin(
+                                holder.getApplicationContext(), holder,
+                                android.os.SystemClock.elapsedRealtime() + startupBackoffMs);
+                        awaitWake(Math.max(startupBackoffMs, IDLE_POLL_MS));
+                        continue;
+                    }
                     state = State.REQUESTING;
                     final long requestPlayerTimeMs = startupRequestPlayerTimeMs(playerTimeMs,
                             edgeMs);
                     session.getStreamState().setPlayerTimeMs(requestPlayerTimeMs);
-                    final int segmentCount = pumpOnceStreaming();
+                    final int segmentCount = holder.hasUnstartedActiveReader()
+                            ? pumpOnceStreamingForStartup() : pumpOnceStreaming();
                     state = State.IDLE;
                     consecutiveIoErrors = 0;
                     if (segmentCount == 0) {
@@ -523,6 +534,22 @@ final class SabrStreamPump {
         try {
             final int segmentCount = session.pumpOnceStreaming(localization);
             holder.recordDiagnosticsThrottled("pump segments=" + segmentCount);
+            return segmentCount;
+        } finally {
+            lastRequestMs = System.currentTimeMillis();
+        }
+    }
+
+    private int pumpOnceStreamingForStartup() throws IOException, ExtractionException {
+        try {
+            final int segmentCount = session.pumpOnceStreamingForStartup(localization);
+            final long remainingBackoffMs = session.getDemandBackoffRemainingMs();
+            if (remainingBackoffMs > 0) {
+                SabrBackoffCoordinator.getInstance().begin(
+                        holder.getApplicationContext(), holder,
+                        android.os.SystemClock.elapsedRealtime() + remainingBackoffMs);
+            }
+            holder.recordDiagnosticsThrottled("pump_startup segments=" + segmentCount);
             return segmentCount;
         } finally {
             lastRequestMs = System.currentTimeMillis();

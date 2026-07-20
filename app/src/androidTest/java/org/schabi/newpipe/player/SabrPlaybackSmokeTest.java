@@ -1,8 +1,10 @@
 package org.schabi.newpipe.player;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assume.assumeTrue;
 
@@ -86,6 +88,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -314,6 +317,27 @@ public final class SabrPlaybackSmokeTest {
     }
 
     @Test
+    public void startupPumpDefersLongBackoffBeforeLoaderDemand() throws Exception {
+        try (SabrSmokeHarness harness = SabrSmokeHarness.create()) {
+            harness.downloader.enqueue(new UmpFixture()
+                    .part(SabrResponseDecoder.NEXT_REQUEST_POLICY, nextRequestPolicy(30_000))
+                    .bytes());
+
+            final long startedAtMs = System.currentTimeMillis();
+            assertEquals(0, harness.holder.session.pumpOnceStreamingForStartup(
+                    new Localization("en", "US")));
+            final long elapsedMs = System.currentTimeMillis() - startedAtMs;
+            final long remainingMs = harness.holder.session.getDemandBackoffRemainingMs();
+
+            assertTrue("Startup pump blocked on the full server backoff: elapsedMs=" + elapsedMs,
+                    elapsedMs < 1_000);
+            assertTrue("Startup pump did not retain a bounded pacing delay: remainingMs="
+                            + remainingMs,
+                    remainingMs >= 1_500 && remainingMs <= 2_000);
+        }
+    }
+
+    @Test
     public void demandBackoffPublishesStandaloneNotificationWhileBuffering() throws Exception {
         final Context context = InstrumentationRegistry.getInstrumentation()
                 .getTargetContext().getApplicationContext();
@@ -367,7 +391,7 @@ public final class SabrPlaybackSmokeTest {
         coordinator.setPlayerBuffering(context, true);
         try (SabrSmokeHarness harness = SabrSmokeHarness.create()) {
             harness.downloader.enqueue(new UmpFixture()
-                    .part(SabrResponseDecoder.NEXT_REQUEST_POLICY, nextRequestPolicy(1_500))
+                    .part(SabrResponseDecoder.NEXT_REQUEST_POLICY, nextRequestPolicy(30_000))
                     .bytes());
             harness.downloader.enqueue(new UmpFixture()
                     .segment(1, SMOKE_VIDEO_ITAG, 1, 0, 30_000)
@@ -399,7 +423,10 @@ public final class SabrPlaybackSmokeTest {
             assertTrue("Expected policy-only and media requests: " + requestTimesMs,
                     requestTimesMs.size() >= 2);
             assertTrue("SABR pump ignored the server backoff: " + requestTimesMs,
-                    requestTimesMs.get(1) - requestTimesMs.get(0) >= 1_200);
+                    requestTimesMs.get(1) - requestTimesMs.get(0) >= 1_500);
+            assertTrue("Initial SABR pump honored the full 30 second backoff instead of the "
+                            + "bounded startup wait: " + requestTimesMs,
+                    requestTimesMs.get(1) - requestTimesMs.get(0) < 5_000);
             assertNull("Backoff notification remained after the pump resumed",
                     awaitBackoffNotification(context, false));
         } finally {
@@ -670,7 +697,86 @@ public final class SabrPlaybackSmokeTest {
     }
 
     @Test
-    public void nativeBootstrapHonorsInitialBackoff() throws Exception {
+    public void adaptiveExactRangesBuildIndexesInParallel() throws Exception {
+        final byte[] poToken = new byte[]{(byte) 0xfb, (byte) 0xef, 1};
+        final String encodedPoToken = "--8B";
+        final byte[] audioInit = mp4Sidx(20_001, 20_000, 19_999);
+        final byte[] videoInit = mp4Sidx(5_000, 5_000, 5_000, 5_000);
+        final YoutubeSabrFormat audioFormat = smokeFormat(SMOKE_AUDIO_ITAG, true,
+                "https://adaptive/audio", 0, audioInit.length - 1);
+        final YoutubeSabrFormat videoFormat = smokeFormat(SMOKE_VIDEO_ITAG, false,
+                "https://adaptive/video", 0, videoInit.length - 1);
+        try (SabrSmokeHarness harness = SabrSmokeHarness.create(audioFormat, videoFormat)) {
+            harness.downloader.enqueueGet("https://adaptive/audio?pot=" + encodedPoToken,
+                    206, audioInit);
+            harness.downloader.enqueueGet("https://adaptive/video?pot=" + encodedPoToken,
+                    206, videoInit);
+
+            final Method method = SabrSessionStore.class.getDeclaredMethod(
+                    "createAdaptiveInitialization", YoutubeSabrInfo.class,
+                    YoutubeSabrFormat.class, YoutubeSabrFormat.class, Localization.class,
+                    byte[].class);
+            method.setAccessible(true);
+            final Object result = method.invoke(null, harness.holder.info, audioFormat,
+                    videoFormat, new Localization("en", "US"), poToken);
+
+            final Field audioData = result.getClass().getDeclaredField("audioInitialization");
+            final Field videoData = result.getClass().getDeclaredField("videoInitialization");
+            audioData.setAccessible(true);
+            videoData.setAccessible(true);
+            assertArrayEquals(audioInit, (byte[]) audioData.get(result));
+            assertArrayEquals(videoInit, (byte[]) videoData.get(result));
+            assertEquals(2, harness.downloader.streamingTimeoutsMs.size());
+            assertTrue(harness.downloader.requestedUrls.contains(
+                    "https://adaptive/audio?pot=" + encodedPoToken));
+            assertTrue(harness.downloader.requestedUrls.contains(
+                    "https://adaptive/video?pot=" + encodedPoToken));
+            assertTrue(harness.downloader.requestBodies.isEmpty());
+        }
+    }
+
+    @Test
+    public void preparedNativeSessionIsTransferredToPlaybackOnce() throws Exception {
+        final YoutubeSabrFormat audioFormat = smokeFormat(SMOKE_AUDIO_ITAG, true);
+        final YoutubeSabrFormat videoFormat = smokeFormat(SMOKE_VIDEO_ITAG, false);
+        final byte[] audioInit = mp4Sidx(20_001, 20_000);
+        final byte[] videoInit = mp4Sidx(5_000, 5_000);
+        try (SabrSmokeHarness harness = SabrSmokeHarness.create(audioFormat, videoFormat)) {
+            harness.downloader.enqueue(new UmpFixture()
+                    .part(SabrResponseDecoder.FORMAT_INITIALIZATION_METADATA,
+                            initializationMetadata(SMOKE_AUDIO_ITAG, 2, 40_001, "audio/mp4"))
+                    .part(SabrResponseDecoder.FORMAT_INITIALIZATION_METADATA,
+                            initializationMetadata(SMOKE_VIDEO_ITAG, 2, 10_000, "video/mp4"))
+                    .initSegment(1, SMOKE_AUDIO_ITAG, audioInit)
+                    .initSegment(2, SMOKE_VIDEO_ITAG, videoInit)
+                    .bytes());
+            harness.holder.session.bootstrapInitialization(new Localization("en", "US"));
+
+            final Constructor<SabrSourceSpec> constructor = SabrSourceSpec.class
+                    .getDeclaredConstructor(String.class, YoutubeSabrInfo.class,
+                            YoutubeSabrFormat.class, YoutubeSabrFormat.class, Localization.class,
+                            byte[].class, byte[].class, YoutubeSabrSession.class);
+            constructor.setAccessible(true);
+            final SabrSourceSpec spec = constructor.newInstance("smoke-video", harness.holder.info,
+                    audioFormat, videoFormat, new Localization("en", "US"), audioInit, videoInit,
+                    harness.holder.session);
+            final Method acquire = SabrSessionStore.class.getDeclaredMethod(
+                    "acquire", Context.class, SabrSourceSpec.class);
+            acquire.setAccessible(true);
+            final SabrSessionStore.Lease lease = (SabrSessionStore.Lease) acquire.invoke(null,
+                    InstrumentationRegistry.getInstrumentation().getTargetContext(), spec);
+            try {
+                assertSame(harness.holder.session, holderOf(lease).session);
+                assertTrue(harness.holder.session.getDiagnosticTrace()
+                        .contains("bootstrap_session_handoff"));
+            } finally {
+                lease.close();
+            }
+        }
+    }
+
+    @Test
+    public void nativeBootstrapHonorsInitialAndSkipsCompletedResponseBackoff() throws Exception {
         final YoutubeSabrFormat audioFormat = smokeFormat(SMOKE_AUDIO_ITAG, true);
         final YoutubeSabrFormat videoFormat = smokeFormat(SMOKE_VIDEO_ITAG, false);
         final byte[] audioInit = mp4Sidx(20_000);
@@ -680,6 +786,7 @@ public final class SabrPlaybackSmokeTest {
                     .part(SabrResponseDecoder.NEXT_REQUEST_POLICY, nextRequestPolicy(500))
                     .bytes());
             harness.downloader.enqueue(new UmpFixture()
+                    .part(SabrResponseDecoder.NEXT_REQUEST_POLICY, nextRequestPolicy(5_000))
                     .part(SabrResponseDecoder.FORMAT_INITIALIZATION_METADATA,
                             initializationMetadata(SMOKE_AUDIO_ITAG, 1, 20_000, "audio/mp4"))
                     .part(SabrResponseDecoder.FORMAT_INITIALIZATION_METADATA,
@@ -688,12 +795,18 @@ public final class SabrPlaybackSmokeTest {
                     .initSegment(2, SMOKE_VIDEO_ITAG, videoInit)
                     .bytes());
 
+            final long bootstrapStartNs = System.nanoTime();
             harness.holder.session.bootstrapInitialization(new Localization("en", "US"));
+            final long bootstrapElapsedMs = TimeUnit.NANOSECONDS.toMillis(
+                    System.nanoTime() - bootstrapStartNs);
 
             final List<Long> requestTimesMs = harness.downloader.requestTimesSnapshot();
             assertEquals(2, requestTimesMs.size());
             assertTrue("Bootstrap ignored the initial SABR backoff: " + requestTimesMs,
                     requestTimesMs.get(1) - requestTimesMs.get(0) >= 400);
+            assertTrue("Bootstrap waited for the completed init response backoff: elapsedMs="
+                            + bootstrapElapsedMs,
+                    bootstrapElapsedMs < 2_000);
         }
     }
 
@@ -2107,11 +2220,20 @@ public final class SabrPlaybackSmokeTest {
 
     private static YoutubeSabrFormat smokeFormat(final int itag, final boolean audio)
             throws Exception {
+        return smokeFormat(itag, audio, null, -1, -1);
+    }
+
+    private static YoutubeSabrFormat smokeFormat(final int itag,
+                                                 final boolean audio,
+                                                 final String initializationUrl,
+                                                 final long initRangeStart,
+                                                 final long initRangeEnd)
+            throws Exception {
         final Constructor<YoutubeSabrFormat> constructor =
                 YoutubeSabrFormat.class.getDeclaredConstructor(int.class, long.class,
                         String.class, String.class, String.class, String.class, boolean.class,
                         String.class, String.class, boolean.class, int.class, int.class,
-                        int.class, long.class, long.class);
+                        int.class, long.class, long.class, String.class, long.class, long.class);
         constructor.setAccessible(true);
         return constructor.newInstance(
                 itag,
@@ -2128,7 +2250,10 @@ public final class SabrPlaybackSmokeTest {
                 audio ? -1 : 1080,
                 audio ? 128_000 : 2_000_000,
                 100_000L,
-                300_000L);
+                300_000L,
+                initializationUrl,
+                initRangeStart,
+                initRangeEnd);
     }
 
     private static byte[] mp4Sidx(final int... durationsMs) {
@@ -2641,6 +2766,8 @@ public final class SabrPlaybackSmokeTest {
         private final List<Long> requestTimesMs = Collections.synchronizedList(new ArrayList<>());
         private final List<Long> streamingTimeoutsMs =
                 Collections.synchronizedList(new ArrayList<>());
+        private final Map<String, byte[]> streamingGetBodies = new ConcurrentHashMap<>();
+        private final Map<String, Integer> streamingGetCodes = new ConcurrentHashMap<>();
 
         private void enqueue(final byte[] body) {
             responses.add(() -> new ByteArrayInputStream(body));
@@ -2648,6 +2775,11 @@ public final class SabrPlaybackSmokeTest {
 
         private void enqueue(final QueuedStreamingBody body) {
             responses.add(body);
+        }
+
+        private void enqueueGet(final String url, final int responseCode, final byte[] body) {
+            streamingGetCodes.put(url, responseCode);
+            streamingGetBodies.put(url, body.clone());
         }
 
         private List<Long> requestTimesSnapshot() {
@@ -2670,7 +2802,14 @@ public final class SabrPlaybackSmokeTest {
                                               final long timeoutMs)
                 throws IOException, ReCaptchaException {
             streamingTimeoutsMs.add(timeoutMs);
-            return super.getStreaming(url, headers, localization, timeoutMs);
+            requestedUrls.add(url);
+            final byte[] body = streamingGetBodies.get(url);
+            final Integer responseCode = streamingGetCodes.get(url);
+            if (body == null || responseCode == null) {
+                throw new IOException("No queued SABR smoke GET response for " + url);
+            }
+            return new StreamingResponse(responseCode, Collections.emptyMap(),
+                    new ByteArrayInputStream(body));
         }
 
         @Override
