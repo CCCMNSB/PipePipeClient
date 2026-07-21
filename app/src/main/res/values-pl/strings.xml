@@ -1063,4 +1063,5 @@
 <string name="sabr_backoff_notification_channel_name">Oczekiwanie na odtwarzanie YouTube</string>
 <string name="sabr_backoff_notification_channel_description">Powiadomienia, gdy YouTube wymaga oczekiwania na żądanie odtwarzania</string>
 <string name="sabr_backoff_notification_title">Oczekiwanie na YouTube</string>
+<string name="youtube_send_session_visitor_data_summary">Wyślij dane odwiedzającego do YouTube. Może zmniejszyć ryzyko tymczasowej blokady IP, ale częściej zmusza do oczekiwania na reklamy.</string>
 </resources>

@@ -1092,4 +1092,5 @@ nSự khác biệt giữa hai loại này là cái nào nhanh thường thiếu 
 <string name="sabr_backoff_notification_channel_name">Đang chờ phát lại YouTube</string>
 <string name="sabr_backoff_notification_channel_description">Thông báo khi YouTube yêu cầu chờ phát lại</string>
 <string name="sabr_backoff_notification_title">Đang chờ YouTube</string>
+<string name="youtube_send_session_visitor_data_summary">Gửi dữ liệu người truy cập cho YouTube. Có thể giảm nguy cơ bị chặn IP tạm thời nhưng thường xuyên bị buộc phải chờ xem quảng cáo hơn</string>
 </resources>

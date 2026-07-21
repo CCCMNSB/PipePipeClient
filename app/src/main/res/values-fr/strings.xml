@@ -1000,4 +1000,5 @@ Voulez-vous continuer?</string>
 <string name="sabr_backoff_notification_channel_name">Lecture YouTube en attente</string>
 <string name="sabr_backoff_notification_channel_description">Notifications lorsque YouTube exige qu\'une demande de lecture soit mise en attente</string>
 <string name="sabr_backoff_notification_title">En attente de YouTube</string>
+<string name="youtube_send_session_visitor_data_summary">Envoyer les données du visiteur à YouTube. Peut réduire le risque de blocage temporaire de l\'IP, mais oblige plus souvent à attendre les publicités.</string>
 </resources>

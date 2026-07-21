@@ -71,6 +71,7 @@ import static org.schabi.newpipe.MainActivity.DEBUG;
 public class App extends MultiDexApplication {
     public static final String PACKAGE_NAME = BuildConfig.APPLICATION_ID;
     private static final String TAG = App.class.toString();
+    private static final String YOUTUBE_ANDROID_VR_CLIENT_NAME = "ANDROID_VR";
     private static App app;
 
     private CarConnectionStateReceiver carConnectionReceiver;
@@ -128,7 +129,17 @@ public class App extends MultiDexApplication {
         NewPipe.init(getDownloader(),
             Localization.getPreferredLocalization(this),
             Localization.getPreferredContentCountry(this));
-        NewPipe.setYoutubeSessionPoTokenProvider(LocalDomPoTokenProvider.shared(this));
+        final LocalDomPoTokenProvider sessionPoTokenProvider =
+                LocalDomPoTokenProvider.shared(this);
+        NewPipe.setYoutubeSessionPoTokenProvider((clientName, localization, contentCountry,
+                                                  loggedIn) -> {
+            if (!shouldProvideYoutubeSessionPoToken(clientName,
+                    isYoutubeSessionVisitorDataEnabled(this))) {
+                return null;
+            }
+            return sessionPoTokenProvider.getSessionPoToken(clientName, localization,
+                    contentCountry, loggedIn);
+        });
         try {
             SabrPolicyRuntime.initialize(this,
                     BuildConfig.SABR_POLICY_PUBLIC_KEY_BASE64, 0);
@@ -238,6 +249,16 @@ public class App extends MultiDexApplication {
                 Localization.getPreferredLocalization(context),
                 Localization.getPreferredContentCountry(context),
                 ServiceList.YouTube.hasTokens());
+    }
+
+    static boolean shouldProvideYoutubeSessionPoToken(@NonNull final String clientName,
+                                                       final boolean visitorDataEnabled) {
+        return visitorDataEnabled || YOUTUBE_ANDROID_VR_CLIENT_NAME.equals(clientName);
+    }
+
+    private static boolean isYoutubeSessionVisitorDataEnabled(@NonNull final Context context) {
+        return PreferenceManager.getDefaultSharedPreferences(context).getBoolean(
+                context.getString(R.string.youtube_session_visitor_data_key), false);
     }
 
     private void prewarmYoutubeSessionPoToken() {

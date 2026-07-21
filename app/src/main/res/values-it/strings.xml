@@ -977,4 +977,5 @@
 <string name="sabr_backoff_notification_channel_name">Riproduzione YouTube in attesa</string>
 <string name="sabr_backoff_notification_channel_description">Notifiche quando YouTube richiede l\'attesa per una richiesta di riproduzione</string>
 <string name="sabr_backoff_notification_title">In attesa di YouTube</string>
+<string name="youtube_send_session_visitor_data_summary">Invia i dati del visitatore a YouTube. Può ridurre il rischio di blocco temporaneo dell\'IP, ma si è più frequentemente costretti ad attendere gli annunci.</string>
 </resources>

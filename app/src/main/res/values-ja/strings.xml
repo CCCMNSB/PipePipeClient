@@ -1006,4 +1006,5 @@
 <string name="sabr_backoff_notification_channel_name">YouTube再生待機</string>
 <string name="sabr_backoff_notification_channel_description">YouTubeで再生リクエストの待機が必要な場合の通知</string>
 <string name="sabr_backoff_notification_title">YouTubeの待機中</string>
+<string name="youtube_send_session_visitor_data_summary">YouTubeに訪問者データを送信します。一時的なIPブロックのリスクを軽減できる可能性がありますが、広告の待機を強制される頻度が高くなります。</string>
 </resources>

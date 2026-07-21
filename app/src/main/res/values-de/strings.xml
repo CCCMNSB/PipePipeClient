@@ -983,4 +983,5 @@
 <string name="sabr_backoff_notification_channel_name">YouTube-Wiedergabe wartet</string>
 <string name="sabr_backoff_notification_channel_description">Benachrichtigungen, wenn YouTube verlangt, dass eine Wiedergabeanfrage wartet</string>
 <string name="sabr_backoff_notification_title">Warten auf YouTube</string>
+<string name="youtube_send_session_visitor_data_summary">Besucherdaten an YouTube senden. Kann das Risiko einer temporären IP-Sperre verringern, zwingt aber häufiger zum Warten auf Werbung.</string>
 </resources>
