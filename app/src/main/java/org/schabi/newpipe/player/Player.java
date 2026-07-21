@@ -312,7 +312,9 @@ public final class Player implements
         @Override
         public void run() {
             updateSabrBackoffCountdown();
-            if (currentState == STATE_BUFFERING) {
+            if (currentState == STATE_BLOCKED
+                    || (!exoPlayerIsNull() && simpleExoPlayer.getPlaybackState()
+                    == androidx.media3.common.Player.STATE_BUFFERING)) {
                 sabrBackoffHandler.postDelayed(this, 250L);
             }
         }
@@ -2629,7 +2631,7 @@ public final class Player implements
         if (DEBUG) {
             Log.d(TAG, "onBlocked() called");
         }
-        stopSabrBackoffCountdown();
+        startSabrBackoffCountdown();
         if (!isProgressLoopRunning()) {
             startProgressLoop();
         }
