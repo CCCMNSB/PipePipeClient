@@ -1049,6 +1049,6 @@
 <plurals name="sabr_backoff_notification_content">
 <item quantity="other">YouTube 强制我们等待 %1$d 秒后继续播放</item>
 </plurals>
-<string name="sabr_backoff_notification_channel_id">sabr_backoff</string>
+
 <string name="youtube_send_session_visitor_data_summary">向 YouTube 发送访客数据。可能会降低 IP 被临时封禁的风险，但会更频繁地被强制等待广告。</string>
 </resources>
