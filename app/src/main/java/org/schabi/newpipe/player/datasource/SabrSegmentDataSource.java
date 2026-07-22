@@ -410,6 +410,14 @@ public final class SabrSegmentDataSource implements DataSource {
                 recoveryAtMs = -1;
                 lastRecoveryAtMs = -1;
             }
+            if (holder.session.getDemandBackoffRemainingMs() > 0) {
+                // Server-directed pacing is not a playback stall. Keep polling so cancellation and
+                // reader replacement remain responsive, but do not let the local recovery watchdog
+                // reposition the session and attempt another request before the server deadline.
+                noProgressSinceMs = now;
+                recoveryAtMs = -1;
+                lastRecoveryAtMs = -1;
+            }
             if (now - noProgressSinceMs > RECOVERY_AFTER_NO_PROGRESS_MS
                     && (lastRecoveryAtMs < 0
                             || now - lastRecoveryAtMs > RECOVERY_RETRY_MS)

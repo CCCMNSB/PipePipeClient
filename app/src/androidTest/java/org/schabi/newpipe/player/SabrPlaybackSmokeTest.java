@@ -285,20 +285,20 @@ public final class SabrPlaybackSmokeTest {
     }
 
     @Test
-    public void demandBackoffIsCappedForWaitingLoader() throws Exception {
+    public void demandHonorsFullServerBackoff() throws Exception {
         try (SabrSmokeHarness harness = SabrSmokeHarness.create()) {
             harness.downloader.enqueue(new UmpFixture()
                     .segment(1, SMOKE_VIDEO_ITAG, 1, 0, 30_000)
                     .bytes());
             harness.downloader.enqueue(new UmpFixture()
-                    .part(SabrResponseDecoder.NEXT_REQUEST_POLICY, nextRequestPolicy(30_000))
+                    .part(SabrResponseDecoder.NEXT_REQUEST_POLICY, nextRequestPolicy(3_000))
                     .bytes());
             harness.downloader.enqueue(new UmpFixture()
                     .segment(2, SMOKE_VIDEO_ITAG, 2, 30_000, 5_000)
                     .bytes());
 
             final long elapsedMs = harness.openMediaSegment(
-                    SabrSegmentRequest.media(harness.videoFormat, 2), 5_000);
+                    SabrSegmentRequest.media(harness.videoFormat, 2), 6_000);
 
             final String trace = harness.holder.session.getDiagnosticTrace();
             assertTrue("Demand path did not request the target segment: " + trace,
@@ -309,10 +309,62 @@ public final class SabrPlaybackSmokeTest {
             final long retryDelayMs = requestTimesMs.get(2) - requestTimesMs.get(1);
             assertTrue("Demand retry ignored the server backoff entirely: delayMs="
                             + retryDelayMs + " trace=" + trace,
-                    retryDelayMs >= 1_500);
-            assertTrue("Demand retry honored the full 30 second backoff instead of the bounded "
-                            + "loader wait: elapsedMs=" + elapsedMs + " trace=" + trace,
-                    elapsedMs < 5_000);
+                    retryDelayMs >= 2_800);
+            assertTrue("Demand retry did not honor the full server backoff: elapsedMs="
+                            + elapsedMs + " trace=" + trace, elapsedMs < 5_000);
+        }
+    }
+
+    @Test
+    public void demandBackoffRemainsCancelableWithoutEarlyRequest() throws Exception {
+        try (SabrSmokeHarness harness = SabrSmokeHarness.create()) {
+            harness.downloader.enqueue(new UmpFixture()
+                    .segment(1, SMOKE_VIDEO_ITAG, 1, 0, 30_000).bytes());
+            harness.downloader.enqueue(new UmpFixture()
+                    .part(SabrResponseDecoder.NEXT_REQUEST_POLICY, nextRequestPolicy(3_000))
+                    .bytes());
+            final SabrSegmentRequest request = SabrSegmentRequest.media(harness.videoFormat, 2);
+            final SabrSegmentDataSource dataSource = new SabrSegmentDataSource(
+                    harness.holder, harness.readerOwner, request.getFormat(),
+                    new Localization("en", "US"), false);
+            final AtomicReference<Throwable> failure = new AtomicReference<>();
+            final CountDownLatch done = new CountDownLatch(1);
+            final Thread loader = new Thread(() -> {
+                try {
+                    dataSource.open(new DataSpec(harness.segmentUri(request)));
+                } catch (final Throwable e) {
+                    failure.set(e);
+                } finally {
+                    done.countDown();
+                }
+            }, "SabrSmokeCancelableBackoff");
+            loader.start();
+            boolean completed;
+            try {
+                final long deadlineNs = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+                while (harness.holder.session.getDemandBackoffRemainingMs() == 0
+                        && System.nanoTime() < deadlineNs) {
+                    Thread.sleep(25);
+                }
+                assertTrue("Demand did not enter the server backoff: "
+                                + harness.holder.session.getDiagnosticTrace(),
+                        harness.holder.session.getDemandBackoffRemainingMs() > 0);
+                harness.advanceReaderGeneration();
+                completed = done.await(1_500, TimeUnit.MILLISECONDS);
+                Thread.sleep(250);
+            } finally {
+                dataSource.close();
+                loader.interrupt();
+                done.await(2, TimeUnit.SECONDS);
+            }
+            final String trace = harness.holder.session.getDiagnosticTrace();
+            assertTrue("Backoff kept the stale loader blocked: " + trace, completed);
+            assertTrue("Backoff cancellation should surface as a recoverable load failure: "
+                            + failure.get(), failure.get() instanceof IOException);
+            assertEquals("Cancellation sent a request before the server deadline: " + trace,
+                    2, harness.downloader.requestTimesSnapshot().size());
+            assertTrue("Backoff cancellation failed the shared session: " + trace,
+                    !trace.contains("terminal_failure"));
         }
     }
 
@@ -348,7 +400,7 @@ public final class SabrPlaybackSmokeTest {
                     .segment(1, SMOKE_VIDEO_ITAG, 1, 0, 30_000)
                     .bytes());
             harness.downloader.enqueue(new UmpFixture()
-                    .part(SabrResponseDecoder.NEXT_REQUEST_POLICY, nextRequestPolicy(30_000))
+                    .part(SabrResponseDecoder.NEXT_REQUEST_POLICY, nextRequestPolicy(3_000))
                     .bytes());
             harness.downloader.enqueue(new UmpFixture()
                     .segment(2, SMOKE_VIDEO_ITAG, 2, 30_000, 5_000)
@@ -373,9 +425,9 @@ public final class SabrPlaybackSmokeTest {
                     notification);
             assertTrue("Demand completed before the backoff notification was observed",
                     completed.getCount() > 0);
-            assertTrue("SABR demand did not recover after its bounded backoff",
+            assertTrue("SABR demand did not recover after the server backoff",
                     completed.await(5, TimeUnit.SECONDS));
-            assertNull("SABR demand failed after its bounded backoff", failure.get());
+            assertNull("SABR demand failed after the server backoff", failure.get());
             assertNull("Backoff notification remained after the demanded segment recovered",
                     awaitBackoffNotification(context, false));
         } finally {
@@ -478,7 +530,7 @@ public final class SabrPlaybackSmokeTest {
     }
 
     @Test
-    public void nearEdgeNoProgressRefetchesBeforeFailingSession() throws Exception {
+    public void nearEdgeServerBackoffsDoNotTriggerLocalRecovery() throws Exception {
         try (SabrSmokeHarness harness = SabrSmokeHarness.create()) {
             harness.downloader.enqueue(new UmpFixture()
                     .segment(1, SMOKE_VIDEO_ITAG, 1, 0, 30_000)
@@ -497,14 +549,15 @@ public final class SabrPlaybackSmokeTest {
                     SabrSegmentRequest.media(harness.videoFormat, 2), 15_000);
 
             final String trace = harness.holder.session.getDiagnosticTrace();
-            assertTrue("Near-edge stall never performed an actionable recovery: " + trace,
-                    trace.contains("recovery type=near_edge_refetch"));
-            assertTrue("Near-edge recovery did not reposition the pump: " + trace,
-                    trace.contains("pump_rewind itag=" + SMOKE_VIDEO_ITAG + " seq=2"));
-            assertTrue("Near-edge recovery fired before sustained no-progress: elapsedMs="
+            assertTrue("Near-edge server pacing response was not exercised: " + trace,
+                    trace.contains("pump_demand_no_media itag=" + SMOKE_VIDEO_ITAG + " seq=2"));
+            assertTrue("Server-directed backoff incorrectly triggered local recovery: " + trace,
+                    !trace.contains("recovery type=near_edge_refetch")
+                            && !trace.contains("pump_rewind itag=" + SMOKE_VIDEO_ITAG + " seq=2"));
+            assertTrue("Demand did not preserve the repeated server backoffs: elapsedMs="
                             + elapsedMs + " trace=" + trace,
-                    elapsedMs >= 9_500);
-            assertTrue("Near-edge recovery failed the shared SABR session: " + trace,
+                    elapsedMs >= 11_500);
+            assertTrue("Near-edge server pacing failed the shared SABR session: " + trace,
                     !trace.contains("terminal_failure"));
         }
     }
@@ -899,21 +952,21 @@ public final class SabrPlaybackSmokeTest {
     }
 
     @Test
-    public void demandProtectedNoMediaBackoffRemainsBounded() throws Exception {
+    public void demandProtectedNoMediaHonorsServerBackoff() throws Exception {
         try (SabrSmokeHarness harness = SabrSmokeHarness.create()) {
             harness.downloader.enqueue(new UmpFixture()
                     .segment(1, SMOKE_VIDEO_ITAG, 1, 0, 30_000)
                     .bytes());
             harness.downloader.enqueue(new UmpFixture()
                     .part(SabrResponseDecoder.STREAM_PROTECTION_STATUS, streamProtection(3, 7))
-                    .part(SabrResponseDecoder.NEXT_REQUEST_POLICY, nextRequestPolicy(30_000))
+                    .part(SabrResponseDecoder.NEXT_REQUEST_POLICY, nextRequestPolicy(3_000))
                     .bytes());
             harness.downloader.enqueue(new UmpFixture()
                     .segment(2, SMOKE_VIDEO_ITAG, 2, 30_000, 5_000)
                     .bytes());
 
             final long elapsedMs = harness.openMediaSegment(
-                    SabrSegmentRequest.media(harness.videoFormat, 2), 5_000);
+                    SabrSegmentRequest.media(harness.videoFormat, 2), 6_000);
 
             final String trace = harness.holder.session.getDiagnosticTrace();
             assertTrue("Protected no-media response was not exercised: " + trace,
@@ -924,10 +977,9 @@ public final class SabrPlaybackSmokeTest {
             final long retryDelayMs = requestTimesMs.get(2) - requestTimesMs.get(1);
             assertTrue("Protected no-media retry ignored backoff: delayMs=" + retryDelayMs
                             + " trace=" + trace,
-                    retryDelayMs >= 1_500);
-            assertTrue("Loader waited too long after bounded protected no-media backoff: elapsedMs="
-                            + elapsedMs,
-                    elapsedMs < 5_000);
+                    retryDelayMs >= 2_800);
+            assertTrue("Protected no-media retry did not honor the server backoff: elapsedMs="
+                            + elapsedMs, elapsedMs < 5_000);
         }
     }
 

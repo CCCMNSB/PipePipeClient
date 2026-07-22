@@ -178,8 +178,14 @@ final class SabrStreamPump {
             wake();
             return;
         }
-        final boolean added = activeDemands.putIfAbsent(key, new SegmentDemand(
-                request, readerOwner, readerGeneration, System.currentTimeMillis())) == null;
+        final long nowMs = System.currentTimeMillis();
+        final SegmentDemand created = new SegmentDemand(
+                request, readerOwner, readerGeneration, nowMs);
+        final long remainingBackoffMs = session.getDemandBackoffRemainingMs();
+        if (remainingBackoffMs > 0) {
+            created.pausePolicyClockForBackoff(nowMs, remainingBackoffMs);
+        }
+        final boolean added = activeDemands.putIfAbsent(key, created) == null;
         ensureStarted();
         if (added) {
             wake();
@@ -189,8 +195,14 @@ final class SabrStreamPump {
     void clearSegmentDemand(@NonNull final SabrSegmentRequest request,
                             @NonNull final Object readerOwner,
                             final long readerGeneration) {
-        activeDemands.remove(DemandKey.from(request, readerOwner, readerGeneration));
+        final SegmentDemand removed = activeDemands.remove(
+                DemandKey.from(request, readerOwner, readerGeneration));
         demandFailures.remove(DemandKey.from(request, readerOwner, readerGeneration));
+        if (removed != null) {
+            // A server backoff can park the pump for many seconds. Wake it so cancellation or a
+            // superseded reader is observed immediately without permitting an early request.
+            wake();
+        }
     }
 
     void requestSeekTo(@NonNull final SabrSegmentRequest request, final boolean backward) {
@@ -245,6 +257,12 @@ final class SabrStreamPump {
                     session.setPlayHeadMs(Math.max(0, holder.getReaderTailMs() - backBufferMs));
                     session.evictPlayed();
                     final long edgeMs = session.getStreamState().getMinBufferedEndMs();
+                    final long remainingBackoffMs = session.getDemandBackoffRemainingMs();
+                    if (remainingBackoffMs > 0) {
+                        state = State.IDLE;
+                        awaitWake(remainingBackoffMs);
+                        continue;
+                    }
                     final YoutubeSabrFormat initialization = pendingInitialization;
                     if (initialization != null) {
                         pendingInitialization = null;
@@ -562,6 +580,10 @@ final class SabrStreamPump {
         final YoutubeSabrSession.DemandResponseResult result;
         try {
             result = session.pumpOnceStreamingForDemand(localization, request);
+            final long remainingBackoffMs = session.getDemandBackoffRemainingMs();
+            if (remainingBackoffMs > 0) {
+                pauseDemandPolicyClocksForBackoff(remainingBackoffMs);
+            }
             holder.recordDiagnosticsThrottled("pump_until_cached itag="
                     + request.getFormat().getItag()
                     + " seq=" + request.getSequenceNumber()
@@ -581,6 +603,13 @@ final class SabrStreamPump {
         }
         awaitWake(Math.max(remainingBackoffMs,
                 demand.retryDelayMs > 0 ? demand.retryDelayMs : IDLE_POLL_MS));
+    }
+
+    private void pauseDemandPolicyClocksForBackoff(final long remainingBackoffMs) {
+        final long nowMs = System.currentTimeMillis();
+        for (final SegmentDemand activeDemand : activeDemands.values()) {
+            activeDemand.pausePolicyClockForBackoff(nowMs, remainingBackoffMs);
+        }
     }
 
     private long targetReadaheadCushionMs() {
@@ -738,7 +767,7 @@ final class SabrStreamPump {
         }
         // A control-only response is pacing/protocol state, not evidence that the server omitted
         // a demanded media segment. The ordinary response policy has already handled it; keeping
-        // the demand counters unchanged also preserves the bounded server backoff.
+        // the demand counters unchanged also preserves the server backoff.
         if (result.getSegmentCount() == 0 && result.getReturnedSegments().isEmpty()) {
             demand.retryDelayMs = 0;
             session.addDiagnosticEvent("pump_demand_no_media itag="
@@ -760,7 +789,7 @@ final class SabrStreamPump {
                         result.getTargetTrackSegmentCount(), result.getReturnedSegments(),
                         result.areReturnedSegmentsTruncated()));
         demand.retryDelayMs = decision.getRetryDelayMs();
-        final long elapsedMs = Math.max(0, nowMs - demand.createdAtMs);
+        final long elapsedMs = demand.getPolicyElapsedMs(nowMs);
         session.addDiagnosticEvent("pump_demand_omission itag="
                 + demand.request.getFormat().getItag()
                 + " seq=" + demand.request.getSequenceNumber()
@@ -842,6 +871,8 @@ final class SabrStreamPump {
         private int responsesWithoutDemandedSegment;
         private int recoveryCount;
         private int retryDelayMs;
+        private long policyCreatedAtMs;
+        private long policyBackoffUntilMs;
 
         private SegmentDemand(@NonNull final SabrSegmentRequest request,
                               @NonNull final Object readerOwner,
@@ -851,12 +882,27 @@ final class SabrStreamPump {
             this.readerOwner = readerOwner;
             this.readerGeneration = readerGeneration;
             this.createdAtMs = sinceMs;
+            this.policyCreatedAtMs = sinceMs;
         }
 
         @NonNull
         private SabrSessionPolicy.DemandState policyState(final long nowMs) {
-            return new SabrSessionPolicy.DemandState(createdAtMs, nowMs,
+            return new SabrSessionPolicy.DemandState(policyCreatedAtMs, nowMs,
                     responsesWithoutDemandedSegment, recoveryCount);
+        }
+
+        private void pausePolicyClockForBackoff(final long nowMs, final long remainingBackoffMs) {
+            final long backoffUntilMs = nowMs + remainingBackoffMs;
+            final long unaccountedBackoffMs = backoffUntilMs
+                    - Math.max(nowMs, policyBackoffUntilMs);
+            if (unaccountedBackoffMs > 0) {
+                policyCreatedAtMs += unaccountedBackoffMs;
+                policyBackoffUntilMs = backoffUntilMs;
+            }
+        }
+
+        private long getPolicyElapsedMs(final long nowMs) {
+            return Math.max(0, nowMs - policyCreatedAtMs);
         }
 
         @NonNull
