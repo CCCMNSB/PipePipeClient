@@ -1059,9 +1059,9 @@
 <string name="show_auto_translated_subtitles_summary">Pokaż automatycznie przetłumaczone napisy YouTube. Wymaga zalogowania do YouTube.</string>
 <string name="show_auto_translated_subtitles_login_required_summary">Wyłączone, ponieważ dla automatycznie przetłumaczonych napisów wymagane jest zalogowanie do YouTube.</string>
 <string name="auto_translated_subtitles_language_title">Automatycznie tłumacz napisy na</string>
-
 <string name="sabr_backoff_notification_channel_name">Oczekiwanie na odtwarzanie YouTube</string>
 <string name="sabr_backoff_notification_channel_description">Powiadomienia, gdy YouTube wymaga oczekiwania na żądanie odtwarzania</string>
 <string name="sabr_backoff_notification_title">Oczekiwanie na YouTube</string>
 <string name="youtube_send_session_visitor_data_summary">Wyślij dane odwiedzającego do YouTube. Może zmniejszyć ryzyko tymczasowej blokady IP, ale częściej zmusza do oczekiwania na reklamy.</string>
+<string name="sabr_backoff_notification_content">YouTube wymusza na nas odczekanie %1$d sekund przed wznowieniem odtwarzania</string>
 </resources>

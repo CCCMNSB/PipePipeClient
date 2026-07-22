@@ -129,8 +129,8 @@ public final class SabrBackoffCoordinator {
                 appContext.getString(R.string.sabr_backoff_notification_channel_id))
                 .setSmallIcon(R.drawable.ic_pipepipe)
                 .setContentTitle(appContext.getString(R.string.sabr_backoff_notification_title))
-                .setContentText(appContext.getResources().getQuantityString(
-                        R.plurals.sabr_backoff_notification_content, seconds, seconds))
+                .setContentText(appContext.getString(
+                        R.string.sabr_backoff_notification_content, seconds))
                 .setContentIntent(PendingIntent.getActivity(appContext, NOTIFICATION_ID,
                         new Intent(appContext, MainActivity.class),
                         PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT))

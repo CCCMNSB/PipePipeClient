@@ -979,9 +979,9 @@
 <string name="error_sabr_download_storage">Der SABR-Download konnte nicht geschrieben werden</string>
 <string name="error_sabr_download_protocol">SABR-Protokollfehler</string>
 <string name="webview_unavailable_youtube_hint">WebView nicht verfügbar. Bitte stellen Sie sicher, dass Ihre WebView-Version höher als 80 ist.\n\nAndroid 6 und 10: Aktualisieren Sie Android WebView im Play Store.\nAndroid 7, 8, 9: Aktualisieren Sie Chrome im Play Store.\nAndere Versionen: Dies sollte nicht passieren. Bitte melden Sie es auf unserem GitHub.</string>
-
 <string name="sabr_backoff_notification_channel_name">YouTube-Wiedergabe wartet</string>
 <string name="sabr_backoff_notification_channel_description">Benachrichtigungen, wenn YouTube verlangt, dass eine Wiedergabeanfrage wartet</string>
 <string name="sabr_backoff_notification_title">Warten auf YouTube</string>
 <string name="youtube_send_session_visitor_data_summary">Besucherdaten an YouTube senden. Kann das Risiko einer temporären IP-Sperre verringern, zwingt aber häufiger zum Warten auf Werbung.</string>
+<string name="sabr_backoff_notification_content">YouTube zwingt uns, %1$d Sekunden zu warten, bevor die Wiedergabe fortgesetzt wird</string>
 </resources>

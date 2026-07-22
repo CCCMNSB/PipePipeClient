@@ -2822,8 +2822,8 @@ public final class Player implements
             return;
         }
         final int seconds = SabrBackoffCoordinator.remainingSeconds(remainingMs);
-        binding.sabrBackoffCountdown.setText(context.getResources().getQuantityString(
-                R.plurals.sabr_backoff_notification_content, seconds, seconds));
+        binding.sabrBackoffCountdown.setText(context.getString(
+                R.string.sabr_backoff_notification_content, seconds));
         binding.sabrBackoffCountdown.setVisibility(View.VISIBLE);
     }
 
