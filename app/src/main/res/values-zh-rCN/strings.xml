@@ -815,7 +815,7 @@
 <string name="sponsor_promote">成为支持者</string>
 <string name="random_play_order_title">随机顺序</string>
 <string name="random_play_order_summary">在后台播放时自动随机播放您的本地播放列表</string>
-<string name="update_log">- 修复了在特定条件下导致 SABR 播放出现频繁缓冲、网络错误、无限加载及意外崩溃的问题。\n\n- 全面显著提升了 SABR 的播放性能，包括更快的加载和跳转速度，并大幅减少了流量消耗。</string>
+<string name="update_log">- 进一步提升了 YouTube 视频信息加载和播放启动速度\n- 修复了在某些情况下可能导致 SABR 播放错误的几个问题\n- 修复了在某些情况下 WebView 被错误报告为不可用的问题\n- 修复了在某些情况下 IP 地址被错误报告为被 YouTube 封禁的问题\n- 提升了应用的整体稳定性</string>
 <string name="speeding_playback_title">长按以加快播放</string>
 <string name="view_on_github">在GitHub上查看</string>
 <string name="donation_dialog_title">支持该项目</string>
@@ -1046,6 +1046,6 @@
 <string name="sabr_backoff_notification_channel_name">YouTube 播放等待</string>
 <string name="sabr_backoff_notification_channel_description">YouTube 强制播放请求等待时显示通知</string>
 <string name="sabr_backoff_notification_title">正在等待 YouTube</string>
-<string name="youtube_send_session_visitor_data_summary">向 YouTube 发送访客数据。可能会降低 IP 被临时封禁的风险，但会更频繁地被强制等待广告。</string>
+<string name="youtube_send_session_visitor_data_summary">向 YouTube 发送访客数据。有助于避免临时的 IP 封禁，但您可能会被迫更频繁地等待广告。</string>
 <string name="sabr_backoff_notification_content">YouTube 强制我们等待 %1$d 秒后才能继续播放</string>
 </resources>

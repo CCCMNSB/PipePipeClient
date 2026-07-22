@@ -124,7 +124,7 @@
 <item quantity="other">%s odpowiedzi</item>
 </plurals>
 <string name="random_play_order_summary">Automatycznie odtwarzaj losowo w twoich lokalnych playlistach, gdy odtwarzasz w tle</string>
-<string name="update_log">To wydanie naprawia błąd powstrzymujący poprawne odtwarzanie filmów na Youtube. \n\nYouTube ostatnio wyłączył wszystkie metody które były wcześniej używane do przechwytywania strumieni wideo, co powodowało niedziałanie filmów i transmisji na żywo dla prawie wszystkich użytkowników, wliczając w to tych którzy byli zalogowani do YouTube w ustawieniach. Po pilnych poprawkach, zmigrowaliśmy na nowy protokół SABR YouTube\'a, aby przywrócić odtwarzanie.\n\nNowe w 5.2.2: Dodaliśmy kilka zapasowych endpointów wydobywania jako tymaczasowe obejście problemu dla użytkowników którzy odczuwają niestabilność z SABR. Jeżeli filmy nie odtwarzają się poprawnie, przejdź do Ustawienia → Zaawansowane → Endpoint wydobywania YouTube i spróbuj przełączyć go na inny i sprawdź czy naprawi to problem. \n\nYouTube często się zmienia, więc sprawdzaj często czy są nowe aktualizacje, aby wszystko dobrze działało.</string>
+<string name="update_log">- Dalsza poprawa szybkości ładowania informacji o filmach na YouTube oraz uruchamiania odtwarzania\n- Rozwiązano kilka problemów, które w pewnych warunkach mogły powodować błędy odtwarzania SABR\n- Naprawiono błędne zgłaszanie niedostępności komponentu WebView w niektórych przypadkach\n- Naprawiono błędne zgłaszanie adresów IP jako zablokowanych przez YouTube w niektórych przypadkach\n- Poprawiono ogólną stabilność aplikacji</string>
 <string name="speeding_playback_title">Przytrzymaj aby przyspieszyć odtwarzanie</string>
 <string name="view_on_github">Zobacz na GitHubie</string>
 <string name="contribution_encouragement">Niezależnie od tego, czy masz pomysł na tłumaczenie, zmiany w projekcie, oczyszczenie kodu źródłowego, czy na naprawdę ciężkie zmiany w kodzie — pomoc jest zawsze mile widziana. Im więcej jest zrobione, tym lepiej!</string>
@@ -1062,6 +1062,6 @@
 <string name="sabr_backoff_notification_channel_name">Oczekiwanie na odtwarzanie YouTube</string>
 <string name="sabr_backoff_notification_channel_description">Powiadomienia, gdy YouTube wymaga oczekiwania na żądanie odtwarzania</string>
 <string name="sabr_backoff_notification_title">Oczekiwanie na YouTube</string>
-<string name="youtube_send_session_visitor_data_summary">Wyślij dane odwiedzającego do YouTube. Może zmniejszyć ryzyko tymczasowej blokady IP, ale częściej zmusza do oczekiwania na reklamy.</string>
+<string name="youtube_send_session_visitor_data_summary">Wyślij dane odwiedzającego do YouTube. Pomaga uniknąć tymczasowych blokad IP, ale możesz być zmuszony do częstszego oczekiwania na reklamy.</string>
 <string name="sabr_backoff_notification_content">YouTube wymusza na nas odczekanie %1$d sekund przed wznowieniem odtwarzania</string>
 </resources>

@@ -750,7 +750,7 @@
 <string name="sponsor_promote">Unterstützer werden</string>
 <string name="random_play_order_title">Zufällige Reihenfolge</string>
 <string name="random_play_order_summary">Automatisch Ihre lokalen Wiedergabelisten mischen, wenn sie im Hintergrund abgespielt werden</string>
-<string name="update_log">- SABR-Wiedergabeprobleme behoben, die unter bestimmten Bedingungen zu häufigem Puffern, Netzwerkfehlern, endlosem Laden und unerwarteten Abstürzen führten.\n\n- Die SABR-Wiedergabeleistung wurde auf ganzer Linie erheblich verbessert, einschließlich viel schnellerem Laden und Suchen sowie einem deutlich reduzierten Datenverbrauch.</string>
+<string name="update_log">- Weiter verbesserte Ladegeschwindigkeit von YouTube-Videoinformationen und beim Wiedergabestart\n- Mehrere Probleme behoben, die unter bestimmten Bedingungen zu SABR-Wiedergabefehlern führen konnten\n- Fehler behoben, bei dem WebView in einigen Fällen fälschlicherweise als nicht verfügbar gemeldet wurde\n- Fehler behoben, bei dem IP-Adressen in einigen Fällen fälschlicherweise als von YouTube blockiert gemeldet wurden\n- Allgemeine App-Stabilität verbessert</string>
 <string name="speeding_playback_title">Langes Drücken, um die Wiedergabe zu beschleunigen</string>
 <string name="view_on_github">Auf GitHub ansehen</string>
 <string name="donation_dialog_title">Projekt unterstützen</string>
@@ -982,6 +982,6 @@
 <string name="sabr_backoff_notification_channel_name">YouTube-Wiedergabe wartet</string>
 <string name="sabr_backoff_notification_channel_description">Benachrichtigungen, wenn YouTube verlangt, dass eine Wiedergabeanfrage wartet</string>
 <string name="sabr_backoff_notification_title">Warten auf YouTube</string>
-<string name="youtube_send_session_visitor_data_summary">Besucherdaten an YouTube senden. Kann das Risiko einer temporären IP-Sperre verringern, zwingt aber häufiger zum Warten auf Werbung.</string>
+<string name="youtube_send_session_visitor_data_summary">Besucherdaten an YouTube senden. Hilft dabei, vorübergehende IP-Sperren zu vermeiden, aber Sie müssen möglicherweise häufiger auf Werbung warten.</string>
 <string name="sabr_backoff_notification_content">YouTube zwingt uns, %1$d Sekunden zu warten, bevor die Wiedergabe fortgesetzt wird</string>
 </resources>
