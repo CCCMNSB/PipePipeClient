@@ -985,7 +985,7 @@ nSự khác biệt giữa hai loại này là cái nào nhanh thường thiếu 
 <string name="exit_app_confirmation_message">Hiển thị thông báo "nhấn quay lại lần nữa để thoát" để tránh thoát nhầm</string>
 <string name="exit_app_confirmation_title">Xác nhận thoát ứng dụng</string>
 <string name="try_again">Vui lòng thử lại</string>
-<string name="swipe_seek_gesture_control_title">Vuốt để tìm cử chỉ</string>
+<string name="swipe_seek_gesture_control_title">Vuốt để tua</string>
 <string name="swipe_seek_gesture_control_summary">Vuốt sang phải để tua nhanh, và sang trái để tua lại</string>
 <string name="large_grid">Lưới lớn</string>
 <string name="card">Thẻ</string>
@@ -1093,4 +1093,6 @@ nSự khác biệt giữa hai loại này là cái nào nhanh thường thiếu 
 <string name="sabr_backoff_notification_title">Đang chờ YouTube</string>
 <string name="youtube_send_session_visitor_data_summary">Gửi dữ liệu người truy cập đến YouTube. Giúp tránh việc bị chặn IP tạm thời, nhưng bạn có thể sẽ phải chờ quảng cáo thường xuyên hơn.</string>
 <string name="sabr_backoff_notification_content">YouTube buộc chúng ta phải đợi %1$d giây trước khi tiếp tục phát</string>
+<string name="playback_speed_gesture_control_title">Vuốt để điều khiển tốc độ phát lại</string>
+<string name="playback_speed_gesture_control_summary">Vuốt ở giữa để điều khiển tốc độ phát. Vô hiệu hóa điều khiển bằng cử chỉ toàn màn hình</string>
 </resources>

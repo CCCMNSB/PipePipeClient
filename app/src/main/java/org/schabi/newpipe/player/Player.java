@@ -5544,6 +5544,10 @@ case ERROR_CODE_DECODER_INIT_FAILED: {
         return binding.swipeSeekDisplay;
     }
 
+    public TextView getSwipeSpeedDisplay() {
+        return binding.swipeSpeedDisplay;
+    }
+
     public PlayerFastSeekOverlay getFastSeekOverlay() {
         return binding.fastSeekOverlay;
     }
