@@ -28,8 +28,6 @@ import org.schabi.newpipe.extractor.downloader.Downloader;
 import org.schabi.newpipe.extractor.services.youtube.YoutubeApiDecoder;
 import org.schabi.newpipe.ktx.ExceptionUtils;
 import org.schabi.newpipe.player.datasource.LocalDomPoTokenProvider;
-import org.schabi.newpipe.player.datasource.SabrPolicyRuntime;
-import org.schabi.newpipe.player.datasource.SabrPolicyUpdateWorker;
 import org.schabi.newpipe.settings.NewPipeSettings;
 import org.schabi.newpipe.util.*;
 
@@ -140,13 +138,6 @@ public class App extends MultiDexApplication {
             return sessionPoTokenProvider.getSessionPoToken(clientName, localization,
                     contentCountry, loggedIn);
         });
-        try {
-            SabrPolicyRuntime.initialize(this,
-                    BuildConfig.SABR_POLICY_PUBLIC_KEY_BASE64, 0);
-            SabrPolicyUpdateWorker.initialize(this);
-        } catch (final IllegalArgumentException error) {
-            Log.e(TAG, "Could not initialize SABR cloud policy; using builtin", error);
-        }
         final AndroidWebViewAvailabilityChecker webViewAvailabilityChecker =
                 new AndroidWebViewAvailabilityChecker(this);
         NewPipe.setWebViewAvailabilityChecker(webViewAvailabilityChecker);

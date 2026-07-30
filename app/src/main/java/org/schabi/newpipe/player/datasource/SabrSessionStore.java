@@ -768,7 +768,7 @@ public final class SabrSessionStore {
         final File spoolDirectory = new File(context.getApplicationContext().getCacheDir(),
                 "sabr-bootstrap/" + info.getVideoId() + '-' + System.nanoTime());
         final YoutubeSabrSession session = new YoutubeSabrSession(info, audioFormat, videoFormat,
-                sessionProvider, spoolDirectory, SabrPolicyRuntime.createSessionHost());
+                sessionProvider, spoolDirectory);
         session.setBackoffListener(backoffState);
         boolean handedOff = false;
         try {
@@ -836,7 +836,7 @@ public final class SabrSessionStore {
             @NonNull final byte[] poToken)
             throws IOException, ExtractionException {
         final YoutubeSabrSession session = new YoutubeSabrSession(info, audioFormat, videoFormat,
-                null, null, SabrPolicyRuntime.createSessionHost());
+                null, null);
         final Future<byte[]> audio = INITIALIZATION_EXECUTOR.submit(() ->
                 session.fetchInitializationData(audioFormat, localization, 2_000, poToken));
         final Future<byte[]> video = INITIALIZATION_EXECUTOR.submit(() ->
@@ -952,8 +952,7 @@ public final class SabrSessionStore {
                 session.addDiagnosticEvent("bootstrap_session_handoff");
             } else {
                 session = new YoutubeSabrSession(spec.getInfo(), spec.getAudioFormat(),
-                        spec.getVideoFormat(), sessionProvider, spoolDirectory,
-                        SabrPolicyRuntime.createSessionHost());
+                        spec.getVideoFormat(), sessionProvider, spoolDirectory);
                 attachPoToken(spec.getVideoId(), spec.getInfo(), sessionProvider, session);
             }
             final Holder holder = new Holder(context, spec, session);
