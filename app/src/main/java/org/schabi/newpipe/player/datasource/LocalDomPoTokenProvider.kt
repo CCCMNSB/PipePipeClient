@@ -204,11 +204,13 @@ class LocalDomPoTokenProvider(context: Context) :
         val visitorData = info.visitorData ?: synchronized(visitorDataLock) {
             fetchedVisitorData
         } ?: throw SabrProtocolException("Missing visitorData for Local DOM PO token")
-        if (forceRefresh) {
-            cache.remove(videoId)
-            prefs.edit().remove(videoId).apply()
-        }
         synchronized(mintLocks.computeIfAbsent(videoId) { Any() }) {
+            if (forceRefresh) {
+                cache.remove(videoId)
+                prefs.edit().remove(videoId).apply()
+                invalidateGenerator(visitorData, credentialIdentity)
+                Log.i(TAG, "reset attestation after rejected token video=$videoId")
+            }
             val now = System.currentTimeMillis()
             val cached = cache[videoId]
                 ?: diskLoad(videoId)?.also { cache[videoId] = it }
@@ -219,8 +221,10 @@ class LocalDomPoTokenProvider(context: Context) :
                 Log.i(TAG, "cache hit video=$videoId bytes=${cached.token.size}")
                 return cached.token
             }
-            val token = ensureGenerator(visitorData, credentialIdentity)
-                .generateRawPoToken(videoId)
+            val token = synchronized(generatorLock) {
+                ensureGenerator(visitorData, credentialIdentity)
+                    .generateRawPoToken(videoId)
+            }
             cache[videoId] = CachedToken(token, now, visitorData, credentialIdentity)
             diskSave(videoId, token, now, visitorData, credentialIdentity)
             Log.i(TAG, "mint complete video=$videoId bytes=${token.size}")
@@ -279,6 +283,24 @@ class LocalDomPoTokenProvider(context: Context) :
             generatorCredentialIdentity = credentialIdentity
             rawSessionPoToken = freshSessionPoToken
             return fresh
+        }
+    }
+
+    private fun invalidateGenerator(
+        visitorData: String,
+        credentialIdentity: String,
+    ) {
+        synchronized(generatorLock) {
+            if (generatorVisitorData != visitorData ||
+                generatorCredentialIdentity != credentialIdentity
+            ) {
+                return
+            }
+            generator?.let { mainHandler.post { it.close() } }
+            generator = null
+            generatorVisitorData = null
+            generatorCredentialIdentity = null
+            rawSessionPoToken = null
         }
     }
 

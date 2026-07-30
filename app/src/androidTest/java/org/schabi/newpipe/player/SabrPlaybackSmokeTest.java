@@ -28,6 +28,7 @@ import androidx.media3.exoplayer.analytics.AnalyticsListener;
 import androidx.media3.exoplayer.source.MediaSource;
 import androidx.media3.exoplayer.trackselection.DefaultTrackSelector;
 import androidx.media3.exoplayer.upstream.DefaultBandwidthMeter;
+import androidx.preference.PreferenceManager;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.LargeTest;
 import androidx.test.platform.app.InstrumentationRegistry;
@@ -36,6 +37,7 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.schabi.newpipe.App;
 import org.schabi.newpipe.DownloaderImpl;
+import org.schabi.newpipe.R;
 import org.schabi.newpipe.extractor.downloader.CancellableCall;
 import org.schabi.newpipe.extractor.downloader.Downloader;
 import org.schabi.newpipe.extractor.downloader.Request;
@@ -46,6 +48,7 @@ import org.schabi.newpipe.extractor.NewPipe;
 import org.schabi.newpipe.extractor.ServiceList;
 import org.schabi.newpipe.extractor.localization.ContentCountry;
 import org.schabi.newpipe.extractor.localization.Localization;
+import org.schabi.newpipe.extractor.playlist.PlaylistInfo;
 import org.schabi.newpipe.extractor.services.youtube.sabr.SabrMediaSegment;
 import org.schabi.newpipe.extractor.services.youtube.sabr.SabrRequestDumper;
 import org.schabi.newpipe.extractor.services.youtube.sabr.SabrResponseDecoder;
@@ -57,12 +60,14 @@ import org.schabi.newpipe.extractor.services.youtube.sabr.YoutubeSabrSession;
 import org.schabi.newpipe.extractor.stream.AudioStream;
 import org.schabi.newpipe.extractor.stream.DeliveryMethod;
 import org.schabi.newpipe.extractor.stream.StreamInfo;
+import org.schabi.newpipe.extractor.stream.StreamInfoItem;
 import org.schabi.newpipe.extractor.stream.VideoStream;
 import org.schabi.newpipe.player.datasource.SabrDashMediaSource;
 import org.schabi.newpipe.player.datasource.SabrSegmentDataSource;
 import org.schabi.newpipe.player.helper.LegacySubtitleRenderersFactory;
 import org.schabi.newpipe.player.helper.LoadController;
 import org.schabi.newpipe.player.helper.PlayerDataSource;
+import org.schabi.newpipe.player.resolver.AudioPlaybackResolver;
 import org.schabi.newpipe.player.resolver.QualityResolver;
 import org.schabi.newpipe.player.resolver.VideoPlaybackResolver;
 import org.schabi.newpipe.player.datasource.SabrSessionStore;
@@ -129,6 +134,48 @@ public final class SabrPlaybackSmokeTest {
     @Test
     public void extractorToMedia3PlaysAndSeeks() throws Exception {
         runSmokeCase(SmokeCase.playback());
+    }
+
+    @Test
+    public void anonymousSequentialAudioCrossesSabrProtectionBoundaries() throws Exception {
+        final Bundle arguments = InstrumentationRegistry.getArguments();
+        final String playlistUrl = arguments.getString("anonymousPlaylistUrl", "");
+        assumeTrue("Set anonymousPlaylistUrl to run the sequential anonymous SABR probe",
+                !playlistUrl.isEmpty());
+
+        final Context context = InstrumentationRegistry.getInstrumentation()
+                .getTargetContext().getApplicationContext();
+        assertTrue("The target process must use PipePipe's App initialization",
+                context instanceof App);
+        final int videoCount = Integer.parseInt(arguments.getString(
+                "anonymousVideoCount", "10"));
+        final long playbackMs = Long.parseLong(arguments.getString(
+                "anonymousPlaybackMs", "130000"));
+        final boolean visitorDataEnabled = Boolean.parseBoolean(arguments.getString(
+                "anonymousVisitorData", "false"));
+        assertTrue("The probe must cross the 60s SABR protection boundary",
+                playbackMs > 60_000);
+
+        ServiceList.YouTube.setTokens("");
+        PreferenceManager.getDefaultSharedPreferences(context).edit()
+                .putBoolean(context.getString(R.string.youtube_session_visitor_data_key),
+                        visitorDataEnabled)
+                .commit();
+        NewPipe.setYoutubePlayerClient("mweb");
+
+        final PlaylistInfo playlist = PlaylistInfo.getInfo(ServiceList.YouTube, playlistUrl);
+        assertTrue("Playlist has fewer items than requested: requested=" + videoCount
+                        + " actual=" + playlist.getRelatedItems().size(),
+                playlist.getRelatedItems().size() >= videoCount);
+
+        for (int index = 0; index < videoCount; index++) {
+            final StreamInfoItem item = playlist.getRelatedItems().get(index);
+            final StreamInfo info = StreamInfo.getInfo(ServiceList.YouTube, item.getUrl());
+            assertTrue("Extractor returned no SABR audio stream for item=" + index
+                            + " video=" + info.getId(),
+                    info.getAudioStreams().stream().anyMatch(SabrPlaybackSmokeTest::isSabr));
+            runAnonymousAudioWindow(context, info, index, playbackMs);
+        }
     }
 
     @Test
@@ -526,6 +573,35 @@ public final class SabrPlaybackSmokeTest {
             assertTrue("Server-paced demand recovery took too long: elapsedMs=" + elapsedMs
                             + " trace=" + trace,
                     elapsedMs < 9_000);
+        }
+    }
+
+    @Test
+    public void protectionBoundaryReloadsAfterTokenRefreshBudget() throws Exception {
+        try (SabrSmokeHarness harness = SabrSmokeHarness.create()) {
+            for (int i = 0; i < 3; i++) {
+                harness.downloader.enqueue(new UmpFixture()
+                        .part(SabrResponseDecoder.STREAM_PROTECTION_STATUS,
+                                streamProtection(2, -1))
+                        .part(SabrResponseDecoder.NEXT_REQUEST_POLICY,
+                                nextRequestPolicy(2_000))
+                        .bytes());
+            }
+
+            try {
+                for (int i = 0; i < 3; i++) {
+                    harness.holder.session.pumpOnceStreaming(
+                            new Localization("en", "US"));
+                }
+            } catch (final Exception expected) {
+                final String trace = harness.holder.session.getDiagnosticTrace();
+                assertTrue("Protection boundary did not reload after the token refresh budget: "
+                                + trace,
+                        trace.contains("protected_no_media_reload refreshes=2 reloads=0"));
+                return;
+            }
+            throw new AssertionError(
+                    "Protection boundary kept retrying after the token refresh budget");
         }
     }
 
@@ -1806,6 +1882,89 @@ public final class SabrPlaybackSmokeTest {
 
     private static boolean isSabr(final VideoStream stream) {
         return stream.getDeliveryMethod() == DeliveryMethod.SABR;
+    }
+
+    private static boolean isSabr(final AudioStream stream) {
+        return stream.getDeliveryMethod() == DeliveryMethod.SABR;
+    }
+
+    private static void runAnonymousAudioWindow(final Context context,
+                                                final StreamInfo info,
+                                                final int index,
+                                                final long playbackMs) throws Exception {
+        final PlayerDataSource dataSource = new PlayerDataSource(context,
+                DownloaderImpl.USER_AGENT, new DefaultBandwidthMeter.Builder(context).build());
+        final MediaSource mediaSource = new AudioPlaybackResolver(context, dataSource).resolve(info);
+        assertNotNull("Audio resolver returned no MediaSource for item=" + index
+                + " video=" + info.getId(), mediaSource);
+
+        final AtomicReference<ExoPlayer> playerRef = new AtomicReference<>();
+        final AtomicReference<PlaybackException> playerError = new AtomicReference<>();
+        final CountDownLatch ready = new CountDownLatch(1);
+        InstrumentationRegistry.getInstrumentation().runOnMainSync(() -> {
+            final ExoPlayer player = new ExoPlayer.Builder(context)
+                    .setLoadControl(new LoadController())
+                    .build();
+            player.addListener(new Player.Listener() {
+                @Override
+                public void onPlaybackStateChanged(final int state) {
+                    if (state == Player.STATE_READY || state == Player.STATE_ENDED) {
+                        ready.countDown();
+                    }
+                }
+
+                @Override
+                public void onPlayerError(final PlaybackException error) {
+                    playerError.compareAndSet(null, error);
+                    ready.countDown();
+                }
+            });
+            player.setVolume(0f);
+            player.setMediaSource(mediaSource);
+            player.prepare();
+            player.play();
+            playerRef.set(player);
+        });
+
+        SabrSessionStore.Holder holder = null;
+        try {
+            assertTrue("Anonymous audio item did not become ready: index=" + index
+                            + " video=" + info.getId(),
+                    ready.await(PREPARE_TIMEOUT_SECONDS, TimeUnit.SECONDS));
+            assertNull("Anonymous audio item failed during startup: index=" + index
+                    + " video=" + info.getId(), playerError.get());
+            holder = getHolder(info.getId());
+            holder.session.setTraceEnabled(true);
+            final long durationMs = durationOf(playerRef.get());
+            assertTrue("Anonymous probe item is too short to cross 60s: index=" + index
+                    + " video=" + info.getId() + " durationMs=" + durationMs,
+                    durationMs > 61_000);
+            final long targetMs = Math.min(playbackMs, durationMs - 1_000);
+            waitForPosition(playerRef.get(), targetMs,
+                    TimeUnit.MILLISECONDS.toSeconds(targetMs) + PLAYBACK_TIMEOUT_SECONDS);
+            assertNull("Anonymous audio item failed: index=" + index + " video=" + info.getId(),
+                    playerError.get());
+            System.out.println("SABR_ANONYMOUS_SEQUENCE index=" + index
+                    + " video=" + info.getId()
+                    + " positionMs=" + positionOf(playerRef.get())
+                    + " trace=" + holder.session.getDiagnosticTrace());
+        } catch (final Exception | AssertionError failure) {
+            final String trace = holder == null ? "<no SABR session>"
+                    : holder.session.getDiagnosticTrace();
+            System.out.println("SABR_ANONYMOUS_SEQUENCE_FAILURE index=" + index
+                    + " video=" + info.getId()
+                    + " positionMs=" + (playerRef.get() == null ? -1
+                    : positionOf(playerRef.get()))
+                    + " trace=" + trace);
+            throw failure;
+        } finally {
+            InstrumentationRegistry.getInstrumentation().runOnMainSync(() -> {
+                if (playerRef.get() != null) {
+                    playerRef.get().release();
+                }
+            });
+            SabrSessionStore.evict(info.getId());
+        }
     }
 
     private static SabrSessionStore.Holder getHolder(final String videoId) throws Exception {
