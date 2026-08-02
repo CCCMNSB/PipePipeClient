@@ -162,22 +162,22 @@ public class AdvancedSettingsFragment extends BasePreferenceFragment implements 
         final String[] values = getResources().getStringArray(
                 R.array.youtube_player_client_values);
         if (loggedIn) {
-            preference.setEntries(new CharSequence[]{entries[3], entries[0]});
-            preference.setEntryValues(new CharSequence[]{values[3], values[0]});
+            preference.setEntries(new CharSequence[]{entries[2], entries[0]});
+            preference.setEntryValues(new CharSequence[]{values[2], values[0]});
             final String selected = preference.getValue();
-            if (!isYoutubePlayerClientAllowed(selected, values[3], values[0])) {
+            if (!isYoutubePlayerClientAllowed(selected, values[2], values[0])) {
                 preference.setValue("tv_downgraded");
                 defaultPreferences.edit().putString(
                         getString(R.string.youtube_player_client_key), "tv_downgraded").apply();
             }
         } else {
-            preference.setEntries(new CharSequence[]{entries[0], entries[1], entries[2]});
-            preference.setEntryValues(new CharSequence[]{values[0], values[1], values[2]});
+            preference.setEntries(new CharSequence[]{entries[0], entries[1]});
+            preference.setEntryValues(new CharSequence[]{values[0], values[1]});
             if (!isYoutubePlayerClientAllowed(preference.getValue(),
-                    values[0], values[1], values[2])) {
-                preference.setValue("mweb");
+                    values[0], values[1])) {
+                preference.setValue("android_vr");
                 defaultPreferences.edit().putString(
-                        getString(R.string.youtube_player_client_key), "mweb").apply();
+                        getString(R.string.youtube_player_client_key), "android_vr").apply();
             }
         }
     }

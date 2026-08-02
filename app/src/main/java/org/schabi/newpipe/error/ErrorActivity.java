@@ -381,7 +381,7 @@ public class ErrorActivity extends AppCompatActivity {
 
     private String getEndpoint() {
         return PreferenceManager.getDefaultSharedPreferences(this)
-                .getString(getString(R.string.youtube_player_client_key), "mweb");
+                .getString(getString(R.string.youtube_player_client_key), "android_vr");
     }
 
     private String getOsString() {

@@ -157,7 +157,7 @@ public class App extends MultiDexApplication {
         final boolean hasYouTubeLogin = !TextUtils.isEmpty(prefs.getString(
                 getString(R.string.youtube_cookies_key), null));
         final String defaultYoutubePlayerClient = hasYouTubeLogin
-                ? "tv_downgraded" : "mweb";
+                ? "tv_downgraded" : "android_vr";
         String youtubePlayerClient = prefs.getString(youtubePlayerClientKey,
                 defaultYoutubePlayerClient);
         boolean isYoutubePlayerClientValid = false;
@@ -260,12 +260,6 @@ public class App extends MultiDexApplication {
                 return new YoutubePoTokenClientContext(YOUTUBE_WEB_CLIENT_NAME,
                         YoutubeParsingHelper::getClientVersion,
                         YoutubeParsingHelper.WEB_USER_AGENT);
-            case "web_safari":
-                return new YoutubePoTokenClientContext(YOUTUBE_WEB_CLIENT_NAME,
-                        () -> "2.20260114.08.00",
-                        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-                                + "AppleWebKit/605.1.15 (KHTML, like Gecko) "
-                                + "Version/15.5 Safari/605.1.15,gzip(gfe)");
             case "android_vr":
                 return new YoutubePoTokenClientContext(YOUTUBE_ANDROID_VR_CLIENT_NAME,
                         () -> "1.65.10",

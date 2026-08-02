@@ -145,7 +145,6 @@ public final class YoutubePlaybackBenchmarkTest {
 
         final List<Path> paths = filterPaths(Arrays.asList(
                 new Path("sabr", "mweb", DeliveryMethod.SABR),
-                new Path("hls", "web_safari", DeliveryMethod.HLS),
                 new Path("tv_downgraded_generated_dash", "tv_downgraded",
                         DeliveryMethod.PROGRESSIVE_HTTP),
                 new Path("android_vr_generated_dash", "android_vr",
