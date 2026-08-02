@@ -263,6 +263,26 @@ class LocalDomPoTokenProvider(context: Context) :
         )
     }
 
+    override fun invalidatePoTokenIdentity(info: YoutubeSabrInfo): Boolean {
+        sessionPoTokenPrewarmer.cancel()
+        synchronized(visitorDataLock) {
+            fetchedVisitorData = null
+            fetchedVisitorDataLoggedIn = null
+            fetchedVisitorDataCredentialIdentity = null
+            visitorDataFetchedAtMs = 0
+        }
+        synchronized(generatorLock) {
+            generator?.let { mainHandler.post { it.close() } }
+            generator = null
+            generatorContext = null
+            generatorCredentialIdentity = null
+        }
+        cache.clear()
+        prefs.edit().clear().commit()
+        Log.i(TAG, "rotated pending attestation identity video=${info.videoId}")
+        return true
+    }
+
     private fun getOrMintToken(
         contentBinding: String,
         context: LocalDomPoTokenContext,

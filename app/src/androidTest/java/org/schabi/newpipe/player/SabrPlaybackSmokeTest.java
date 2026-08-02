@@ -1930,10 +1930,10 @@ public final class SabrPlaybackSmokeTest {
                             + " positionMs=" + positionOf(playerRef.get()) + " trace=" + trace,
                     positionOf(playerRef.get()) >= targetMs);
             final int maxProtectionStatus = holder.session.getMaxStreamProtectionStatus();
-            assertTrue("Anonymous audio item received unexpected protection status: index="
+            assertTrue("Anonymous audio item received terminal protection status: index="
                             + index + " video=" + info.getId() + " maxStatus="
                             + maxProtectionStatus + " trace=" + trace,
-                    maxProtectionStatus <= 1);
+                    maxProtectionStatus <= 2);
             System.out.println("SABR_ANONYMOUS_SEQUENCE index=" + index
                     + " video=" + info.getId()
                     + " positionMs=" + positionOf(playerRef.get())
