@@ -1057,7 +1057,8 @@ public final class YoutubePlaybackBenchmarkTest {
             return result;
         }
         @Override public int getOverrideResolutionIndex(final List<VideoStream> streams,
-                                                        final int selectedIndex) {
+                                                        final String selectedResolution,
+                                                        final String selectedCodec) {
             return getDefaultResolutionIndex(streams);
         }
         @Override public int getCurrentAudioQualityIndex(final List<AudioStream> streams) { return 0; }

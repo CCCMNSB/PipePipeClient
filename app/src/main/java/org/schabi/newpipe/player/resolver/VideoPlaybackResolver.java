@@ -45,7 +45,10 @@ public class VideoPlaybackResolver implements PlaybackResolver {
     private final QualityResolver qualityResolver;
     private SourceType streamSourceType;
 
-    private int selectedIndex = -1;
+    @Nullable
+    private String selectedResolution;
+    @Nullable
+    private String selectedCodec;
     @Nullable
     private String audioTrack;
 
@@ -122,13 +125,20 @@ public class VideoPlaybackResolver implements PlaybackResolver {
                 }
             }
         }
-        final int index;
+        int index;
         if (videos.isEmpty()) {
             index = -1;
-        } else if (selectedIndex == -1) {
+        } else if (selectedResolution == null) {
             index = qualityResolver.getDefaultResolutionIndex(videos);
         } else {
-            index = qualityResolver.getOverrideResolutionIndex(videos, selectedIndex);
+            index = qualityResolver.getOverrideResolutionIndex(
+                    videos, selectedResolution, selectedCodec);
+        }
+        if (!videos.isEmpty() && (index < 0 || index >= videos.size())) {
+            index = qualityResolver.getDefaultResolutionIndex(videos);
+            if (index < 0 || index >= videos.size()) {
+                index = 0;
+            }
         }
         final MediaItemTag tag = StreamInfoTag.of(info, videos, index);
         @Nullable final VideoStream video = tag.getMaybeQuality()
@@ -243,12 +253,9 @@ public class VideoPlaybackResolver implements PlaybackResolver {
         return Optional.ofNullable(streamSourceType);
     }
 
-    public int getSelectedIndex() {
-        return selectedIndex;
-    }
-
-    public void setSelectedIndex(int selectedIndex) {
-        this.selectedIndex = selectedIndex;
+    public void setSelectedStream(@NonNull final VideoStream selectedStream) {
+        selectedResolution = selectedStream.getResolution();
+        selectedCodec = selectedStream.getCodec();
     }
 
     public void addBlacklistUrl(@NonNull final String url) {

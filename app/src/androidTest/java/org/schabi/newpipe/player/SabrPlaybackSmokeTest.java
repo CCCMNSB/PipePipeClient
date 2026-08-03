@@ -3634,8 +3634,9 @@ public final class SabrPlaybackSmokeTest {
 
         @Override
         public int getOverrideResolutionIndex(final List<VideoStream> sortedVideos,
-                                              final int selectedIndex) {
-            return selectedIndex;
+                                              final String selectedResolution,
+                                              final String selectedCodec) {
+            return getDefaultResolutionIndex(sortedVideos);
         }
 
         @Override

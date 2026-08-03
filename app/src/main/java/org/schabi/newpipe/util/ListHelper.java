@@ -63,6 +63,82 @@ public final class ListHelper {
         return getDefaultResolutionWithDefaultFormat(context, defaultResolution, videoStreams);
     }
 
+    /**
+     * Finds the stream matching a quality selected on a previous video.
+     *
+     * <p>Stream list positions are not stable between videos. Match the selected resolution and
+     * codec family instead, preferring an exact frame-rate variant when available, then the same
+     * effective resolution, and finally the closest lower resolution.</p>
+     *
+     * @param targetResolution resolution selected by the user
+     * @param targetCodec codec selected by the user, or {@code null} if it is unknown
+     * @param videoStreams streams available for the new video
+     * @return a valid stream index, or {@code -1} if the stream list is empty
+     */
+    public static int getResolutionAndCodecIndex(
+            @NonNull final String targetResolution,
+            @Nullable final String targetCodec,
+            @Nullable final List<VideoStream> videoStreams) {
+        if (videoStreams == null || videoStreams.isEmpty()) {
+            return -1;
+        }
+
+        final String normalizedTarget = normalizeResolutionKey(targetResolution);
+        final String codecFamily = codecFamilyOf(targetCodec);
+        int index;
+
+        if (codecFamily != null) {
+            index = findBestVideoStreamIndex(videoStreams, targetResolution, null, codecFamily);
+            if (index >= 0) {
+                return index;
+            }
+            index = findBestVideoStreamIndex(videoStreams, null, normalizedTarget, codecFamily);
+            if (index >= 0) {
+                return index;
+            }
+        }
+
+        index = findBestVideoStreamIndex(videoStreams, targetResolution, null, null);
+        if (index >= 0) {
+            return index;
+        }
+        index = findBestVideoStreamIndex(videoStreams, null, normalizedTarget, null);
+        if (index >= 0) {
+            return index;
+        }
+
+        String fallbackResolution = null;
+        for (final VideoStream stream : videoStreams) {
+            final String resolution = normalizeResolutionKey(
+                    Objects.toString(stream.getResolution(), ""));
+            if (compareVideoStreamResolution(resolution, normalizedTarget) < 0
+                    && (fallbackResolution == null || compareVideoStreamResolution(
+                    resolution, fallbackResolution) > 0)) {
+                fallbackResolution = resolution;
+            }
+        }
+        if (fallbackResolution == null) {
+            for (final VideoStream stream : videoStreams) {
+                final String resolution = normalizeResolutionKey(
+                        Objects.toString(stream.getResolution(), ""));
+                if (fallbackResolution == null || compareVideoStreamResolution(
+                        resolution, fallbackResolution) < 0) {
+                    fallbackResolution = resolution;
+                }
+            }
+        }
+
+        if (codecFamily != null) {
+            index = findBestVideoStreamIndex(
+                    videoStreams, null, fallbackResolution, codecFamily);
+            if (index >= 0) {
+                return index;
+            }
+        }
+        index = findBestVideoStreamIndex(videoStreams, null, fallbackResolution, null);
+        return index >= 0 ? index : 0;
+    }
+
     public static int getDefaultAudioFormat(final Context context,
                                             final List<AudioStream> audioStreams) {
         if (audioStreams == null || audioStreams.isEmpty()) {
@@ -382,6 +458,53 @@ public final class ListHelper {
      */
     private static String normalizeResolutionKey(@NonNull final String raw) {
         return raw.replaceAll("(?i)p.*", "p");  // CASE-insensitive removal after the "p"
+    }
+
+    @Nullable
+    private static String codecFamilyOf(@Nullable final String codec) {
+        if (codec == null || codec.isEmpty()) {
+            return null;
+        }
+        final String normalized = codec.toLowerCase(Locale.ROOT);
+        if (normalized.startsWith("av01")) {
+            return "av1";
+        }
+        if (normalized.startsWith("vp09") || normalized.startsWith("vp9")) {
+            return "vp9";
+        }
+        if (normalized.startsWith("hev1") || normalized.startsWith("hvc1")) {
+            return "hevc";
+        }
+        if (normalized.startsWith("avc")) {
+            return "avc";
+        }
+        final int separator = normalized.indexOf('.');
+        return separator < 0 ? normalized : normalized.substring(0, separator);
+    }
+
+    private static int findBestVideoStreamIndex(
+            @NonNull final List<VideoStream> streams,
+            @Nullable final String exactResolution,
+            @Nullable final String normalizedResolution,
+            @Nullable final String codecFamily) {
+        int bestIndex = -1;
+        for (int i = 0; i < streams.size(); i++) {
+            final VideoStream stream = streams.get(i);
+            final String resolution = Objects.toString(stream.getResolution(), "");
+            final boolean resolutionMatches = exactResolution != null
+                    ? exactResolution.equals(resolution)
+                    : normalizedResolution != null && normalizedResolution.equals(
+                    normalizeResolutionKey(resolution));
+            if (!resolutionMatches || (codecFamily != null
+                    && !codecFamily.equals(codecFamilyOf(stream.getCodec())))) {
+                continue;
+            }
+            if (bestIndex < 0 || compareVideoStreamResolution(
+                    stream, streams.get(bestIndex)) > 0) {
+                bestIndex = i;
+            }
+        }
+        return bestIndex;
     }
 
 
@@ -818,13 +941,22 @@ public final class ListHelper {
     }
 
     private static int getCodecPriority(final VideoStream stream) {
-        String codec = stream.getCodec();
-        if (codec == null) return 0;
-        if (codec.startsWith("av01")) return 4;
-        if (codec.startsWith("vp09") || codec.startsWith("vp9")) return 3;
-        if (codec.startsWith("hev1") || codec.startsWith("hvc1")) return 2;
-        if (codec.startsWith("avc")) return 1;
-        return 0;
+        final String codecFamily = codecFamilyOf(stream.getCodec());
+        if (codecFamily == null) {
+            return 0;
+        }
+        switch (codecFamily) {
+            case "av1":
+                return 4;
+            case "vp9":
+                return 3;
+            case "hevc":
+                return 2;
+            case "avc":
+                return 1;
+            default:
+                return 0;
+        }
     }
 
     // Compares the quality of two video streams.

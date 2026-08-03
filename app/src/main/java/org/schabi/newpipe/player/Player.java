@@ -496,8 +496,10 @@ public final class Player implements
 
             @Override
             public int getOverrideResolutionIndex(final List<VideoStream> sortedVideos,
-                                                  final int selectedIndex) {
-                return selectedIndex;
+                                                  final String selectedResolution,
+                                                  @Nullable final String selectedCodec) {
+                return ListHelper.getResolutionAndCodecIndex(
+                        selectedResolution, selectedCodec, sortedVideos);
             }
 
             @Override
@@ -4375,7 +4377,7 @@ case ERROR_CODE_DECODER_INIT_FAILED: {
 
             saveStreamProgressState(); //TODO added, check if good
             setRecovery();
-            setSelectedIndex(menuItemIndex);
+            setSelectedStream(availableStreams.get(menuItemIndex));
             reloadPlayQueueManager();
 
             binding.qualityTextView.setText(menuItem.getTitle());
@@ -4417,8 +4419,8 @@ case ERROR_CODE_DECODER_INIT_FAILED: {
         isSomePopupMenuVisible = true;
     }
 
-    private void setSelectedIndex(int index) {
-        videoResolver.setSelectedIndex(index);
+    private void setSelectedStream(@NonNull final VideoStream stream) {
+        videoResolver.setSelectedStream(stream);
     }
 
     private void closeAllPopupMenus() {
