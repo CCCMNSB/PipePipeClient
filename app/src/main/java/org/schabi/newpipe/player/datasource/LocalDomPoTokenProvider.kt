@@ -283,6 +283,16 @@ class LocalDomPoTokenProvider(context: Context) :
         return true
     }
 
+    fun invalidateVisitorData() {
+        sessionPoTokenPrewarmer.cancel()
+        synchronized(visitorDataLock) {
+            fetchedVisitorData = null
+            fetchedVisitorDataLoggedIn = null
+            fetchedVisitorDataCredentialIdentity = null
+            visitorDataFetchedAtMs = 0
+        }
+    }
+
     private fun getOrMintToken(
         contentBinding: String,
         context: LocalDomPoTokenContext,
