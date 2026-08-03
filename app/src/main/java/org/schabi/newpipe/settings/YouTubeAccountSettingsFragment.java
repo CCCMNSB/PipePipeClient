@@ -78,6 +78,7 @@ public class YouTubeAccountSettingsFragment extends BaseAccountSettingsFragment 
     @Override
     protected void refreshAccountDependentState() {
         super.refreshAccountDependentState();
+        App.reconcileYoutubePlayerClient(requireContext());
         App.prewarmYoutubeSessionPoToken(requireContext());
     }
 

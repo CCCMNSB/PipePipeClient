@@ -151,33 +151,7 @@ public class App extends MultiDexApplication {
 
         // Initialize image loader
         final SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
-        final String youtubePlayerClientKey = getString(R.string.youtube_player_client_key);
-        final String[] youtubePlayerClients = getResources()
-                .getStringArray(R.array.youtube_player_client_values);
-        final boolean hasYouTubeLogin = !TextUtils.isEmpty(prefs.getString(
-                getString(R.string.youtube_cookies_key), null));
-        final String defaultYoutubePlayerClient = hasYouTubeLogin
-                ? "tv_downgraded" : "android_vr";
-        String youtubePlayerClient = prefs.getString(youtubePlayerClientKey,
-                defaultYoutubePlayerClient);
-        boolean isYoutubePlayerClientValid = false;
-        for (final String client : youtubePlayerClients) {
-            if (client.equals(youtubePlayerClient)) {
-                isYoutubePlayerClientValid = true;
-                break;
-            }
-        }
-        if (!isYoutubePlayerClientValid) {
-            youtubePlayerClient = defaultYoutubePlayerClient;
-            prefs.edit().putString(youtubePlayerClientKey, youtubePlayerClient).apply();
-        }
-        if ((hasYouTubeLogin && !"tv_downgraded".equals(youtubePlayerClient)
-                && !"mweb".equals(youtubePlayerClient))
-                || (!hasYouTubeLogin && "tv_downgraded".equals(youtubePlayerClient))) {
-            youtubePlayerClient = defaultYoutubePlayerClient;
-            prefs.edit().putString(youtubePlayerClientKey, youtubePlayerClient).apply();
-        }
-        NewPipe.setYoutubePlayerClient(youtubePlayerClient);
+        reconcileYoutubePlayerClient(this);
         prewarmYoutubeSessionPoToken(this);
         PicassoHelper.init(this);
         PicassoHelper.setShouldLoadImages(
@@ -186,6 +160,24 @@ public class App extends MultiDexApplication {
                 && prefs.getBoolean(getString(R.string.show_image_indicators_key), false));
 
         configureRxJavaErrorHandler();
+    }
+
+    public static void reconcileYoutubePlayerClient(@NonNull final Context context) {
+        final SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
+        final String playerClientKey = context.getString(R.string.youtube_player_client_key);
+        final boolean loggedIn = !TextUtils.isEmpty(prefs.getString(
+                context.getString(R.string.youtube_cookies_key), null));
+        final String defaultClient = loggedIn ? "tv_downgraded" : "android_vr";
+        final String selectedClient = prefs.getString(playerClientKey, defaultClient);
+        final boolean allowed = loggedIn
+                ? "tv_downgraded".equals(selectedClient)
+                : "mweb".equals(selectedClient) || "android_vr".equals(selectedClient);
+        final String reconciledClient = allowed ? selectedClient : defaultClient;
+
+        if (!reconciledClient.equals(selectedClient)) {
+            prefs.edit().putString(playerClientKey, reconciledClient).apply();
+        }
+        NewPipe.setYoutubePlayerClient(reconciledClient);
     }
 
     private void scheduleYoutubeDecoderPrewarm(final WebViewJavaScriptDecoder decoder) {
