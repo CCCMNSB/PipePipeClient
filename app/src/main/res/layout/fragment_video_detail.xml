@@ -634,6 +634,12 @@
 
     </androidx.coordinatorlayout.widget.CoordinatorLayout>
 
+    <FrameLayout
+        android:id="@+id/sticky_player_container"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:visibility="gone" />
+
     <RelativeLayout
         android:id="@+id/overlay_layout"
         android:layout_width="match_parent"
@@ -741,11 +747,5 @@
         </LinearLayout>
 
     </RelativeLayout>
-
-    <FrameLayout
-        android:id="@+id/sticky_player_container"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:visibility="gone" />
 
 </FrameLayout>

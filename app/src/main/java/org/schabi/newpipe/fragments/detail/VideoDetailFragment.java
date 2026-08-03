@@ -464,7 +464,6 @@ public final class VideoDetailFragment
 
     @Override
     public void onDestroyView() {
-        moveThumbnailToContainer(binding.detailThumbnailContainer);
         super.onDestroyView();
         binding = null;
     }
@@ -1625,18 +1624,16 @@ public final class VideoDetailFragment
                 .getDefaultSharedPreferences(requireContext());
         final boolean enableStickyPlayer = preferences.getBoolean(
                 getString(R.string.pin_video_to_top_key), true)
-                && !DeviceUtils.isLandscape(requireContext())
-                && bottomSheetState == BottomSheetBehavior.STATE_EXPANDED;
-        if (stickyPlayerEnabled == enableStickyPlayer) {
-            updateStickyPlayerLayout(binding.detailThumbnailRootLayout.getHeight());
-            return;
-        }
+                && !DeviceUtils.isLandscape(requireContext());
 
         stickyPlayerEnabled = enableStickyPlayer;
         moveThumbnailToContainer(enableStickyPlayer
                 ? binding.stickyPlayerContainer
                 : binding.detailThumbnailContainer);
-        binding.stickyPlayerContainer.setVisibility(enableStickyPlayer ? View.VISIBLE : View.GONE);
+        final int stickyPlayerVisibility = enableStickyPlayer ? View.VISIBLE : View.GONE;
+        if (binding.stickyPlayerContainer.getVisibility() != stickyPlayerVisibility) {
+            binding.stickyPlayerContainer.setVisibility(stickyPlayerVisibility);
+        }
         updateStickyPlayerLayout(binding.detailThumbnailRootLayout.getHeight());
     }
 
@@ -1659,8 +1656,11 @@ public final class VideoDetailFragment
         final int height = Math.max(playerHeight, binding.detailThumbnailImageView.getMinimumHeight());
         final ViewGroup.LayoutParams stickyParams = binding.stickyPlayerContainer.getLayoutParams();
         if (stickyParams != null) {
-            stickyParams.height = stickyPlayerEnabled ? height : 0;
-            binding.stickyPlayerContainer.setLayoutParams(stickyParams);
+            final int stickyHeight = stickyPlayerEnabled ? height : 0;
+            if (stickyParams.height != stickyHeight) {
+                stickyParams.height = stickyHeight;
+                binding.stickyPlayerContainer.setLayoutParams(stickyParams);
+            }
         }
 
         final ViewGroup.LayoutParams mainContentParams = binding.detailMainContent.getLayoutParams();
@@ -1673,8 +1673,10 @@ public final class VideoDetailFragment
             }
         } else if (mainContentParams instanceof LinearLayout.LayoutParams) {
             final LinearLayout.LayoutParams linearLayoutParams = (LinearLayout.LayoutParams) mainContentParams;
-            linearLayoutParams.topMargin = 0;
-            binding.detailMainContent.setLayoutParams(linearLayoutParams);
+            if (linearLayoutParams.topMargin != 0) {
+                linearLayoutParams.topMargin = 0;
+                binding.detailMainContent.setLayoutParams(linearLayoutParams);
+            }
         }
     }
 
@@ -2590,9 +2592,12 @@ public final class VideoDetailFragment
             manageSpaceAtTheBottom(false);
             bottomSheetBehavior.setPeekHeight(peekHeight);
             if (bottomSheetState == BottomSheetBehavior.STATE_COLLAPSED) {
+                binding.overlayLayout.setVisibility(View.VISIBLE);
                 binding.overlayLayout.setAlpha(MAX_OVERLAY_ALPHA);
+                setOverlayElementsClickable(true);
             } else if (bottomSheetState == BottomSheetBehavior.STATE_EXPANDED) {
                 binding.overlayLayout.setAlpha(0);
+                binding.overlayLayout.setVisibility(View.INVISIBLE);
                 setOverlayElementsClickable(false);
             }
         }
@@ -2604,7 +2609,6 @@ public final class VideoDetailFragment
                 try {
                     switch (newState) {
                         case BottomSheetBehavior.STATE_HIDDEN:
-                            updateStickyPlayerMode();
                             moveFocusToMainFragment(true);
                             manageSpaceAtTheBottom(true);
 
@@ -2612,7 +2616,6 @@ public final class VideoDetailFragment
                             cleanUp();
                             break;
                         case BottomSheetBehavior.STATE_EXPANDED:
-                            updateStickyPlayerMode();
                             moveFocusToMainFragment(false);
                             manageSpaceAtTheBottom(false);
 
@@ -2638,7 +2641,6 @@ public final class VideoDetailFragment
                             setOverlayLook(binding.appBarLayout, behavior, 1);
                             break;
                         case BottomSheetBehavior.STATE_COLLAPSED:
-                            updateStickyPlayerMode();
                             moveFocusToMainFragment(true);
                             manageSpaceAtTheBottom(false);
 
@@ -2654,7 +2656,7 @@ public final class VideoDetailFragment
                             break;
                         case BottomSheetBehavior.STATE_DRAGGING:
                         case BottomSheetBehavior.STATE_SETTLING:
-                            updateStickyPlayerMode();
+                            binding.overlayLayout.setVisibility(View.VISIBLE);
                             if (isPlayerAvailable() && player.isFullscreen()) {
                                 showSystemUi();
                             }
@@ -2745,14 +2747,26 @@ public final class VideoDetailFragment
         if (behavior == null || slideOffset < 0) {
             return;
         }
+        if (slideOffset < 1) {
+            binding.overlayLayout.setVisibility(View.VISIBLE);
+        }
         binding.overlayLayout.setAlpha(Math.min(MAX_OVERLAY_ALPHA, 1 - slideOffset));
         // These numbers are not special. They just do a cool transition
         behavior.setTopAndBottomOffset(
                 (int) (-binding.detailThumbnailImageView.getHeight() * 2 * (1 - slideOffset) / 3));
         appBar.requestLayout();
+        if (slideOffset >= 1) {
+            binding.overlayLayout.setVisibility(View.INVISIBLE);
+        }
     }
 
     private void setOverlayElementsClickable(final boolean enable) {
+        binding.overlayLayout.setDescendantFocusability(enable
+                ? ViewGroup.FOCUS_AFTER_DESCENDANTS
+                : ViewGroup.FOCUS_BLOCK_DESCENDANTS);
+        binding.overlayLayout.setImportantForAccessibility(enable
+                ? View.IMPORTANT_FOR_ACCESSIBILITY_AUTO
+                : View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);
         binding.overlayThumbnail.setClickable(enable);
         binding.overlayThumbnail.setLongClickable(enable);
         binding.overlayMetadataLayout.setClickable(enable);
