@@ -45,11 +45,9 @@ import com.google.common.collect.ForwardingMap;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Sets;
 import com.google.common.net.HttpHeaders;
-import org.schabi.newpipe.extractor.NewPipe;
 import org.schabi.newpipe.extractor.ServiceList;
 import org.schabi.newpipe.extractor.StreamingService;
 import org.schabi.newpipe.extractor.exceptions.ExtractionException;
-import org.schabi.newpipe.extractor.services.youtube.YoutubeSessionPoTokenProvider;
 import org.schabi.newpipe.extractor.services.youtube.extractors.YoutubeStreamExtractor;
 import org.schabi.newpipe.extractor.stream.AudioStream;
 import org.schabi.newpipe.extractor.stream.StreamInfo;
@@ -497,19 +495,13 @@ public final class YoutubeHttpDataSource extends BaseDataSource implements HttpD
                 }
             }
 
-            if (responseCode == 403) {
-                if (retryCount >= 1) {
-                    throw new RuntimeException("403 error. Your IP is temporarily blocked from "
-                            + "accessing this video.");
-                }
-                final YoutubeSessionPoTokenProvider provider =
-                        NewPipe.getYoutubeSessionPoTokenProvider();
-                if (provider instanceof LocalDomPoTokenProvider) {
-                    ((LocalDomPoTokenProvider) provider).invalidateVisitorData();
-                }
-                retryCount++;
-                retryCounts.put(new AbstractMap.SimpleEntry<>(streamId, itag), retryCount);
-            }
+//            if (responseCode == 403) {
+//                if (retryCount >= 1) {
+//                    throw new RuntimeException("403 error. You IP is temporarily blocked from accessing this video.");
+//                }
+//                retryCount ++;
+//                retryCounts.put(new AbstractMap.SimpleEntry<>(streamId, itag), retryCount);
+//            }
 
             final InputStream errorStream = httpURLConnection.getErrorStream();
             byte[] errorResponseBody;
