@@ -537,8 +537,8 @@ class LocalDomPoTokenProvider(context: Context) :
     companion object {
         private const val TAG = "SabrLocalDomPoToken"
         private const val PREFS = "sabr_local_dom_video_token_cache"
-        private const val TOKEN_TTL_MS = 6L * 60L * 60L * 1000L
-        private const val VISITOR_DATA_TTL_MS = 6L * 60L * 60L * 1000L
+        private const val TOKEN_TTL_MS = 1L * 60L * 60L * 1000L
+        private const val VISITOR_DATA_TTL_MS = 1L * 60L * 60L * 1000L
         @Volatile
         private var sharedInstance: LocalDomPoTokenProvider? = null
 
