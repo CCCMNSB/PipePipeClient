@@ -261,9 +261,6 @@ public class App extends MultiDexApplication {
             case "tv_simply":
                 return new YoutubePoTokenClientContext("TVHTML5_SIMPLY", () -> "1.0",
                         YoutubeParsingHelper.WEB_USER_AGENT);
-            case "tv_downgraded":
-                return new YoutubePoTokenClientContext("TVHTML5", () -> "5.20260114",
-                        "Mozilla/5.0 (ChromiumStylePlatform) Cobalt/Version");
             default:
                 return null;
         }
