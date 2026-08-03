@@ -1,13 +1,16 @@
 package org.schabi.newpipe.player.datasource;
 
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.os.SystemClock;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.preference.PreferenceManager;
 
 import org.schabi.newpipe.App;
+import org.schabi.newpipe.R;
 import org.schabi.newpipe.player.PlaybackStartupTrace;
 import org.schabi.newpipe.player.SabrBackoffCoordinator;
 import org.schabi.newpipe.extractor.exceptions.ExtractionException;
@@ -676,7 +679,8 @@ public final class SabrSessionStore {
             throw new IOException("SABR extractor info is missing for " + videoId);
         }
         final YoutubeSabrInfo info = Objects.requireNonNull(extractorInfo);
-        final YoutubeSabrFormat audioFormat = pickAudioFormat(info, preferredAudioTrackId);
+        final YoutubeSabrFormat audioFormat = pickAudioFormat(
+                App.getApp(), info, preferredAudioTrackId);
         final YoutubeSabrFormat videoFormat = pickVideoFormat(info, preferredVideoItag);
         if (audioFormat == null || videoFormat == null) {
             throw new IOException("SABR: could not select audio/video formats for " + videoId);
@@ -705,7 +709,7 @@ public final class SabrSessionStore {
         if (!isUsableExtractorInfo(info, streamInfo.getId())) {
             return;
         }
-        final YoutubeSabrFormat audioFormat = pickAudioFormat(info,
+        final YoutubeSabrFormat audioFormat = pickAudioFormat(context, info,
                 PREFERRED_AUDIO.get(streamInfo.getId()));
         final YoutubeSabrFormat videoFormat = pickVideoFormat(info, selectedStream.getItag());
         if (audioFormat == null || videoFormat == null) {
@@ -1066,17 +1070,28 @@ public final class SabrSessionStore {
                 && !info.getFormats().isEmpty();
     }
 
-    private static YoutubeSabrFormat pickAudioFormat(@NonNull final YoutubeSabrInfo info,
+    private static YoutubeSabrFormat pickAudioFormat(@NonNull final Context context,
+                                                     @NonNull final YoutubeSabrInfo info,
                                                      @Nullable final String preferredTrackId) {
-        if (preferredTrackId == null) {
-            return info.findBestAudioFormat();
-        }
+        final SharedPreferences preferences =
+                PreferenceManager.getDefaultSharedPreferences(context);
+        final String preferredLanguage = preferences.getString(
+                context.getString(R.string.preferred_audio_language_key), "original");
+        return pickAudioFormat(info, preferredTrackId, preferredLanguage);
+    }
+
+    static YoutubeSabrFormat pickAudioFormat(@NonNull final YoutubeSabrInfo info,
+                                             @Nullable final String preferredTrackId,
+                                             @Nullable final String preferredLanguage) {
         YoutubeSabrFormat best = null;
         for (final YoutubeSabrFormat f : info.getFormats()) {
             if (!f.isAudio()) {
                 continue;
             }
-            if (!preferredTrackId.equals(f.getAudioTrackId())) {
+            final boolean matches = preferredTrackId != null
+                    ? preferredTrackId.equals(f.getAudioTrackId())
+                    : matchesAudioLanguage(preferredLanguage, f.getAudioTrackId());
+            if (!matches) {
                 continue;
             }
             if (best == null || f.getBitrate() > best.getBitrate()) {
@@ -1084,6 +1099,15 @@ public final class SabrSessionStore {
             }
         }
         return best != null ? best : info.findBestAudioFormat();
+    }
+
+    private static boolean matchesAudioLanguage(@Nullable final String preferredLanguage,
+                                                @Nullable final String trackId) {
+        if (preferredLanguage == null || "original".equals(preferredLanguage)
+                || trackId == null) {
+            return false;
+        }
+        return preferredLanguage.equals(trackId.split("[._-]", 2)[0]);
     }
 
     private static YoutubeSabrFormat pickVideoFormat(@NonNull final YoutubeSabrInfo info,
