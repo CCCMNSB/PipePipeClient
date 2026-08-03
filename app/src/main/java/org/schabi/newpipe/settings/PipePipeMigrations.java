@@ -33,12 +33,22 @@ public final class PipePipeMigrations {
         }
     };
 
+    public static final Migration MIGRATION_2_3 = new Migration(2, 3) {
+        @Override
+        protected void migrate(final Context context, final SharedPreferences preferences) {
+            preferences.edit()
+                    .remove(context.getString(R.string.youtube_player_client_key))
+                    .apply();
+        }
+    };
+
     private static final Migration[] PIPEPIPE_MIGRATIONS = {
             MIGRATION_0_1,
             MIGRATION_1_2,
+            MIGRATION_2_3,
     };
 
-    public static final int VERSION = 2;
+    public static final int VERSION = 3;
 
     public static void initMigrations(final Context context, final boolean isFirstRun) {
         final SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(context);
