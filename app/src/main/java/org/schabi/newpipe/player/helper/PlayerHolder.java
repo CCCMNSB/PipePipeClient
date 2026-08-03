@@ -165,6 +165,11 @@ public final class PlayerHolder {
 
             playerService = localBinder.getService();
             player = localBinder.getPlayer();
+            if (player == null) {
+                Log.w(TAG, "Ignoring connection to a player service without a player");
+                unbind(getCommonContext());
+                return;
+            }
             if (listener != null) {
                 listener.onServiceConnected(player, playerService, playAfterConnect);
             }

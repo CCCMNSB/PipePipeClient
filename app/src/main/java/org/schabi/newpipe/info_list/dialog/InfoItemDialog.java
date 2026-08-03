@@ -13,6 +13,9 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
 import androidx.fragment.app.Fragment;
+import androidx.lifecycle.DefaultLifecycleObserver;
+import androidx.lifecycle.Lifecycle;
+import androidx.lifecycle.LifecycleOwner;
 import androidx.preference.PreferenceManager;
 
 import org.schabi.newpipe.App;
@@ -71,13 +74,28 @@ public final class InfoItemDialog {
                 .map(entry -> entry.getString(activity)).toArray(String[]::new);
 
         // Call an entry's action / onClick method when the entry is selected.
-        final DialogInterface.OnClickListener action = (d, index) ->
+        final DialogInterface.OnClickListener action = (d, index) -> {
+            if (fragment.getView() == null
+                    || !fragment.getViewLifecycleOwner().getLifecycle().getCurrentState()
+                    .isAtLeast(Lifecycle.State.STARTED)) {
+                return;
+            }
             entries.get(index).action.onClick(fragment, info);
+        };
 
         dialog = new AlertDialog.Builder(activity)
                 .setCustomTitle(bannerView)
                 .setItems(items, action)
                 .create();
+
+        final Lifecycle viewLifecycle = fragment.getViewLifecycleOwner().getLifecycle();
+        viewLifecycle.addObserver(new DefaultLifecycleObserver() {
+            @Override
+            public void onDestroy(@NonNull final LifecycleOwner owner) {
+                dialog.dismiss();
+                viewLifecycle.removeObserver(this);
+            }
+        });
 
     }
 

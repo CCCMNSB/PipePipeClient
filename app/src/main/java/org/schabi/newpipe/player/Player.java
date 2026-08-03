@@ -1497,7 +1497,17 @@ public final class Player implements
                             + bitmap.getHeight() + "], from = [" + from + "]");
                 }
 
-                currentThumbnail = bitmap;
+                // Picasso owns the bitmap passed to Targets and may reuse it for other requests.
+                // Keep a player-owned copy because the thumbnail is also retained by the media
+                // session and notification after this callback returns.
+                if (bitmap.isRecycled()) {
+                    Log.w(TAG, "Ignoring a recycled player thumbnail");
+                    currentThumbnail = null;
+                } else {
+                    currentThumbnail = bitmap.copy(
+                            bitmap.getConfig() == null
+                                    ? Bitmap.Config.ARGB_8888 : bitmap.getConfig(), false);
+                }
                 NotificationUtil.getInstance()
                         .createNotificationIfNeededAndUpdate(Player.this, false);
                 // there is a new thumbnail, so changed the end screen thumbnail, too.
@@ -5192,7 +5202,7 @@ case ERROR_CODE_DECODER_INIT_FAILED: {
                     break;
                 case MINIMIZE_ON_EXIT_MODE_POPUP:
                     setRecovery();
-                    NavigationHelper.playOnPopupPlayer(getParentActivity(), playQueue, true);
+                    NavigationHelper.playOnPopupPlayer(context, playQueue, true);
                     break;
                 case MINIMIZE_ON_EXIT_MODE_NONE: default:
                     pause();

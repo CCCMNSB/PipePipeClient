@@ -334,7 +334,7 @@ public class MediaSessionManager {
         final boolean showThumbnail = player.getPrefs().getBoolean(
                 player.getContext().getString(R.string.show_thumbnail_key), true);
         Optional.ofNullable(player.getThumbnail())
-                .filter(bitmap -> showThumbnail)
+                .filter(bitmap -> showThumbnail && !bitmap.isRecycled())
                 .ifPresent(bitmap -> {
                     builder.putBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART, bitmap);
                     builder.putBitmap(MediaMetadataCompat.METADATA_KEY_DISPLAY_ICON, bitmap);

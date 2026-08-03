@@ -167,7 +167,7 @@ public final class PicassoHelper {
     public static RequestCreator loadScaledDownThumbnail(final Context context, final String url,
                                                          final boolean shouldSetTag) {
         // scale down the notification thumbnail for performance
-        final RequestCreator requestCreator = PicassoHelper.loadThumbnail(url)
+        final RequestCreator requestCreator = loadImageDefault(url, R.drawable.dummy_thumbnail)
                 .transform(transformation);
         return shouldSetTag ? requestCreator.tag(PLAYER_THUMBNAIL_TAG) : requestCreator;
     }
