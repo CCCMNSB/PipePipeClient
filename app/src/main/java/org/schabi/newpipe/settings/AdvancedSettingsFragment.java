@@ -159,7 +159,7 @@ public class AdvancedSettingsFragment extends BasePreferenceFragment implements 
         App.reconcileYoutubePlayerClient(requireContext());
         preference.setValue(defaultPreferences.getString(
                 getString(R.string.youtube_player_client_key),
-                loggedIn ? "tv_downgraded" : "android_vr"));
+                loggedIn ? "tv_downgraded" : "visionos"));
     }
 
     @Override
