@@ -72,7 +72,6 @@ public class App extends MultiDexApplication {
     public static final String PACKAGE_NAME = BuildConfig.APPLICATION_ID;
     private static final String TAG = App.class.toString();
     private static final String YOUTUBE_WEB_CLIENT_NAME = "WEB";
-    private static final String YOUTUBE_MWEB_CLIENT_NAME = "MWEB";
     private static final String YOUTUBE_ANDROID_VR_CLIENT_NAME = "ANDROID_VR";
     private static App app;
 
@@ -171,7 +170,7 @@ public class App extends MultiDexApplication {
         final String selectedClient = prefs.getString(playerClientKey, defaultClient);
         final boolean allowed = loggedIn
                 ? "tv_downgraded".equals(selectedClient)
-                : "mweb".equals(selectedClient) || "android_vr".equals(selectedClient);
+                : "android_vr".equals(selectedClient);
         final String reconciledClient = allowed ? selectedClient : defaultClient;
 
         if (!reconciledClient.equals(selectedClient)) {
@@ -244,10 +243,6 @@ public class App extends MultiDexApplication {
     private static YoutubePoTokenClientContext resolveYoutubePoTokenClientContext(
             @NonNull final String selectedClient) {
         switch (selectedClient) {
-            case "mweb":
-                return new YoutubePoTokenClientContext(YOUTUBE_MWEB_CLIENT_NAME,
-                        YoutubeParsingHelper::getClientVersion,
-                        YoutubeParsingHelper.MWEB_USER_AGENT);
             case "web":
                 return new YoutubePoTokenClientContext(YOUTUBE_WEB_CLIENT_NAME,
                         YoutubeParsingHelper::getClientVersion,
