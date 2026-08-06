@@ -307,9 +307,7 @@ public class App extends MultiDexApplication {
 
 
     protected Downloader getDownloader() {
-        final SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
-        final DownloaderImpl downloader = DownloaderImpl.init(null, prefs.getBoolean(
-                getString(R.string.use_dns_over_https_fallback_key), false));
+        final DownloaderImpl downloader = DownloaderImpl.init(null);
         setCookiesToDownloader(downloader);
         return downloader;
     }
