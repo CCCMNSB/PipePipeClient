@@ -123,6 +123,9 @@ public class App extends MultiDexApplication {
 
         // Initialize settings first because others inits can use its values
         NewPipeSettings.initSettings(this);
+        // Set this before any activity is created so AppCompat can apply the selected night mode
+        // while attaching the activity's base context.
+        ThemeHelper.setDayNightMode(this);
 
         // Initialize Android Auto component state based on preference
         DeviceUtils.updateAndroidAutoComponentState(this);
