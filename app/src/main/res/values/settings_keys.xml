@@ -1782,4 +1782,12 @@
         <item>tv_downgraded</item>
     </string-array>
     <string name="sabr_backoff_notification_channel_id">sabr_backoff</string>
+    <string name="sponsor_block_skip_mode_automatic_value" translatable="false">automatic</string>
+    <string name="sponsor_block_skip_mode_manual_value" translatable="false">manual</string>
+    <string name="sponsor_block_skip_mode_highlight_value" translatable="false">highlight</string>
+    <string-array name="sponsor_block_category_mode_values">
+        <item>@string/sponsor_block_skip_mode_automatic_value</item>
+        <item>@string/sponsor_block_skip_mode_manual_value</item>
+        <item>@string/sponsor_block_skip_mode_highlight_value</item>
+    </string-array>
 </resources>
