@@ -6,19 +6,19 @@ import static org.schabi.newpipe.player.helper.PlayerDataSource.LIVE_STREAM_EDGE
 import android.net.Uri;
 import android.util.Log;
 
-import androidx.media3.common.C;
-import androidx.media3.common.MediaItem;
-import androidx.media3.exoplayer.source.MediaSource;
-import androidx.media3.exoplayer.source.ProgressiveMediaSource;
-import androidx.media3.exoplayer.dash.DashMediaSource;
-import androidx.media3.exoplayer.dash.manifest.DashManifest;
-import androidx.media3.exoplayer.dash.manifest.DashManifestParser;
-import androidx.media3.exoplayer.hls.HlsMediaSource;
-import androidx.media3.exoplayer.hls.playlist.HlsPlaylist;
-import androidx.media3.exoplayer.hls.playlist.HlsPlaylistParser;
-import androidx.media3.exoplayer.smoothstreaming.SsMediaSource;
-import androidx.media3.exoplayer.smoothstreaming.manifest.SsManifest;
-import androidx.media3.exoplayer.smoothstreaming.manifest.SsManifestParser;
+import com.google.android.exoplayer2.C;
+import com.google.android.exoplayer2.MediaItem;
+import com.google.android.exoplayer2.source.MediaSource;
+import com.google.android.exoplayer2.source.ProgressiveMediaSource;
+import com.google.android.exoplayer2.source.dash.DashMediaSource;
+import com.google.android.exoplayer2.source.dash.manifest.DashManifest;
+import com.google.android.exoplayer2.source.dash.manifest.DashManifestParser;
+import com.google.android.exoplayer2.source.hls.HlsMediaSource;
+import com.google.android.exoplayer2.source.hls.playlist.HlsPlaylist;
+import com.google.android.exoplayer2.source.hls.playlist.HlsPlaylistParser;
+import com.google.android.exoplayer2.source.smoothstreaming.SsMediaSource;
+import com.google.android.exoplayer2.source.smoothstreaming.manifest.SsManifest;
+import com.google.android.exoplayer2.source.smoothstreaming.manifest.SsManifestParser;
 import com.grack.nanojson.JsonObject;
 import com.grack.nanojson.JsonParser;
 import com.grack.nanojson.JsonParserException;
@@ -49,10 +49,9 @@ import org.schabi.newpipe.player.mediaitem.StreamInfoTag;
 import org.schabi.newpipe.util.StreamTypeUtil;
 import org.schabi.newpipe.App;
 import org.schabi.newpipe.extractor.exceptions.ExtractionException;
-import org.schabi.newpipe.extractor.services.youtube.sabr.YoutubeSabrFormat;
 import org.schabi.newpipe.extractor.services.youtube.sabr.YoutubeSabrInfo;
 import org.schabi.newpipe.player.datasource.SabrDashMediaSource;
-import org.schabi.newpipe.player.datasource.SabrSessionStore;
+import org.schabi.newpipe.player.datasource.SabrSessionHelper;
 import org.schabi.newpipe.player.datasource.SabrSourceSpec;
 
 import androidx.annotation.NonNull;
@@ -150,9 +149,21 @@ public interface PlaybackResolver extends Resolver<StreamInfo, MediaSource> {
                                         @NonNull final String cacheKey,
                                         @NonNull final MediaItemTag metadata)
             throws IOException {
+        return buildMediaSource(dataSource, stream, streamInfo, cacheKey, metadata, 0);
+    }
+
+    @NonNull
+    static MediaSource buildMediaSource(@NonNull final PlayerDataSource dataSource,
+                                        @NonNull final Stream stream,
+                                        @NonNull final StreamInfo streamInfo,
+                                        @NonNull final String cacheKey,
+                                        @NonNull final MediaItemTag metadata,
+                                        final long initialPositionMs)
+            throws IOException {
         StreamingService service = streamInfo.getService();
         if (ServiceList.YouTube.equals(service)) {
-            return createYoutubeMediaSource(stream, streamInfo, dataSource, cacheKey, metadata);
+            return createYoutubeMediaSource(stream, streamInfo, dataSource, cacheKey, metadata,
+                    initialPositionMs);
         } else if (ServiceList.NicoNico.equals(service)) {
             return createNicoNicoMediaSource(stream, streamInfo, dataSource, cacheKey, metadata);
         } else if (ServiceList.BiliBili.equals(service)) {
@@ -350,7 +361,8 @@ public interface PlaybackResolver extends Resolver<StreamInfo, MediaSource> {
             final StreamInfo streamInfo,
             final PlayerDataSource dataSource,
             final String cacheKey,
-            final MediaItemTag metadata) throws IOException {
+            final MediaItemTag metadata,
+            final long initialPositionMs) throws IOException {
         if (!(stream instanceof AudioStream || stream instanceof VideoStream)) {
             throw new IOException("Try to generate a DASH manifest of a YouTube "
                     + stream.getClass() + " " + stream.getContent());
@@ -359,7 +371,7 @@ public interface PlaybackResolver extends Resolver<StreamInfo, MediaSource> {
         final StreamType streamType = streamInfo.getStreamType();
         if (streamType == StreamType.VIDEO_STREAM) {
             return createYoutubeMediaSourceOfVideoStreamType(dataSource, stream, streamInfo,
-                    cacheKey, metadata);
+                    cacheKey, metadata, initialPositionMs);
         } else if (streamType == StreamType.POST_LIVE_STREAM) {
             if (stream.getDeliveryMethod() == DeliveryMethod.HLS) {
                 return buildHlsMediaSource(dataSource, stream, cacheKey, metadata);
@@ -396,7 +408,8 @@ public interface PlaybackResolver extends Resolver<StreamInfo, MediaSource> {
             @NonNull final T stream,
             @NonNull final StreamInfo streamInfo,
             @NonNull final String cacheKey,
-            @NonNull final MediaItemTag metadata) throws IOException {
+            @NonNull final MediaItemTag metadata,
+            final long initialPositionMs) throws IOException {
         final DeliveryMethod deliveryMethod = stream.getDeliveryMethod();
         switch (deliveryMethod) {
             case PROGRESSIVE_HTTP:
@@ -452,7 +465,8 @@ public interface PlaybackResolver extends Resolver<StreamInfo, MediaSource> {
                                 .setCustomCacheKey(cacheKey)
                                 .build());
             case SABR:
-                return buildSabrMediaSource(stream, streamInfo, cacheKey, metadata);
+                return buildSabrMediaSource(dataSource, stream, streamInfo, cacheKey, metadata,
+                        initialPositionMs);
             default:
                 throw new IOException("Unsupported delivery method for YouTube contents: "
                         + deliveryMethod);
@@ -460,10 +474,12 @@ public interface PlaybackResolver extends Resolver<StreamInfo, MediaSource> {
     }
 
     @NonNull
-    private static MediaSource buildSabrMediaSource(@NonNull final Stream stream,
+    private static MediaSource buildSabrMediaSource(@NonNull final PlayerDataSource dataSource,
+                                                    @NonNull final Stream stream,
                                                     @NonNull final StreamInfo streamInfo,
                                                     @NonNull final String cacheKey,
-                                                    @NonNull final MediaItemTag metadata)
+                                                    @NonNull final MediaItemTag metadata,
+                                                    final long initialPositionMs)
             throws IOException {
         final String videoId = streamInfo.getId();
         final int preferredVideoItag =
@@ -471,55 +487,24 @@ public interface PlaybackResolver extends Resolver<StreamInfo, MediaSource> {
         final YoutubeSabrInfo sabrInfo = getSabrInfo(stream);
         final SabrSourceSpec spec;
         try {
-            spec = SabrSessionStore.createSourceSpec(videoId, preferredVideoItag, sabrInfo);
+            spec = SabrSessionHelper.createSourceSpec(videoId, preferredVideoItag,
+                    streamInfo.getAudioStreams(), sabrInfo);
         } catch (final ExtractionException e) {
             throw new IOException("Could not describe SABR source for " + videoId, e);
         }
-        enrichSabrAudioTracks(streamInfo, spec.getInfo());
         final MediaItem mediaItem = new MediaItem.Builder()
                 .setTag(metadata)
                 .setUri(Uri.parse("sabr://" + videoId))
                 .setCustomCacheKey(cacheKey)
                 .build();
-        return new SabrDashMediaSource(App.getApp(), mediaItem, spec);
+        return new SabrDashMediaSource(App.getApp(), mediaItem, spec, dataSource,
+                initialPositionMs);
     }
 
     @Nullable
     private static YoutubeSabrInfo getSabrInfo(@NonNull final Stream stream) {
         final Serializable info = stream.getDeliveryMethodInfo();
         return info instanceof YoutubeSabrInfo ? (YoutubeSabrInfo) info : null;
-    }
-
-    private static void enrichSabrAudioTracks(@NonNull final StreamInfo streamInfo,
-                                              @NonNull final YoutubeSabrInfo info) {
-        final List<AudioStream> audioStreams = streamInfo.getAudioStreams();
-        if (audioStreams.isEmpty()) {
-            return;
-        }
-        final AudioStream template = audioStreams.get(0);
-        final Set<String> present = new HashSet<>();
-        for (final AudioStream a : audioStreams) {
-            present.add(Objects.toString(a.getAudioTrackId(), ""));
-        }
-        for (final YoutubeSabrFormat f : info.getFormats()) {
-            final String trackId = f.getAudioTrackId();
-            if (!f.isAudio() || trackId == null || !present.add(trackId)) {
-                continue;
-            }
-            final String langPart = trackId.split("\\.")[0];
-            final String displayName = f.getAudioTrackDisplayName();
-            audioStreams.add(new AudioStream.Builder()
-                    .setId(template.getId() + "-" + trackId)
-                    .setContent(template.getContent(), template.isUrl())
-                    .setMediaFormat(template.getFormat())
-                    .setAverageBitrate(f.getBitrate())
-                    .setItagItem(template.getItagItem())
-                    .setDeliveryMethod(DeliveryMethod.SABR)
-                    .setAudioTrackId(trackId)
-                    .setAudioTrackName(displayName != null ? displayName : langPart)
-                    .setAudioLocale(langPart.split("-")[0])
-                    .build());
-        }
     }
 
     @NonNull

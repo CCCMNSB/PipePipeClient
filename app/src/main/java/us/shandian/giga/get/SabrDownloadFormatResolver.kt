@@ -1,6 +1,5 @@
 package us.shandian.giga.get
 
-import org.schabi.newpipe.extractor.services.youtube.sabr.YoutubeSabrFormat
 import org.schabi.newpipe.extractor.services.youtube.sabr.YoutubeSabrInfo
 import java.io.File
 import java.io.IOException
@@ -17,38 +16,18 @@ internal object SabrDownloadFormatResolver {
     fun selectedAudioFormat(
         info: YoutubeSabrInfo,
         recoveries: Array<MissionRecoveryInfo>,
-    ): YoutubeSabrFormat {
+    ): YoutubeSabrInfo.Format? {
         val audioRecovery = recoveries.firstOrNull { it.kind == 'a' }
         return audioRecovery?.let { findAudioFormat(info, it) }
-            ?: if (recoveries.any { it.kind == 'v' }) {
-                findLightweightAudioFormat(info)
-            } else {
-                null
-            }
-            ?: info.findBestAudioFormat()
-            ?: throw SabrDownloadException(
-                SabrDownloadException.Reason.FORMAT,
-                "SABR download failed: missing audio format",
-            )
     }
 
     @Throws(IOException::class)
     fun selectedVideoFormat(
         info: YoutubeSabrInfo,
         recoveries: Array<MissionRecoveryInfo>,
-    ): YoutubeSabrFormat {
+    ): YoutubeSabrInfo.Format? {
         val videoRecovery = recoveries.firstOrNull { it.kind == 'v' }
         return videoRecovery?.let { findVideoFormat(info, it) }
-            ?: if (recoveries.any { it.kind == 'a' }) {
-                findLightweightVideoFormat(info)
-            } else {
-                null
-            }
-            ?: info.findLowestVideoFormat()
-            ?: throw SabrDownloadException(
-                SabrDownloadException.Reason.FORMAT,
-                "SABR download failed: missing video format",
-            )
     }
 
     @Throws(IOException::class)
@@ -74,7 +53,7 @@ internal object SabrDownloadFormatResolver {
     private fun findAudioFormat(
         info: YoutubeSabrInfo,
         recovery: MissionRecoveryInfo,
-    ): YoutubeSabrFormat {
+    ): YoutubeSabrInfo.Format {
         return info.formats.firstOrNull { format ->
             format.isAudio &&
                 (recovery.itag <= 0 || format.itag == recovery.itag) &&
@@ -89,7 +68,7 @@ internal object SabrDownloadFormatResolver {
     private fun findVideoFormat(
         info: YoutubeSabrInfo,
         recovery: MissionRecoveryInfo,
-    ): YoutubeSabrFormat {
+    ): YoutubeSabrInfo.Format {
         return info.formats.firstOrNull { format ->
             format.isVideo && (recovery.itag <= 0 || format.itag == recovery.itag)
         } ?: throw SabrDownloadException(
@@ -98,32 +77,4 @@ internal object SabrDownloadFormatResolver {
         )
     }
 
-    private fun findLightweightAudioFormat(info: YoutubeSabrInfo): YoutubeSabrFormat? {
-        return info.formats
-            .filter { it.isAudio }
-            .sortedWith(
-                compareBy<YoutubeSabrFormat> { !it.isOriginalAudio }
-                    .thenBy { it.isDrc }
-                    .thenBy { normalizedBitrate(it) },
-            )
-            .firstOrNull()
-    }
-
-    private fun findLightweightVideoFormat(info: YoutubeSabrInfo): YoutubeSabrFormat? {
-        return info.formats
-            .filter { it.isVideo }
-            .sortedWith(
-                compareBy<YoutubeSabrFormat> { normalizedHeight(it) }
-                    .thenBy { normalizedBitrate(it) },
-            )
-            .firstOrNull()
-    }
-
-    private fun normalizedBitrate(format: YoutubeSabrFormat): Int {
-        return format.bitrate.takeIf { it > 0 } ?: Int.MAX_VALUE
-    }
-
-    private fun normalizedHeight(format: YoutubeSabrFormat): Int {
-        return format.height.takeIf { it > 0 } ?: Int.MAX_VALUE
-    }
 }

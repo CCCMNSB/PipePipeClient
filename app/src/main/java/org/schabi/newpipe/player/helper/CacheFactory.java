@@ -6,16 +6,17 @@ import android.util.Log;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-import androidx.media3.database.StandaloneDatabaseProvider;
-import androidx.media3.datasource.DataSource;
-import androidx.media3.datasource.DefaultDataSource;
-import androidx.media3.datasource.DefaultHttpDataSource;
-import androidx.media3.datasource.FileDataSource;
-import androidx.media3.datasource.TransferListener;
-import androidx.media3.datasource.cache.CacheDataSink;
-import androidx.media3.datasource.cache.CacheDataSource;
-import androidx.media3.datasource.cache.LeastRecentlyUsedCacheEvictor;
-import androidx.media3.datasource.cache.SimpleCache;
+import com.google.android.exoplayer2.database.StandaloneDatabaseProvider;
+import com.google.android.exoplayer2.upstream.DataSource;
+import com.google.android.exoplayer2.upstream.DefaultDataSource;
+import com.google.android.exoplayer2.upstream.DefaultHttpDataSource;
+import com.google.android.exoplayer2.upstream.FileDataSource;
+import com.google.android.exoplayer2.upstream.TransferListener;
+import com.google.android.exoplayer2.upstream.cache.CacheDataSink;
+import com.google.android.exoplayer2.upstream.cache.CacheDataSource;
+import com.google.android.exoplayer2.upstream.cache.CacheKeyFactory;
+import com.google.android.exoplayer2.upstream.cache.LeastRecentlyUsedCacheEvictor;
+import com.google.android.exoplayer2.upstream.cache.SimpleCache;
 
 import org.schabi.newpipe.player.datasource.YoutubeHttpDataSource;
 
@@ -35,12 +36,14 @@ import java.lang.reflect.Method;
     private final String userAgent;
     private final TransferListener transferListener;
     private final DataSource.Factory upstreamDataSourceFactory;
+    @Nullable private final CacheKeyFactory cacheKeyFactory;
 
     public static class Builder {
         private final Context context;
         private final String userAgent;
         private final TransferListener transferListener;
         private DataSource.Factory upstreamDataSourceFactory;
+        @Nullable private CacheKeyFactory cacheKeyFactory;
 
         Builder(@NonNull final Context context,
                 @NonNull final String userAgent,
@@ -55,20 +58,26 @@ import java.lang.reflect.Method;
             this.upstreamDataSourceFactory = upstreamDataSourceFactory;
         }
 
+        public void setCacheKeyFactory(@Nullable final CacheKeyFactory cacheKeyFactory) {
+            this.cacheKeyFactory = cacheKeyFactory;
+        }
+
         public CacheFactory build() {
             return new CacheFactory(context, userAgent, transferListener,
-                    upstreamDataSourceFactory);
+                    upstreamDataSourceFactory, cacheKeyFactory);
         }
     }
 
     private CacheFactory(@NonNull final Context context,
                          @NonNull final String userAgent,
                          @NonNull final TransferListener transferListener,
-                         @Nullable final DataSource.Factory upstreamDataSourceFactory) {
+                         @Nullable final DataSource.Factory upstreamDataSourceFactory,
+                         @Nullable final CacheKeyFactory cacheKeyFactory) {
         this.context = context;
         this.userAgent = userAgent;
         this.transferListener = transferListener;
         this.upstreamDataSourceFactory = upstreamDataSourceFactory;
+        this.cacheKeyFactory = cacheKeyFactory;
 
         final File cacheDir = new File(context.getExternalCacheDir(), CACHE_FOLDER_NAME);
         if (!cacheDir.exists()) {
@@ -121,7 +130,8 @@ import java.lang.reflect.Method;
 
         final FileDataSource fileSource = new FileDataSource();
         final CacheDataSink dataSink = new CacheDataSink(cache, maxFileSize);
-        return new CacheDataSource(cache, dataSource, fileSource, dataSink, CACHE_FLAGS, null);
+        return new CacheDataSource(cache, dataSource, fileSource, dataSink, CACHE_FLAGS, null,
+                cacheKeyFactory);
     }
 
     private static void clearCacheFolderLock(File cacheDir) {

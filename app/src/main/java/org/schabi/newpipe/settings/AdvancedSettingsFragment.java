@@ -153,8 +153,8 @@ public class AdvancedSettingsFragment extends BasePreferenceFragment implements 
             preference.setEntries(new CharSequence[]{entries[2]});
             preference.setEntryValues(new CharSequence[]{values[2]});
         } else {
-            preference.setEntries(new CharSequence[]{entries[0], entries[1]});
-            preference.setEntryValues(new CharSequence[]{values[0], values[1]});
+            preference.setEntries(new CharSequence[]{entries[0], entries[1], entries[3]});
+            preference.setEntryValues(new CharSequence[]{values[0], values[1], values[3]});
         }
         App.reconcileYoutubePlayerClient(requireContext());
         preference.setValue(defaultPreferences.getString(

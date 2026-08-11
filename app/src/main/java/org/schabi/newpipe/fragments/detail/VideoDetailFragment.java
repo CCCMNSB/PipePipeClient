@@ -46,8 +46,8 @@ import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentManager;
 import androidx.preference.PreferenceManager;
 
-import androidx.media3.common.PlaybackException;
-import androidx.media3.common.PlaybackParameters;
+import com.google.android.exoplayer2.PlaybackException;
+import com.google.android.exoplayer2.PlaybackParameters;
 import com.google.android.material.appbar.AppBarLayout;
 import com.google.android.material.bottomsheet.BottomSheetBehavior;
 import com.google.android.material.tabs.TabLayout;
@@ -88,7 +88,6 @@ import org.schabi.newpipe.local.history.HistoryRecordManager;
 import org.schabi.newpipe.player.PlayerService.PlayerType;
 import org.schabi.newpipe.player.Player;
 import org.schabi.newpipe.player.PlaybackStartupTrace;
-import org.schabi.newpipe.player.datasource.SabrSessionStore;
 import org.schabi.newpipe.player.event.OnKeyDownListener;
 import org.schabi.newpipe.player.event.PlayerServiceExtendedEventListener;
 import org.schabi.newpipe.player.helper.PlayerHelper;
@@ -1936,11 +1935,6 @@ public final class VideoDetailFragment
                 false);
         selectedVideoStreamIndex = ListHelper
                 .getDefaultResolutionIndex(activity, sortedVideoStreams);
-        if (selectedVideoStreamIndex >= 0
-                && selectedVideoStreamIndex < sortedVideoStreams.size()) {
-            SabrSessionStore.prewarm(requireContext(), info,
-                    sortedVideoStreams.get(selectedVideoStreamIndex));
-        }
         updateProgressInfo(info);
         initThumbnailViews(info);
         showMetaInfoInTextView(info.getMetaInfo(), binding.detailMetaInfoTextView,

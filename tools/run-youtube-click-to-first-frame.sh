@@ -8,11 +8,15 @@ frame_timeout_seconds="${FRAME_TIMEOUT_SECONDS:-30}"
 build_install="${BUILD_INSTALL:-true}"
 youtube_client="${YOUTUBE_CLIENT:-mweb}"
 benchmark_path="${BENCHMARK_PATH:-$youtube_client}"
-cookie_file="${COOKIE_FILE:-/tmp/token.txt}"
+cookie_file="${COOKIE_FILE-}"
 device_cookie_file="${DEVICE_COOKIE_FILE:-/data/local/tmp/pipepipe-click-benchmark-token.txt}"
 readonly adb_command="${ADB:-adb}"
 output="${OUTPUT:-../log/youtube-click-to-first-frame-$(date +%Y%m%d-%H%M%S).log}"
 jsonl="${JSONL_OUTPUT:-${output%.log}.jsonl}"
+
+if [[ -z "${COOKIE_FILE+x}" && -f /tmp/token.txt ]]; then
+  cookie_file=/tmp/token.txt
+fi
 
 mkdir -p "$(dirname "$output")" "$(dirname "$jsonl")"
 
@@ -180,7 +184,7 @@ for ((round=0; round<repetitions; round++)); do
   done
   if [[ -z "$summary" ]]; then
     echo "Round $round: first frame timed out" | tee -a "$output" >&2
-    $adb_command logcat -d -v threadtime -s PlaybackStartup:I SabrSessionStore:I SabrLocalDomPoToken:I \
+    $adb_command logcat -d -v threadtime -s PlaybackStartup:I SabrSessionHelper:I SabrLocalDomPoToken:I \
       >> "$output"
     exit 1
   fi
@@ -188,7 +192,7 @@ for ((round=0; round<repetitions; round++)); do
 done
 
 $adb_command logcat -d -v threadtime \
-  | rg 'PIPEPIPE_PLAYBACK_STARTUP|SabrSessionStore|SabrLocalDomPoToken' \
+  | rg 'PIPEPIPE_PLAYBACK_STARTUP|SabrSessionHelper|SabrLocalDomPoToken' \
   >> "$output" || true
 
 echo "Click-to-first-frame results: $jsonl"
