@@ -1097,4 +1097,11 @@
 <string name="clear_subscriptions_summary">Remove all subscribed channels from PipePipe</string>
 <string name="clear_subscriptions_confirmation">Clear all subscriptions? This cannot be undone.</string>
 <string name="subscriptions_cleared">Subscriptions cleared</string>
+<string name="fetch_subscription_details_title">Fetch channel details?</string>
+<string name="fetch_subscription_details_message">Fetching channel thumbnails and subscriber counts requires visiting each subscribed channel. The time required depends on the number of subscriptions and may be long for a large subscription list.</string>
+<string name="fetch">Fetch</string>
+<string name="skip">Skip</string>
+<string name="subscription_details_update_ongoing">Fetching channel details…</string>
+<string name="subscription_details_update_complete">Channel details updated</string>
+<string name="subscription_details_update_failed">Could not update channel details</string>
 </resources>

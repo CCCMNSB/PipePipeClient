@@ -9,6 +9,7 @@ import androidx.room.PrimaryKey;
 
 import org.schabi.newpipe.extractor.channel.ChannelInfo;
 import org.schabi.newpipe.extractor.channel.ChannelInfoItem;
+import org.schabi.newpipe.extractor.subscription.SubscriptionItem;
 import org.schabi.newpipe.util.Constants;
 
 import static org.schabi.newpipe.database.subscription.SubscriptionEntity.SUBSCRIPTION_SERVICE_ID;
@@ -59,6 +60,15 @@ public class SubscriptionEntity {
         result.setUrl(info.getUrl());
         result.setData(info.getName(), info.getAvatarUrl(), info.getDescription(),
                 info.getSubscriberCount());
+        return result;
+    }
+
+    @Ignore
+    public static SubscriptionEntity from(@NonNull final SubscriptionItem item) {
+        final SubscriptionEntity result = new SubscriptionEntity();
+        result.setServiceId(item.getServiceId());
+        result.setUrl(item.getUrl());
+        result.setName(item.getName());
         return result;
     }
 

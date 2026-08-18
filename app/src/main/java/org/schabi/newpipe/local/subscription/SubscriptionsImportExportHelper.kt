@@ -23,6 +23,9 @@ import java.util.Locale
  * activity result launchers.
  */
 class SubscriptionsImportExportHelper(private val fragment: Fragment) {
+    @Suppress("unused")
+    private val detailsCoordinator = SubscriptionImportDetailsCoordinator(fragment)
+
     private val requestExportLauncher =
         fragment.registerForActivityResult(StartActivityForResult(), this::requestExportResult)
     private val requestImportLauncher =
@@ -67,8 +70,7 @@ class SubscriptionsImportExportHelper(private val fragment: Fragment) {
     private fun requestImportResult(result: ActivityResult) {
         val inputUri = result.data?.data
         if (inputUri != null && result.resultCode == Activity.RESULT_OK) {
-            ImportConfirmationDialog.show(
-                fragment,
+            fragment.requireContext().startService(
                 Intent(fragment.requireContext(), SubscriptionsImportService::class.java)
                     .putExtra(KEY_MODE, PREVIOUS_EXPORT_MODE)
                     .putExtra(KEY_VALUE, inputUri)
