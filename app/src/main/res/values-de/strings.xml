@@ -993,4 +993,8 @@
 <string name="import_youtube_subscriptions_summary">Abonnements aus Google Takeout importieren</string>
 <string name="import_soundcloud_subscriptions_title">Von SoundCloud importieren</string>
 <string name="import_soundcloud_subscriptions_summary">Abonnements von einem SoundCloud-Profil importieren</string>
+<string name="clear_subscriptions_title">Abonnements löschen</string>
+<string name="clear_subscriptions_summary">Alle abonnierten Kanäle aus PipePipe entfernen</string>
+<string name="clear_subscriptions_confirmation">Alle Abonnements löschen? Dies kann nicht rückgängig gemacht werden.</string>
+<string name="subscriptions_cleared">Abonnements gelöscht</string>
 </resources>

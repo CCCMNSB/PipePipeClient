@@ -111,6 +111,12 @@ class SubscriptionManager(context: Context) {
             .observeOn(AndroidSchedulers.mainThread())
     }
 
+    fun deleteAllSubscriptions(): Completable {
+        return Completable.fromAction { subscriptionTable.deleteAll() }
+            .subscribeOn(Schedulers.io())
+            .observeOn(AndroidSchedulers.mainThread())
+    }
+
     fun insertSubscription(subscriptionEntity: SubscriptionEntity, info: ChannelInfo) {
         database.runInTransaction {
             val subscriptionId = subscriptionTable.insert(subscriptionEntity)

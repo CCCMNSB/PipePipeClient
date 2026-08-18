@@ -1102,4 +1102,8 @@ nSự khác biệt giữa hai loại này là cái nào nhanh thường thiếu 
 <string name="import_youtube_subscriptions_summary">Nhập các đăng ký từ Google Takeout</string>
 <string name="import_soundcloud_subscriptions_title">Nhập từ SoundCloud</string>
 <string name="import_soundcloud_subscriptions_summary">Nhập các đăng ký từ một hồ sơ SoundCloud</string>
+<string name="clear_subscriptions_title">Xóa đăng ký</string>
+<string name="clear_subscriptions_summary">Xóa tất cả các kênh đã đăng ký khỏi PipePipe</string>
+<string name="clear_subscriptions_confirmation">Xóa tất cả đăng ký? Hành động này không thể hoàn tác.</string>
+<string name="subscriptions_cleared">Đã xóa đăng ký</string>
 </resources>

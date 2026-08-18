@@ -1057,4 +1057,8 @@
 <string name="import_youtube_subscriptions_summary">从 Google Takeout 导入订阅</string>
 <string name="import_soundcloud_subscriptions_title">从 SoundCloud 导入</string>
 <string name="import_soundcloud_subscriptions_summary">从 SoundCloud 个人资料导入订阅</string>
+<string name="clear_subscriptions_title">清除订阅</string>
+<string name="clear_subscriptions_summary">从 PipePipe 中移除所有订阅频道</string>
+<string name="clear_subscriptions_confirmation">清除所有订阅？此操作无法撤销。</string>
+<string name="subscriptions_cleared">订阅已清除</string>
 </resources>

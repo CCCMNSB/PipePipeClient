@@ -1016,4 +1016,8 @@
 <string name="import_youtube_subscriptions_summary">Google Takeoutから登録チャンネルをインポート</string>
 <string name="import_soundcloud_subscriptions_title">SoundCloudからインポート</string>
 <string name="import_soundcloud_subscriptions_summary">SoundCloudのプロフィールからサブスクリプションをインポート</string>
+<string name="clear_subscriptions_title">登録チャンネルを消去</string>
+<string name="clear_subscriptions_summary">PipePipeからすべての登録チャンネルを削除します</string>
+<string name="clear_subscriptions_confirmation">すべての登録チャンネルを消去しますか？この操作は元に戻せません。</string>
+<string name="subscriptions_cleared">登録チャンネルを消去しました</string>
 </resources>

@@ -987,4 +987,8 @@
 <string name="import_youtube_subscriptions_summary">Importa le iscrizioni da Google Takeout</string>
 <string name="import_soundcloud_subscriptions_title">Importa da SoundCloud</string>
 <string name="import_soundcloud_subscriptions_summary">Importa le iscrizioni da un profilo SoundCloud</string>
+<string name="clear_subscriptions_title">Cancella iscrizioni</string>
+<string name="clear_subscriptions_summary">Rimuovi tutti i canali a cui sei iscritto da PipePipe</string>
+<string name="clear_subscriptions_confirmation">Cancellare tutte le iscrizioni? Questa operazione non può essere annullata.</string>
+<string name="subscriptions_cleared">Iscrizioni cancellate</string>
 </resources>

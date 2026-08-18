@@ -23,6 +23,7 @@ import org.schabi.newpipe.extractor.NewPipe;
 import org.schabi.newpipe.extractor.ServiceList;
 import org.schabi.newpipe.extractor.localization.ContentCountry;
 import org.schabi.newpipe.extractor.localization.Localization;
+import org.schabi.newpipe.local.subscription.SubscriptionManager;
 import org.schabi.newpipe.local.subscription.SubscriptionsImportExportHelper;
 import org.schabi.newpipe.streams.io.NoFileManagerSafeGuard;
 import org.schabi.newpipe.streams.io.StoredFileHelper;
@@ -52,6 +53,7 @@ public class BackupSettingsFragment extends BasePreferenceFragment {
             = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US);
 
     private ContentSettingsManager manager;
+    private SubscriptionManager subscriptionManager;
     private final CompositeDisposable disposables = new CompositeDisposable();
 
     private String importExportDataPathKey;
@@ -66,6 +68,7 @@ public class BackupSettingsFragment extends BasePreferenceFragment {
     public void onAttach(@NonNull final Context context) {
         super.onAttach(context);
         subscriptionsImportExportHelper = new SubscriptionsImportExportHelper(this);
+        subscriptionManager = new SubscriptionManager(context);
     }
 
     @Override
@@ -137,6 +140,27 @@ public class BackupSettingsFragment extends BasePreferenceFragment {
             return true;
         });
 
+        final Preference clearSubscriptionsPreference =
+                requirePreference(R.string.clear_subscriptions_key);
+        clearSubscriptionsPreference.setOnPreferenceClickListener((final Preference p) -> {
+            new AlertDialog.Builder(requireContext())
+                    .setTitle(R.string.clear_subscriptions_title)
+                    .setMessage(R.string.clear_subscriptions_confirmation)
+                    .setNegativeButton(R.string.cancel, null)
+                    .setPositiveButton(R.string.clear, (dialog, which) ->
+                            clearSubscriptions())
+                    .show();
+            return true;
+        });
+
+    }
+
+    private void clearSubscriptions() {
+        disposables.add(subscriptionManager.deleteAllSubscriptions()
+                .subscribe(
+                        () -> Toast.makeText(requireContext(), R.string.subscriptions_cleared,
+                                Toast.LENGTH_SHORT).show(),
+                        e -> ErrorUtil.showUiErrorSnackbar(this, "Clearing subscriptions", e)));
     }
 
     @Override

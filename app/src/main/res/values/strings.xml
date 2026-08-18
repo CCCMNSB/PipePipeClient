@@ -1093,4 +1093,8 @@
 <string name="import_youtube_subscriptions_summary">Import subscriptions from Google Takeout</string>
 <string name="import_soundcloud_subscriptions_title">Import from SoundCloud</string>
 <string name="import_soundcloud_subscriptions_summary">Import subscriptions from a SoundCloud profile</string>
+<string name="clear_subscriptions_title">Clear subscriptions</string>
+<string name="clear_subscriptions_summary">Remove all subscribed channels from PipePipe</string>
+<string name="clear_subscriptions_confirmation">Clear all subscriptions? This cannot be undone.</string>
+<string name="subscriptions_cleared">Subscriptions cleared</string>
 </resources>

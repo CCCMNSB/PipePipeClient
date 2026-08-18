@@ -1049,4 +1049,8 @@
 <string name="import_youtube_subscriptions_summary">Importar suscripciones desde Google Takeout</string>
 <string name="import_soundcloud_subscriptions_title">Importar desde SoundCloud</string>
 <string name="import_soundcloud_subscriptions_summary">Importar suscripciones desde un perfil de SoundCloud</string>
+<string name="clear_subscriptions_title">Borrar suscripciones</string>
+<string name="clear_subscriptions_summary">Eliminar todos los canales suscritos de PipePipe</string>
+<string name="clear_subscriptions_confirmation">¿Borrar todas las suscripciones? Esto no se puede deshacer.</string>
+<string name="subscriptions_cleared">Suscripciones borradas</string>
 </resources>

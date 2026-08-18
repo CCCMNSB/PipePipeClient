@@ -1073,4 +1073,8 @@
 <string name="import_youtube_subscriptions_summary">Importuj subskrypcje z Google Takeout</string>
 <string name="import_soundcloud_subscriptions_title">Importuj z SoundCloud</string>
 <string name="import_soundcloud_subscriptions_summary">Importuj subskrypcje z profilu SoundCloud</string>
+<string name="clear_subscriptions_title">Wyczyść subskrypcje</string>
+<string name="clear_subscriptions_summary">Usuń wszystkie subskrybowane kanały z PipePipe</string>
+<string name="clear_subscriptions_confirmation">Wyczyścić wszystkie subskrypcje? Tego nie można cofnąć.</string>
+<string name="subscriptions_cleared">Wyczyszczono subskrypcje</string>
 </resources>
