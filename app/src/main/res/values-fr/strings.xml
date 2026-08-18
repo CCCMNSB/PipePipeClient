@@ -1000,4 +1000,6 @@ Voulez-vous continuer?</string>
 <string name="sabr_backoff_notification_content">YouTube nous oblige à attendre %1$d secondes avant de reprendre la lecture</string>
 <string name="playback_speed_gesture_control_title">Balayez pour contrôler la vitesse de lecture</string>
 <string name="playback_speed_gesture_control_summary">Glissez au milieu pour contrôler la vitesse de lecture. Désactive le contrôle gestuel en plein écran.</string>
+<string name="remember_search_filters_title">Mémoriser les filtres de recherche</string>
+<string name="remember_search_filters_summary">Restaurer le service sélectionné, le type de contenu et les filtres de tri lors du lancement d\'une nouvelle recherche</string>
 </resources>

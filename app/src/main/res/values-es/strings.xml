@@ -1039,4 +1039,6 @@
 <string name="sabr_backoff_notification_content">YouTube nos obliga a esperar %1$d segundos antes de continuar la reproducción</string>
 <string name="playback_speed_gesture_control_title">Desliza para controlar la velocidad de reproducción</string>
 <string name="playback_speed_gesture_control_summary">Desliza en el centro para controlar la velocidad de reproducción. Desactiva el control por gestos en pantalla completa.</string>
+<string name="remember_search_filters_title">Recordar filtros de búsqueda</string>
+<string name="remember_search_filters_summary">Restaurar los filtros seleccionados de servicio, tipo de contenido y orden al iniciar una nueva búsqueda</string>
 </resources>

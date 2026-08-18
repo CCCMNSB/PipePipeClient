@@ -1006,4 +1006,6 @@
 <string name="sabr_backoff_notification_content">YouTubeの制限により、再生を続行する前に %1$d 秒待機する必要があります</string>
 <string name="playback_speed_gesture_control_title">スワイプで再生速度を調整</string>
 <string name="playback_speed_gesture_control_summary">中央をスワイプして再生速度を調整します。フルスクリーンのジェスチャー操作は無効になります。</string>
+<string name="remember_search_filters_title">検索フィルターを記憶する</string>
+<string name="remember_search_filters_summary">新しい検索を開始する際に、選択したサービス、コンテンツタイプ、および並べ替えフィルターを復元します。</string>
 </resources>

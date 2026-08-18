@@ -1063,4 +1063,6 @@
 <string name="sabr_backoff_notification_content">YouTube wymusza na nas odczekanie %1$d sekund przed wznowieniem odtwarzania</string>
 <string name="playback_speed_gesture_control_title">Przesuń, aby sterować prędkością odtwarzania</string>
 <string name="playback_speed_gesture_control_summary">Przesuń pośrodku, aby sterować prędkością odtwarzania. Wyłącza sterowanie gestami na pełnym ekranie</string>
+<string name="remember_search_filters_title">Zapamiętaj filtry wyszukiwania</string>
+<string name="remember_search_filters_summary">Przywróć wybraną usługę, typ treści i filtry sortowania podczas rozpoczynania nowego wyszukiwania</string>
 </resources>

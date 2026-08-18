@@ -1092,4 +1092,6 @@ nSự khác biệt giữa hai loại này là cái nào nhanh thường thiếu 
 <string name="sabr_backoff_notification_content">YouTube buộc chúng ta phải đợi %1$d giây trước khi tiếp tục phát</string>
 <string name="playback_speed_gesture_control_title">Vuốt để điều khiển tốc độ phát lại</string>
 <string name="playback_speed_gesture_control_summary">Vuốt ở giữa để điều khiển tốc độ phát. Vô hiệu hóa điều khiển bằng cử chỉ toàn màn hình</string>
+<string name="remember_search_filters_title">Ghi nhớ bộ lọc tìm kiếm</string>
+<string name="remember_search_filters_summary">Khôi phục các bộ lọc về dịch vụ, loại nội dung và sắp xếp đã chọn khi bắt đầu một tìm kiếm mới</string>
 </resources>

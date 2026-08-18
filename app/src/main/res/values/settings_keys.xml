@@ -1792,4 +1792,5 @@
         <item>@string/sponsor_block_skip_mode_manual_value</item>
         <item>@string/sponsor_block_skip_mode_highlight_value</item>
     </string-array>
+    <string name="remember_search_filters_key">remember_search_filters</string>
 </resources>

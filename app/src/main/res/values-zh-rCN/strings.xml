@@ -1047,4 +1047,6 @@
 <string name="sabr_backoff_notification_content">YouTube 强制我们等待 %1$d 秒后才能继续播放</string>
 <string name="playback_speed_gesture_control_title">滑动控制播放速度</string>
 <string name="playback_speed_gesture_control_summary">在中间滑动以控制播放速度。将禁用全屏手势控制</string>
+<string name="remember_search_filters_title">记住搜索筛选条件</string>
+<string name="remember_search_filters_summary">开始新搜索时恢复所选的服务、内容类型和排序筛选条件</string>
 </resources>
