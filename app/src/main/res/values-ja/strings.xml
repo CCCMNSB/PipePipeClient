@@ -1008,4 +1008,12 @@
 <string name="playback_speed_gesture_control_summary">中央をスワイプして再生速度を調整します。フルスクリーンのジェスチャー操作は無効になります。</string>
 <string name="remember_search_filters_title">検索フィルターを記憶する</string>
 <string name="remember_search_filters_summary">新しい検索を開始する際に、選択したサービス、コンテンツタイプ、および並べ替えフィルターを復元します。</string>
+<string name="import_subscriptions_title">サブスクリプションのインポート</string>
+<string name="import_subscriptions_summary">以前のJSONエクスポートからサブスクリプションをインポートします</string>
+<string name="export_subscriptions_title">サブスクリプションのエクスポート</string>
+<string name="export_subscriptions_summary">サブスクリプションをJSONファイルにエクスポートします</string>
+<string name="import_youtube_subscriptions_title">YouTubeからインポート</string>
+<string name="import_youtube_subscriptions_summary">Google Takeoutから登録チャンネルをインポート</string>
+<string name="import_soundcloud_subscriptions_title">SoundCloudからインポート</string>
+<string name="import_soundcloud_subscriptions_summary">SoundCloudのプロフィールからサブスクリプションをインポート</string>
 </resources>

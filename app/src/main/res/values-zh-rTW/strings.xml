@@ -1039,4 +1039,12 @@
 <string name="playback_speed_gesture_control_summary">在中間滑動以控制播放速度。會停用全螢幕手勢控制。</string>
 <string name="remember_search_filters_title">記住搜尋篩選器</string>
 <string name="remember_search_filters_summary">開始新搜尋時，還原選取的服務、內容類型與排序篩選器</string>
+<string name="import_subscriptions_title">匯入訂閱</string>
+<string name="import_subscriptions_summary">從先前的 JSON 匯出檔匯入訂閱</string>
+<string name="export_subscriptions_title">匯出訂閱</string>
+<string name="export_subscriptions_summary">將訂閱匯出至 JSON 檔案</string>
+<string name="import_youtube_subscriptions_title">從 YouTube 匯入</string>
+<string name="import_youtube_subscriptions_summary">從 Google Takeout 匯入訂閱</string>
+<string name="import_soundcloud_subscriptions_title">從 SoundCloud 匯入</string>
+<string name="import_soundcloud_subscriptions_summary">從 SoundCloud 個人檔案匯入訂閱</string>
 </resources>

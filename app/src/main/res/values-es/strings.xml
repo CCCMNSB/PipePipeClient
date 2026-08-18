@@ -1041,4 +1041,12 @@
 <string name="playback_speed_gesture_control_summary">Desliza en el centro para controlar la velocidad de reproducción. Desactiva el control por gestos en pantalla completa.</string>
 <string name="remember_search_filters_title">Recordar filtros de búsqueda</string>
 <string name="remember_search_filters_summary">Restaurar los filtros seleccionados de servicio, tipo de contenido y orden al iniciar una nueva búsqueda</string>
+<string name="import_subscriptions_title">Importar suscripciones</string>
+<string name="import_subscriptions_summary">Importar suscripciones de una exportación JSON anterior</string>
+<string name="export_subscriptions_title">Exportar suscripciones</string>
+<string name="export_subscriptions_summary">Exportar suscripciones a un archivo JSON</string>
+<string name="import_youtube_subscriptions_title">Importar desde YouTube</string>
+<string name="import_youtube_subscriptions_summary">Importar suscripciones desde Google Takeout</string>
+<string name="import_soundcloud_subscriptions_title">Importar desde SoundCloud</string>
+<string name="import_soundcloud_subscriptions_summary">Importar suscripciones desde un perfil de SoundCloud</string>
 </resources>

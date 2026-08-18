@@ -985,4 +985,12 @@
 <string name="playback_speed_gesture_control_summary">In der Mitte wischen, um die Wiedergabegeschwindigkeit zu steuern. Deaktiviert die Vollbild-Gestensteuerung.</string>
 <string name="remember_search_filters_title">Suchfilter merken</string>
 <string name="remember_search_filters_summary">Ausgewählten Dienst, Inhaltstyp und Sortierfilter beim Starten einer neuen Suche wiederherstellen</string>
+<string name="import_subscriptions_title">Abonnements importieren</string>
+<string name="import_subscriptions_summary">Abonnements aus einem vorherigen JSON-Export importieren</string>
+<string name="export_subscriptions_title">Abonnements exportieren</string>
+<string name="export_subscriptions_summary">Abonnements in eine JSON-Datei exportieren</string>
+<string name="import_youtube_subscriptions_title">Von YouTube importieren</string>
+<string name="import_youtube_subscriptions_summary">Abonnements aus Google Takeout importieren</string>
+<string name="import_soundcloud_subscriptions_title">Von SoundCloud importieren</string>
+<string name="import_soundcloud_subscriptions_summary">Abonnements von einem SoundCloud-Profil importieren</string>
 </resources>

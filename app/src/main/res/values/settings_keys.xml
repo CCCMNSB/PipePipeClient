@@ -1793,4 +1793,8 @@
         <item>@string/sponsor_block_skip_mode_highlight_value</item>
     </string-array>
     <string name="remember_search_filters_key">remember_search_filters</string>
+    <string name="import_subscriptions_key">import_subscriptions</string>
+    <string name="export_subscriptions_key">export_subscriptions</string>
+    <string name="import_youtube_subscriptions_key">import_youtube_subscriptions</string>
+    <string name="import_soundcloud_subscriptions_key">import_soundcloud_subscriptions</string>
 </resources>

@@ -1094,4 +1094,12 @@ nSự khác biệt giữa hai loại này là cái nào nhanh thường thiếu 
 <string name="playback_speed_gesture_control_summary">Vuốt ở giữa để điều khiển tốc độ phát. Vô hiệu hóa điều khiển bằng cử chỉ toàn màn hình</string>
 <string name="remember_search_filters_title">Ghi nhớ bộ lọc tìm kiếm</string>
 <string name="remember_search_filters_summary">Khôi phục các bộ lọc về dịch vụ, loại nội dung và sắp xếp đã chọn khi bắt đầu một tìm kiếm mới</string>
+<string name="import_subscriptions_title">Nhập đăng ký</string>
+<string name="import_subscriptions_summary">Nhập đăng ký từ bản xuất JSON trước đó</string>
+<string name="export_subscriptions_title">Xuất đăng ký</string>
+<string name="export_subscriptions_summary">Xuất đăng ký sang tệp JSON</string>
+<string name="import_youtube_subscriptions_title">Nhập từ YouTube</string>
+<string name="import_youtube_subscriptions_summary">Nhập các đăng ký từ Google Takeout</string>
+<string name="import_soundcloud_subscriptions_title">Nhập từ SoundCloud</string>
+<string name="import_soundcloud_subscriptions_summary">Nhập các đăng ký từ một hồ sơ SoundCloud</string>
 </resources>

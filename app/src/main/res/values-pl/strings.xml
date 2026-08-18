@@ -1065,4 +1065,12 @@
 <string name="playback_speed_gesture_control_summary">Przesuń pośrodku, aby sterować prędkością odtwarzania. Wyłącza sterowanie gestami na pełnym ekranie</string>
 <string name="remember_search_filters_title">Zapamiętaj filtry wyszukiwania</string>
 <string name="remember_search_filters_summary">Przywróć wybraną usługę, typ treści i filtry sortowania podczas rozpoczynania nowego wyszukiwania</string>
+<string name="import_subscriptions_title">Importuj subskrypcje</string>
+<string name="import_subscriptions_summary">Importuj subskrypcje z poprzedniego eksportu JSON</string>
+<string name="export_subscriptions_title">Eksportuj subskrypcje</string>
+<string name="export_subscriptions_summary">Eksportuj subskrypcje do pliku JSON</string>
+<string name="import_youtube_subscriptions_title">Importuj z YouTube</string>
+<string name="import_youtube_subscriptions_summary">Importuj subskrypcje z Google Takeout</string>
+<string name="import_soundcloud_subscriptions_title">Importuj z SoundCloud</string>
+<string name="import_soundcloud_subscriptions_summary">Importuj subskrypcje z profilu SoundCloud</string>
 </resources>

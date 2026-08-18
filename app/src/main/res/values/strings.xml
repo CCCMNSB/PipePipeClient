@@ -1085,4 +1085,12 @@
 <string name="sabr_backoff_notification_content">YouTube forces us to wait %1$d seconds before continuing playback</string>
 <string name="remember_search_filters_title">Remember search filters</string>
 <string name="remember_search_filters_summary">Restore the selected service, content type, and sort filters when starting a new search</string>
+<string name="import_subscriptions_title">Import subscriptions</string>
+<string name="import_subscriptions_summary">Import subscriptions from a previous JSON export</string>
+<string name="export_subscriptions_title">Export subscriptions</string>
+<string name="export_subscriptions_summary">Export subscriptions to a JSON file</string>
+<string name="import_youtube_subscriptions_title">Import from YouTube</string>
+<string name="import_youtube_subscriptions_summary">Import subscriptions from Google Takeout</string>
+<string name="import_soundcloud_subscriptions_title">Import from SoundCloud</string>
+<string name="import_soundcloud_subscriptions_summary">Import subscriptions from a SoundCloud profile</string>
 </resources>

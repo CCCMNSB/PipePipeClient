@@ -1049,4 +1049,12 @@
 <string name="playback_speed_gesture_control_summary">在中间滑动以控制播放速度。将禁用全屏手势控制</string>
 <string name="remember_search_filters_title">记住搜索筛选条件</string>
 <string name="remember_search_filters_summary">开始新搜索时恢复所选的服务、内容类型和排序筛选条件</string>
+<string name="import_subscriptions_title">导入订阅</string>
+<string name="import_subscriptions_summary">从之前的 JSON 导出文件中导入订阅</string>
+<string name="export_subscriptions_title">导出订阅</string>
+<string name="export_subscriptions_summary">将订阅导出为 JSON 文件</string>
+<string name="import_youtube_subscriptions_title">从 YouTube 导入</string>
+<string name="import_youtube_subscriptions_summary">从 Google Takeout 导入订阅</string>
+<string name="import_soundcloud_subscriptions_title">从 SoundCloud 导入</string>
+<string name="import_soundcloud_subscriptions_summary">从 SoundCloud 个人资料导入订阅</string>
 </resources>
