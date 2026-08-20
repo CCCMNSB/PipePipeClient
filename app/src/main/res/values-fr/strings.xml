@@ -1014,4 +1014,11 @@ Voulez-vous continuer?</string>
 <string name="clear_subscriptions_summary">Supprimer toutes les chaînes abonnées de PipePipe</string>
 <string name="clear_subscriptions_confirmation">Effacer tous les abonnements ? Cette action est irréversible.</string>
 <string name="subscriptions_cleared">Abonnements effacés</string>
+<string name="fetch_subscription_details_title">Récupérer les détails de la chaîne ?</string>
+<string name="fetch_subscription_details_message">La récupération des miniatures de chaîne et du nombre d\'abonnés nécessite de visiter chaque chaîne à laquelle vous êtes abonné. Le temps nécessaire dépend du nombre d\'abonnements et peut être long pour une grande liste d\'abonnements. Si vous ignorez cette étape, les détails d\'une chaîne seront tout de même mis à jour automatiquement lorsque vous l\'ouvrirez manuellement.</string>
+<string name="fetch">Récupérer</string>
+<string name="skip">Ignorer</string>
+<string name="subscription_details_update_ongoing">Récupération des détails de la chaîne…</string>
+<string name="subscription_details_update_complete">Détails de la chaîne mis à jour</string>
+<string name="subscription_details_update_failed">Impossible de mettre à jour les détails de la chaîne</string>
 </resources>

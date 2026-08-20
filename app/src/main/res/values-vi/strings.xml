@@ -1106,4 +1106,11 @@ nSự khác biệt giữa hai loại này là cái nào nhanh thường thiếu 
 <string name="clear_subscriptions_summary">Xóa tất cả các kênh đã đăng ký khỏi PipePipe</string>
 <string name="clear_subscriptions_confirmation">Xóa tất cả đăng ký? Hành động này không thể hoàn tác.</string>
 <string name="subscriptions_cleared">Đã xóa đăng ký</string>
+<string name="fetch_subscription_details_title">Lấy thông tin chi tiết kênh?</string>
+<string name="fetch_subscription_details_message">Việc tải ảnh thu nhỏ và số lượng người đăng ký của kênh yêu cầu phải truy cập vào từng kênh đã đăng ký. Thời gian thực hiện phụ thuộc vào số lượng kênh đăng ký và có thể kéo dài nếu danh sách đăng ký lớn. Nếu bạn bỏ qua bước này, thông tin chi tiết của kênh vẫn sẽ được cập nhật tự động khi bạn mở thủ công.</string>
+<string name="fetch">Lấy</string>
+<string name="skip">Bỏ qua</string>
+<string name="subscription_details_update_ongoing">Đang lấy thông tin chi tiết kênh…</string>
+<string name="subscription_details_update_complete">Đã cập nhật thông tin chi tiết kênh</string>
+<string name="subscription_details_update_failed">Không thể cập nhật thông tin chi tiết kênh</string>
 </resources>

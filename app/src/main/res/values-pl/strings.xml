@@ -1077,4 +1077,11 @@
 <string name="clear_subscriptions_summary">Usuń wszystkie subskrybowane kanały z PipePipe</string>
 <string name="clear_subscriptions_confirmation">Wyczyścić wszystkie subskrypcje? Tego nie można cofnąć.</string>
 <string name="subscriptions_cleared">Wyczyszczono subskrypcje</string>
+<string name="fetch_subscription_details_title">Pobrać szczegóły kanału?</string>
+<string name="fetch_subscription_details_message">Pobieranie miniatur kanałów i liczby subskrybentów wymaga odwiedzenia każdego zasubskrybowanego kanału. Wymagany czas zależy od liczby subskrypcji i może być długi w przypadku dużej listy subskrypcji. Jeśli pominiesz ten krok, szczegóły kanału nadal będą aktualizowane automatycznie, gdy otworzysz go ręcznie.</string>
+<string name="fetch">Pobierz</string>
+<string name="skip">Pomiń</string>
+<string name="subscription_details_update_ongoing">Pobieranie szczegółów kanału…</string>
+<string name="subscription_details_update_complete">Zaktualizowano szczegóły kanału</string>
+<string name="subscription_details_update_failed">Nie udało się zaktualizować szczegółów kanału</string>
 </resources>

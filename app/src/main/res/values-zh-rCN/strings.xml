@@ -1061,4 +1061,11 @@
 <string name="clear_subscriptions_summary">从 PipePipe 中移除所有订阅频道</string>
 <string name="clear_subscriptions_confirmation">清除所有订阅？此操作无法撤销。</string>
 <string name="subscriptions_cleared">订阅已清除</string>
+<string name="fetch_subscription_details_title">获取频道详情？</string>
+<string name="fetch_subscription_details_message">获取频道缩略图和订阅者数量需要访问每一个已订阅的频道。所需时间取决于订阅数量，如果订阅列表很大，可能需要较长时间。如果您跳过此步骤，当您手动打开频道时，频道的详细信息仍会自动更新。</string>
+<string name="fetch">获取</string>
+<string name="skip">跳过</string>
+<string name="subscription_details_update_ongoing">正在获取频道详情…</string>
+<string name="subscription_details_update_complete">频道详情已更新</string>
+<string name="subscription_details_update_failed">无法更新频道详情</string>
 </resources>

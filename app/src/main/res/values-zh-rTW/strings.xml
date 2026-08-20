@@ -1051,4 +1051,11 @@
 <string name="clear_subscriptions_summary">從 PipePipe 移除所有已訂閱的頻道</string>
 <string name="clear_subscriptions_confirmation">清除所有訂閱？此操作無法復原。</string>
 <string name="subscriptions_cleared">訂閱已清除</string>
+<string name="fetch_subscription_details_title">擷取頻道詳細資訊？</string>
+<string name="fetch_subscription_details_message">擷取頻道縮圖和訂閱人數需要造訪每一個已訂閱的頻道。所需時間取決於訂閱數量，若訂閱清單龐大，可能會需要較長時間。如果您略過此步驟，當您手動開啟頻道時，頻道的詳細資訊仍會自動更新。</string>
+<string name="fetch">擷取</string>
+<string name="skip">略過</string>
+<string name="subscription_details_update_ongoing">正在擷取頻道詳細資訊…</string>
+<string name="subscription_details_update_complete">頻道詳細資訊已更新</string>
+<string name="subscription_details_update_failed">無法更新頻道詳細資訊</string>
 </resources>

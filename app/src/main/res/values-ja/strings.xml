@@ -1020,4 +1020,11 @@
 <string name="clear_subscriptions_summary">PipePipeからすべての登録チャンネルを削除します</string>
 <string name="clear_subscriptions_confirmation">すべての登録チャンネルを消去しますか？この操作は元に戻せません。</string>
 <string name="subscriptions_cleared">登録チャンネルを消去しました</string>
+<string name="fetch_subscription_details_title">チャンネルの詳細を取得しますか？</string>
+<string name="fetch_subscription_details_message">チャンネルのサムネイルと登録者数を取得するには、登録している各チャンネルにアクセスする必要があります。所要時間は登録数によって異なり、登録リストが膨大な場合は時間がかかる可能性があります。この手順をスキップした場合でも、手動でチャンネルを開いた際にその詳細は自動的に更新されます。</string>
+<string name="fetch">取得</string>
+<string name="skip">スキップ</string>
+<string name="subscription_details_update_ongoing">チャンネルの詳細を取得中…</string>
+<string name="subscription_details_update_complete">チャンネルの詳細を更新しました</string>
+<string name="subscription_details_update_failed">チャンネルの詳細を更新できませんでした</string>
 </resources>
