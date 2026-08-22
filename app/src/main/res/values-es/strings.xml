@@ -1060,4 +1060,7 @@
 <string name="subscription_details_update_ongoing">Obteniendo detalles del canal…</string>
 <string name="subscription_details_update_complete">Detalles del canal actualizados</string>
 <string name="subscription_details_update_failed">No se pudieron actualizar los detalles del canal</string>
+<string name="channel_is_blocked">Este canal está en tu lista de bloqueados</string>
+<string name="resize_pinch">Pellizcar</string>
+<string name="pinch_to_zoom_selected">Pellizcar para hacer zoom.</string>
 </resources>

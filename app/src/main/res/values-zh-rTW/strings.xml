@@ -1058,4 +1058,7 @@
 <string name="subscription_details_update_ongoing">正在擷取頻道詳細資訊…</string>
 <string name="subscription_details_update_complete">頻道詳細資訊已更新</string>
 <string name="subscription_details_update_failed">無法更新頻道詳細資訊</string>
+<string name="channel_is_blocked">此頻道在您的封鎖名單中</string>
+<string name="resize_pinch">捏合</string>
+<string name="pinch_to_zoom_selected">雙指捏合以縮放。</string>
 </resources>

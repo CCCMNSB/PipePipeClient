@@ -1084,4 +1084,7 @@
 <string name="subscription_details_update_ongoing">Pobieranie szczegółów kanału…</string>
 <string name="subscription_details_update_complete">Zaktualizowano szczegóły kanału</string>
 <string name="subscription_details_update_failed">Nie udało się zaktualizować szczegółów kanału</string>
+<string name="channel_is_blocked">Ten kanał jest na twojej liście zablokowanych</string>
+<string name="resize_pinch">Uszczypnij</string>
+<string name="pinch_to_zoom_selected">Uszczypnij, aby powiększyć.</string>
 </resources>

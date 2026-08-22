@@ -998,4 +998,7 @@
 <string name="subscription_details_update_ongoing">Recupero dei dettagli del canale in corso…</string>
 <string name="subscription_details_update_complete">Dettagli del canale aggiornati</string>
 <string name="subscription_details_update_failed">Impossibile aggiornare i dettagli del canale</string>
+<string name="channel_is_blocked">Questo canale è nella tua lista di blocco</string>
+<string name="resize_pinch">Pizzica</string>
+<string name="pinch_to_zoom_selected">Pizzica per ingrandire.</string>
 </resources>

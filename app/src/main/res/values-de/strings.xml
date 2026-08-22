@@ -1004,4 +1004,7 @@
 <string name="subscription_details_update_ongoing">Kanaldetails werden abgerufen…</string>
 <string name="subscription_details_update_complete">Kanaldetails aktualisiert</string>
 <string name="subscription_details_update_failed">Kanaldetails konnten nicht aktualisiert werden</string>
+<string name="channel_is_blocked">Dieser Kanal befindet sich auf deiner Blockierliste</string>
+<string name="resize_pinch">Zusammenziehen</string>
+<string name="pinch_to_zoom_selected">Zum Zoomen zusammenziehen.</string>
 </resources>

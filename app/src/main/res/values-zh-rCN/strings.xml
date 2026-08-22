@@ -1068,4 +1068,7 @@
 <string name="subscription_details_update_ongoing">正在获取频道详情…</string>
 <string name="subscription_details_update_complete">频道详情已更新</string>
 <string name="subscription_details_update_failed">无法更新频道详情</string>
+<string name="channel_is_blocked">此频道在您的黑名单中</string>
+<string name="resize_pinch">捏合</string>
+<string name="pinch_to_zoom_selected">捏合以缩放。</string>
 </resources>
