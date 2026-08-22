@@ -241,9 +241,12 @@ public final class SabrDashMediaSource extends CompositeMediaSource<Integer> {
             if (label != null && !label.isEmpty()) {
                 builder.append("<Label>").append(xml(label)).append("</Label>");
             }
-            if (first.isOriginalAudio()) {
-                builder.append("<Role schemeIdUri=\"urn:mpeg:dash:role:2011\" value=\"main\"/>");
-            }
+            final boolean isBootstrapAudio = java.util.Objects.equals(
+                    first.getAudioTrackId(),
+                    spec.getBootstrapAudioFormat().getAudioTrackId());
+            builder.append("<Role schemeIdUri=\"urn:mpeg:dash:role:2011\" value=\"")
+                    .append(isBootstrapAudio ? "main" : "alternate")
+                    .append("\"/>");
         } else {
             builder.append('>');
         }
