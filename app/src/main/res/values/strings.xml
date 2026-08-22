@@ -1105,4 +1105,6 @@
 <string name="subscription_details_update_ongoing">Fetching channel details…</string>
 <string name="subscription_details_update_complete">Channel details updated</string>
 <string name="subscription_details_update_failed">Could not update channel details</string>
+<string name="resize_pinch">Pinch</string>
+<string name="pinch_to_zoom_selected">Pinch to zoom.</string>
 </resources>
