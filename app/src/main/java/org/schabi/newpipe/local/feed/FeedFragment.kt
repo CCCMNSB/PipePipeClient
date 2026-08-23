@@ -262,6 +262,10 @@ class FeedFragment : BaseStateFragment<FeedState>() {
     override fun initListeners() {
         super.initListeners()
         feedBinding.refreshRootView.setOnClickListener { reloadContent() }
+        feedBinding.refreshSubtitleText.setOnLongClickListener {
+            showNotLoadedSubscriptions()
+            true
+        }
         feedBinding.swipeRefreshLayout.setOnRefreshListener { reloadContent() }
         feedBinding.newItemsLoadedButton.setOnClickListener {
             hideNewItemsLoaded(true)
@@ -832,6 +836,51 @@ class FeedFragment : BaseStateFragment<FeedState>() {
         if (errors.isNotEmpty()) {
             ErrorUtil.showSnackbar(this, ErrorInfo(errors, UserAction.REQUESTED_FEED, ""))
         }
+    }
+
+    private fun showNotLoadedSubscriptions() {
+        disposables.add(
+            Single.fromCallable {
+                val feedDao = NewPipeDatabase.getInstance(requireContext()).feedDAO()
+                when (groupId) {
+                    FeedGroupEntity.GROUP_ALL_ID -> feedDao.getNotLoadedSubscriptions()
+                    else -> feedDao.getNotLoadedSubscriptionsForGroup(groupId)
+                }
+            }
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(
+                    { subscriptions ->
+                        if (subscriptions.isEmpty()) {
+                            return@subscribe
+                        }
+
+                        AlertDialog.Builder(requireContext())
+                            .setTitle(
+                                getString(
+                                    R.string.feed_subscription_not_loaded_count,
+                                    subscriptions.size
+                                )
+                            )
+                            .setItems(
+                                subscriptions.map { it.name ?: it.url.orEmpty() }.toTypedArray()
+                            ) { _, index ->
+                                val subscription = subscriptions[index]
+                                subscription.url?.let { url ->
+                                    NavigationHelper.openChannelFragment(
+                                        fm,
+                                        subscription.serviceId,
+                                        url,
+                                        subscription.name ?: url
+                                    )
+                                }
+                            }
+                            .setNegativeButton(R.string.cancel, null)
+                            .show()
+                    },
+                    { throwable -> Log.e(TAG, "Unable to load failed subscriptions", throwable) }
+                )
+        )
     }
 
     private fun handleFeedNotAvailable(

@@ -212,6 +212,20 @@ abstract class FeedDAO {
 
     @Query(
         """
+        SELECT s.* FROM subscriptions s
+
+        INNER JOIN feed_last_updated lu
+        ON s.uid = lu.subscription_id
+
+        WHERE lu.last_updated IS NULL
+
+        ORDER BY s.name COLLATE NOCASE ASC
+        """
+    )
+    abstract fun getNotLoadedSubscriptions(): List<SubscriptionEntity>
+
+    @Query(
+        """
         SELECT COUNT(*) FROM subscriptions s
         
         INNER JOIN feed_group_subscription_join fgs
@@ -224,6 +238,23 @@ abstract class FeedDAO {
         """
     )
     abstract fun notLoadedCountForGroup(groupId: Long): Flowable<Long>
+
+    @Query(
+        """
+        SELECT s.* FROM subscriptions s
+
+        INNER JOIN feed_group_subscription_join fgs
+        ON s.uid = fgs.subscription_id AND fgs.group_id = :groupId
+
+        LEFT JOIN feed_last_updated lu
+        ON s.uid = lu.subscription_id
+
+        WHERE lu.last_updated IS NULL
+
+        ORDER BY s.name COLLATE NOCASE ASC
+        """
+    )
+    abstract fun getNotLoadedSubscriptionsForGroup(groupId: Long): List<SubscriptionEntity>
 
     @Query(
         """
