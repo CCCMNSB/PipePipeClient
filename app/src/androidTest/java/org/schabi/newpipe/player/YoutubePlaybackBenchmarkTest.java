@@ -143,8 +143,6 @@ public final class YoutubePlaybackBenchmarkTest {
                 new Path("tv_downgraded_generated_dash", "tv_downgraded",
                         DeliveryMethod.PROGRESSIVE_HTTP),
                 new Path("visionos_generated_dash", "visionos",
-                        DeliveryMethod.PROGRESSIVE_HTTP),
-                new Path("android_vr_generated_dash", "android_vr",
                         DeliveryMethod.PROGRESSIVE_HTTP)), pathFilter);
         assertTrue("No benchmark paths selected by paths=" + pathFilter, !paths.isEmpty());
         emit("PIPEPIPE_BENCHMARK_CONFIG", new JSONObject()

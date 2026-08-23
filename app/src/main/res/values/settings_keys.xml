@@ -1773,13 +1773,11 @@
     <string name="export_data_to_newpipe_key">export_data_to_newpipe</string>
     <string name="youtube_player_client_key">youtube_player_client</string>
     <string-array name="youtube_player_client_entries">
-        <item>Android VR</item>
         <item>VisionOS</item>
         <item>TV Downgraded</item>
         <item>MWEB (SABR)</item>
     </string-array>
     <string-array name="youtube_player_client_values">
-        <item>android_vr</item>
         <item>visionos</item>
         <item>tv_downgraded</item>
         <item>mweb</item>

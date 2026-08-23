@@ -167,7 +167,6 @@ public class App extends MultiDexApplication {
         final boolean allowed = loggedIn
                 ? "tv_downgraded".equals(selectedClient) || "mweb".equals(selectedClient)
                 : "mweb".equals(selectedClient)
-                        || "android_vr".equals(selectedClient)
                         || "visionos".equals(selectedClient);
         final String reconciledClient = allowed ? selectedClient : defaultClient;
 

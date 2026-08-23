@@ -33,8 +33,8 @@ case "${control_client,,}" in
       control_client=visionos
     fi
     ;;
-  tv_downgraded|visionos|android_vr) control_client="${control_client,,}" ;;
-  *) echo "CONTROL_CLIENT must be auto, tv_downgraded, visionos, or android_vr" >&2; exit 2 ;;
+  tv_downgraded|visionos) control_client="${control_client,,}" ;;
+  *) echo "CONTROL_CLIENT must be auto, tv_downgraded, or visionos" >&2; exit 2 ;;
 esac
 if [[ -z "$paths" ]]; then
   paths="sabr,${control_client}_generated_dash"
