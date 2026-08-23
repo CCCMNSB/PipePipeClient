@@ -150,16 +150,16 @@ public class AdvancedSettingsFragment extends BasePreferenceFragment implements 
         final String[] values = getResources().getStringArray(
                 R.array.youtube_player_client_values);
         if (loggedIn) {
-            preference.setEntries(new CharSequence[]{entries[1], entries[2]});
-            preference.setEntryValues(new CharSequence[]{values[1], values[2]});
+            preference.setEntries(new CharSequence[]{entries[1]});
+            preference.setEntryValues(new CharSequence[]{values[1]});
         } else {
-            preference.setEntries(new CharSequence[]{entries[0], entries[2]});
-            preference.setEntryValues(new CharSequence[]{values[0], values[2]});
+            preference.setEntries(new CharSequence[]{entries[0], entries[1]});
+            preference.setEntryValues(new CharSequence[]{values[0], values[1]});
         }
         App.reconcileYoutubePlayerClient(requireContext());
         preference.setValue(defaultPreferences.getString(
                 getString(R.string.youtube_player_client_key),
-                loggedIn ? "tv_downgraded" : "visionos"));
+                loggedIn ? "mweb" : "visionos"));
     }
 
     @Override
