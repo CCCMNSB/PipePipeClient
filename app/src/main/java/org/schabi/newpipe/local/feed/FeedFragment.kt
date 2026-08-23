@@ -62,6 +62,7 @@ import org.schabi.newpipe.database.subscription.SubscriptionEntity
 import org.schabi.newpipe.databinding.FragmentFeedBinding
 import org.schabi.newpipe.databinding.PlaylistControlBinding
 import org.schabi.newpipe.error.ErrorInfo
+import org.schabi.newpipe.error.ErrorUtil
 import org.schabi.newpipe.error.UserAction
 import org.schabi.newpipe.extractor.exceptions.AccountTerminatedException
 import org.schabi.newpipe.extractor.exceptions.ContentNotAvailableException
@@ -826,6 +827,10 @@ class FeedFragment : BaseStateFragment<FeedState>() {
                     )
                 return // this will be called on the remaining errors by handleFeedNotAvailable()
             }
+        }
+
+        if (errors.isNotEmpty()) {
+            ErrorUtil.showSnackbar(this, ErrorInfo(errors, UserAction.REQUESTED_FEED, ""))
         }
     }
 
