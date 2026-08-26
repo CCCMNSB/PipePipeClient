@@ -50,6 +50,7 @@ import org.schabi.newpipe.local.playlist.LocalPlaylistFragment;
 import org.schabi.newpipe.local.subscription.SubscriptionFragment;
 import org.schabi.newpipe.local.subscription.SubscriptionListFragment;
 import org.schabi.newpipe.local.subscription.SubscriptionsImportFragment;
+import org.schabi.newpipe.subtitles.SubtitleJumpFragment;
 import org.schabi.newpipe.player.PlayerService;
 import org.schabi.newpipe.player.PlayerService.PlayerType;
 import org.schabi.newpipe.player.PlayQueueActivity;
@@ -522,6 +523,13 @@ public final class NavigationHelper {
     public static void openStatisticFragment(final FragmentManager fragmentManager) {
         defaultTransaction(fragmentManager)
                 .replace(R.id.fragment_holder, new StatisticsPlaylistFragment())
+                .addToBackStack(null)
+                .commit();
+    }
+
+    public static void openSubtitleJumpFragment(final FragmentManager fragmentManager) {
+        defaultTransaction(fragmentManager)
+                .replace(R.id.fragment_holder, new SubtitleJumpFragment())
                 .addToBackStack(null)
                 .commit();
     }

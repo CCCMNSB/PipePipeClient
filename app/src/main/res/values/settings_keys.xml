@@ -1597,6 +1597,7 @@
     <string name="subtitle_base_url_key">subtitle_base_url_key</string>
     <string name="subtitle_font_key">subtitle_font_key</string>
     <string name="subtitle_font_default_value">lxgw_wenkai</string>
+    <string name="subtitle_cache_key">subtitle_cache_key</string>
 
     <string name="bullet_comments_outline_radius_key">bullet_comments_outline_radius_key</string>
     <string name="advanced_formats_key">advanced_formats_key</string>

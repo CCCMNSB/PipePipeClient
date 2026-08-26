@@ -162,11 +162,14 @@ public final class SubtitleOverlayView extends View {
             final float textHalf = textSize / 2f;
             float yPx = isBottomAnchor(line) ? (h * y - textHalf - h * 0.03f)
                     : (h * y + textHalf + h * 0.03f);
-            // Clamp within view.
-            yPx = Math.max(textSize + 2f, Math.min(yPx, h - textSize - 2f));
+            // Keep subtitles out of the top/bottom control bars (progress bar / buttons), but
+            // otherwise respect the ASS position (lane staggering is preserved).
+            final float topLimit = h * 0.08f;
+            final float bottomLimit = h * 0.86f;
+            yPx = Math.max(topLimit + textSize, Math.min(yPx, bottomLimit));
             // Nudge down if the previous line is at nearly the same y.
             if (lastY >= 0 && Math.abs(yPx - lastY) < textSize * 1.2f) {
-                yPx = Math.min(h - textSize - 2f, lastY + textSize * 1.1f);
+                yPx = Math.min(bottomLimit, lastY + textSize * 1.1f);
             }
             lastY = yPx;
 

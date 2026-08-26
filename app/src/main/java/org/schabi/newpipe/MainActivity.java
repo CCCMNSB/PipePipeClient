@@ -114,6 +114,7 @@ public class MainActivity extends AppCompatActivity {
     private static final int ITEM_ID_BOOKMARKS = -3;
     private static final int ITEM_ID_DOWNLOADS = -4;
     private static final int ITEM_ID_HISTORY = -5;
+    private static final int ITEM_ID_SUBTITLES = -6;
     private static final int ITEM_ID_SETTINGS = 0;
     private static final int ITEM_ID_ABOUT = 1;
 
@@ -330,6 +331,9 @@ public class MainActivity extends AppCompatActivity {
         drawerLayoutBinding.navigation.getMenu()
                 .add(R.id.menu_tabs_group, ITEM_ID_HISTORY, ORDER, R.string.action_history)
                 .setIcon(R.drawable.ic_history);
+        drawerLayoutBinding.navigation.getMenu()
+                .add(R.id.menu_tabs_group, ITEM_ID_SUBTITLES, ORDER, R.string.tab_subtitles)
+                .setIcon(R.drawable.ic_subtitles);
 
         //Settings and About
         drawerLayoutBinding.navigation.getMenu()
@@ -386,6 +390,9 @@ public class MainActivity extends AppCompatActivity {
                 break;
             case ITEM_ID_HISTORY:
                 NavigationHelper.openStatisticFragment(getSupportFragmentManager());
+                break;
+            case ITEM_ID_SUBTITLES:
+                NavigationHelper.openSubtitleJumpFragment(getSupportFragmentManager());
                 break;
             default:
                 final int currentServiceId = ServiceHelper.getSelectedServiceId(this);

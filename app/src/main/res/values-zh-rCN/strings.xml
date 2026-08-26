@@ -312,6 +312,12 @@
 <!-- History -->
 <string name="title_activity_history">历史</string>
 <string name="action_history">历史</string>
+<!-- Subtitles -->
+<string name="tab_subtitles">有字幕的视频</string>
+<string name="subtitle_jump_empty">未找到字幕清单</string>
+<string name="subtitle_jump_error">未找到字幕清单</string>
+<string name="subtitle_jump_search_hint">搜索标题或视频 ID</string>
+<string name="subtitle_jump_load_more">加载更多</string>
 <string name="delete_item_search_history">您要从搜索历史记录中删除此项吗？</string>
 <string name="title_last_played">上次播放</string>
 <string name="title_most_played">最多播放</string>
@@ -1094,6 +1100,12 @@
 <string name="subtitle_base_url_title">字幕仓库基础地址</string>
 <string name="subtitle_base_url_summary">字幕仓库的 raw 根地址（末尾不要斜杠）。App 会请求 &lt;地址&gt;/&lt;视频ID&gt;.ass，其次 .srt。</string>
 <string name="subtitle_font_title">字幕字体</string>
+<string name="subtitle_cache_category_title">字幕缓存</string>
+<string name="subtitle_cache_manage_title">管理字幕缓存</string>
+<string name="subtitle_cache_manage_empty">暂无已缓存的字幕。</string>
+<string name="subtitle_cache_summary_count">%1$d 条 · %2$s</string>
+<string name="subtitle_cache_delete_selected">删除选中</string>
+<string name="subtitle_cache_clear_all">清空全部</string>
 <string-array name="subtitle_font_entries">
     <item>霞鹜文楷</item>
     <item>衬线体 (Serif)</item>

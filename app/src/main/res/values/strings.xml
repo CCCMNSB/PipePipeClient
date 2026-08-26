@@ -343,6 +343,12 @@
 <!-- History -->
 <string name="title_activity_history">History</string>
 <string name="action_history">History</string>
+<!-- Subtitles -->
+<string name="tab_subtitles">Subtitles</string>
+<string name="subtitle_jump_empty">Subtitle list not found.</string>
+<string name="subtitle_jump_error">Subtitle list not found.</string>
+<string name="subtitle_jump_search_hint">Search title or video id</string>
+<string name="subtitle_jump_load_more">Load more</string>
 <string name="delete_item_search_history">Do you want to delete this item from search history?</string>
 <string name="title_last_played">Last Played</string>
 <string name="title_most_played">Most Played</string>
@@ -1043,6 +1049,12 @@
 <string name="subtitle_base_url_title">Subtitle repository base URL</string>
 <string name="subtitle_base_url_summary">Raw base URL of the subtitle repo (no trailing slash). The app requests &lt;baseUrl&gt;/&lt;videoId&gt;.ass then .srt.</string>
 <string name="subtitle_font_title">Subtitle font</string>
+<string name="subtitle_cache_category_title">Subtitle cache</string>
+<string name="subtitle_cache_manage_title">Manage subtitle cache</string>
+<string name="subtitle_cache_manage_empty">No cached subtitles yet.</string>
+<string name="subtitle_cache_summary_count">%1$d entries · %2$s</string>
+<string name="subtitle_cache_delete_selected">Delete selected</string>
+<string name="subtitle_cache_clear_all">Clear all</string>
 <string-array name="subtitle_font_entries">
     <item>霞鹜文楷 (LXGW WenKai)</item>
     <item>Serif</item>

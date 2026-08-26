@@ -239,4 +239,18 @@
                 app:singleLineTitle="false"
                 app:iconSpaceReserved="false"/>
     </PreferenceCategory>
+
+    <PreferenceCategory
+            android:key="subtitle_cache_category"
+            android:title="@string/subtitle_cache_category_title"
+            app:singleLineTitle="false"
+            app:iconSpaceReserved="false">
+
+        <Preference
+                android:key="@string/subtitle_cache_key"
+                android:title="@string/subtitle_cache_manage_title"
+                android:summary=""
+                app:singleLineTitle="false"
+                app:iconSpaceReserved="false"/>
+    </PreferenceCategory>
 </PreferenceScreen>

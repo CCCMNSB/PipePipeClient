@@ -78,6 +78,71 @@ public class BulletCommentsSettingsFragment extends BasePreferenceFragment {
                 return true;
             });
         }
+
+        // Subtitle cache management (mirrors the danmaku cache one).
+        refreshSubtitleCacheSummary();
+        final androidx.preference.Preference subCachePref =
+                findPreference(getString(R.string.subtitle_cache_key));
+        if (subCachePref != null) {
+            subCachePref.setOnPreferenceClickListener(preference -> {
+                openSubtitleCacheManager();
+                return true;
+            });
+        }
+    }
+
+    private void refreshSubtitleCacheSummary() {
+        final androidx.preference.Preference cachePref =
+                findPreference(getString(R.string.subtitle_cache_key));
+        if (cachePref == null) {
+            return;
+        }
+        final List<org.schabi.newpipe.player.subtitles.SubtitleCache.CacheEntry> entries =
+                org.schabi.newpipe.player.subtitles.SubtitleCache.list(getContext());
+        final long total = org.schabi.newpipe.player.subtitles.SubtitleCache.totalSize(getContext());
+        cachePref.setSummary(entries.isEmpty()
+                ? getString(R.string.subtitle_cache_manage_empty)
+                : getString(R.string.subtitle_cache_summary_count,
+                entries.size(), humanSize(total)));
+    }
+
+    private void openSubtitleCacheManager() {
+        final List<org.schabi.newpipe.player.subtitles.SubtitleCache.CacheEntry> entries =
+                org.schabi.newpipe.player.subtitles.SubtitleCache.list(getContext());
+        if (entries == null || entries.isEmpty()) {
+            new androidx.appcompat.app.AlertDialog.Builder(getContext())
+                    .setTitle(R.string.subtitle_cache_manage_title)
+                    .setMessage(R.string.subtitle_cache_manage_empty)
+                    .setPositiveButton(android.R.string.ok, null)
+                    .show();
+            return;
+        }
+        final String[] labels = new String[entries.size()];
+        for (int i = 0; i < entries.size(); i++) {
+            final org.schabi.newpipe.player.subtitles.SubtitleCache.CacheEntry e = entries.get(i);
+            labels[i] = e.label + " · " + humanSize(e.sizeBytes);
+        }
+        final boolean[] checked = new boolean[entries.size()];
+        final android.content.Context ctx = getContext();
+        new androidx.appcompat.app.AlertDialog.Builder(ctx)
+                .setTitle(getString(R.string.subtitle_cache_manage_title)
+                        + " (" + humanSize(org.schabi.newpipe.player.subtitles.SubtitleCache.totalSize(ctx)) + ")")
+                .setMultiChoiceItems(labels, checked,
+                        (dialog, which, isChecked) -> checked[which] = isChecked)
+                .setPositiveButton(R.string.subtitle_cache_delete_selected, (d, w) -> {
+                    for (int i = 0; i < entries.size(); i++) {
+                        if (checked[i]) {
+                            org.schabi.newpipe.player.subtitles.SubtitleCache.deleteByKey(ctx, entries.get(i).key);
+                        }
+                    }
+                    refreshSubtitleCacheSummary();
+                })
+                .setNegativeButton(R.string.subtitle_cache_clear_all, (d, w) -> {
+                    org.schabi.newpipe.player.subtitles.SubtitleCache.clearAll(ctx);
+                    refreshSubtitleCacheSummary();
+                })
+                .setNeutralButton(android.R.string.cancel, null)
+                .show();
     }
 
     private void refreshCacheSummary() {
@@ -165,6 +230,7 @@ public class BulletCommentsSettingsFragment extends BasePreferenceFragment {
     public void onResume() {
         super.onResume();
         refreshCacheSummary();
+        refreshSubtitleCacheSummary();
         getPreferenceManager().getSharedPreferences()
                 .registerOnSharedPreferenceChangeListener(listener);
     }

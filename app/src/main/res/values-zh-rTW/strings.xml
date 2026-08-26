@@ -130,6 +130,12 @@
 <string name="contribution_title">貢獻</string>
 <string name="title_activity_history">歷史紀錄</string>
 <string name="action_history">歷史紀錄</string>
+<!-- Subtitles -->
+<string name="tab_subtitles">有字幕的影片</string>
+<string name="subtitle_jump_empty">找不到字幕清單</string>
+<string name="subtitle_jump_error">找不到字幕清單</string>
+<string name="subtitle_jump_search_hint">搜尋標題或影片 ID</string>
+<string name="subtitle_jump_load_more">載入更多</string>
 <string name="delete_item_search_history">確定要刪除此項搜尋紀錄嗎？</string>
 <string name="no_player_found_toast">找不到串流播放器（您可以安裝 VLC 來播放）。</string>
 <string name="default_content_country_title">預設內容國家</string>
@@ -1084,6 +1090,12 @@
 <string name="subtitle_base_url_title">字幕倉庫基礎網址</string>
 <string name="subtitle_base_url_summary">字幕倉庫的 raw 根網址（結尾不要斜線）。App 會請求 &lt;網址&gt;/&lt;影片ID&gt;.ass，其次 .srt。</string>
 <string name="subtitle_font_title">字幕字型</string>
+<string name="subtitle_cache_category_title">字幕快取</string>
+<string name="subtitle_cache_manage_title">管理字幕快取</string>
+<string name="subtitle_cache_manage_empty">暫無已快取的字幕。</string>
+<string name="subtitle_cache_summary_count">%1$d 條 · %2$s</string>
+<string name="subtitle_cache_delete_selected">刪除選取</string>
+<string name="subtitle_cache_clear_all">清空全部</string>
 <string-array name="subtitle_font_entries">
     <item>霞鶩文楷</item>
     <item>襯線體 (Serif)</item>

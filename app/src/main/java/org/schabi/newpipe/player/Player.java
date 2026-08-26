@@ -2485,6 +2485,22 @@ public final class Player implements
 
     private MovieBulletCommentsPlayer bcPlayer = null;
     private org.schabi.newpipe.player.subtitles.SubtitleOverlayView subtitleOverlayView = null;
+    private java.util.List<org.schabi.newpipe.player.subtitles.SubtitleLine> subtitleLines = null;
+    private boolean subtitleShown = false;
+
+    /** When set before opening a video, the player auto-loads the online subtitle matching this id. */
+    private static String pendingAutoLoadSubtitleId = null;
+
+    /**
+     * Set a subtitle id that should be auto-loaded once the next prepared stream matches it.
+     * Used by the subtitle-jump flow (e.g. {@code SubtitleJumpFragment}).
+     *
+     * @param id the repo subtitle id (usually the YouTube video id), or {@code null}/{@code ""}
+     *           to clear
+     */
+    public static void setPendingAutoLoadSubtitleId(final String id) {
+        pendingAutoLoadSubtitleId = id;
+    }
 
     private Duration getCurrentPositionDuration() {
         if (currentItem == null) {
@@ -2505,6 +2521,12 @@ public final class Player implements
      *////////////////////////////////////////////////
     //region BulletCommentsPlayer
     private void initBCPlayer() {
+        // Reset subtitle state for the newly prepared stream so old subs don't leak over.
+        subtitleLines = null;
+        subtitleShown = false;
+        if (subtitleOverlayView != null) {
+            subtitleOverlayView.setLines(new java.util.ArrayList<>());
+        }
         try {
             if (currentMetadata != null && NewPipe.getService(currentMetadata.getServiceId())
                     .getServiceInfo()
@@ -2733,6 +2755,17 @@ public final class Player implements
         if (currentMetadata == null) {
             return;
         }
+        final String id = subtitleIdFor(currentMetadata.getStreamUrl());
+        loadAndShowSubtitle(id);
+    }
+
+    /** Load (or toggle) the online subtitle for the given repo id, showing user feedback. */
+    private void loadAndShowSubtitle(final String id) {
+        if (id == null || id.isEmpty()) {
+            android.widget.Toast.makeText(context, "无法从此视频链接识别字幕 ID",
+                    android.widget.Toast.LENGTH_LONG).show();
+            return;
+        }
         if (!prefs.getBoolean(context.getString(R.string.subtitle_enable_key), true)) {
             android.widget.Toast.makeText(context, "字幕功能已关闭，请在设置中开启",
                     android.widget.Toast.LENGTH_LONG).show();
@@ -2743,25 +2776,31 @@ public final class Player implements
         }
         subtitleOverlayView.setFont(prefs.getString(context.getString(R.string.subtitle_font_key),
                 "lxgw_wenkai"));
-        final String baseUrl = prefs.getString(context.getString(R.string.subtitle_base_url_key),
-                subtitleBaseUrlDefault());
-        final String id = subtitleIdFor(currentMetadata.getStreamUrl());
-        if (id.isEmpty()) {
-            android.widget.Toast.makeText(context, "无法从此视频链接识别字幕 ID",
-                    android.widget.Toast.LENGTH_LONG).show();
+
+        // Already loaded: toggle show/hide (no re-download).
+        if (subtitleLines != null && !subtitleLines.isEmpty()) {
+            subtitleShown = !subtitleShown;
+            subtitleOverlayView.setLines(subtitleShown ? subtitleLines : new java.util.ArrayList<>());
+            android.widget.Toast.makeText(context, subtitleShown ? "已显示字幕" : "已隐藏字幕",
+                    android.widget.Toast.LENGTH_SHORT).show();
             return;
         }
+
+        final String baseUrl = prefs.getString(context.getString(R.string.subtitle_base_url_key),
+                subtitleBaseUrlDefault());
         android.widget.Toast.makeText(context, "正在加载在线字幕 (" + id + ")…",
                 android.widget.Toast.LENGTH_LONG).show();
         new Thread(() -> {
             final java.util.List<org.schabi.newpipe.player.subtitles.SubtitleLine> lines =
                     org.schabi.newpipe.player.subtitles.OnlineSubtitleFetcher.fetch(
-                            context, baseUrl, id, true);
+                            context, baseUrl, id, false);
             new android.os.Handler(android.os.Looper.getMainLooper()).post(() -> {
                 if (lines != null && !lines.isEmpty()) {
+                    subtitleLines = lines;
+                    subtitleShown = true;
                     subtitleOverlayView.setLines(lines);
                     android.widget.Toast.makeText(context,
-                            "已加载字幕，共 " + lines.size() + " 条",
+                            "已加载字幕，共 " + lines.size() + " 条（再点字幕按钮可关闭）",
                             android.widget.Toast.LENGTH_LONG).show();
                 } else {
                     android.widget.Toast.makeText(context,
@@ -2770,6 +2809,26 @@ public final class Player implements
                 }
             });
         }).start();
+    }
+
+    /** Auto-load a pending subtitle (set via {@link #setPendingAutoLoadSubtitleId}) if it matches
+     * the currently prepared stream. Consumes the pending id once metadata is available so the
+     * auto-load fires only once, on the stream that was actually opened. */
+    private void maybeAutoLoadSubtitleFromPending() {
+        if (pendingAutoLoadSubtitleId == null || pendingAutoLoadSubtitleId.isEmpty()) {
+            return;
+        }
+        // Metadata may not be populated yet on the very first onPrepared; keep the request pending
+        // so a later hook (e.g. initBCPlayer) can pick it up.
+        if (currentMetadata == null) {
+            return;
+        }
+        final String pendingId = pendingAutoLoadSubtitleId;
+        pendingAutoLoadSubtitleId = null;
+        final String currentId = subtitleIdFor(currentMetadata.getStreamUrl());
+        if (pendingId.equals(currentId)) {
+            loadAndShowSubtitle(currentId);
+        }
     }
     //endregion Online subtitles
 
@@ -3549,6 +3608,12 @@ case ERROR_CODE_DECODER_INIT_FAILED: {
         }
         if (subtitleOverlayView != null) {
             subtitleOverlayView.setPositionMs(currentProgress);
+        }
+        // Auto-load a pending online subtitle only once playback is actually running (progress is
+        // being reported). maybeAutoLoadSubtitleFromPending() consumes the pending id, so it fires
+        // exactly once, at the right time instead of prematurely during prepare.
+        if (isPlaying()) {
+            maybeAutoLoadSubtitleFromPending();
         }
         // YouTube livestreams use DASH and getCurrentPosition() works correctly
         // Other services (HLS) need startAt hack to show correct time
