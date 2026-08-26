@@ -88,4 +88,121 @@
             android:summary="%s"
             app:singleLineTitle="false"
             app:iconSpaceReserved="false"/>
+
+    <PreferenceCategory
+            android:title="@string/danmaku_translation_category"
+            app:singleLineTitle="false"
+            app:iconSpaceReserved="false">
+
+        <SwitchPreferenceCompat
+                android:key="@string/danmaku_show_original_key"
+                android:title="@string/danmaku_show_original_title"
+                android:summary="@string/danmaku_show_original_summary"
+                android:defaultValue="true"
+                app:singleLineTitle="false"
+                app:iconSpaceReserved="false"/>
+
+        <ListPreference
+                android:key="@string/danmaku_translation_provider_key"
+                android:title="@string/danmaku_translation_provider_title"
+                android:entries="@array/danmaku_translation_provider_entries"
+                android:entryValues="@array/danmaku_translation_provider_values"
+                android:defaultValue="mlkit"
+                app:singleLineTitle="false"
+                app:iconSpaceReserved="false"/>
+
+        <ListPreference
+                android:key="@string/danmaku_translation_target_lang_key"
+                android:title="@string/danmaku_translation_target_lang_title"
+                android:entries="@array/danmaku_translation_target_lang_entries"
+                android:entryValues="@array/danmaku_translation_target_lang_values"
+                android:defaultValue="zh-CN"
+                app:singleLineTitle="false"
+                app:iconSpaceReserved="false"/>
+
+        <ListPreference
+                android:key="@string/danmaku_source_lang_key"
+                android:title="@string/danmaku_source_lang_title"
+                android:summary="@string/danmaku_source_lang_summary"
+                android:entries="@array/danmaku_source_lang_entries"
+                android:entryValues="@array/danmaku_source_lang_values"
+                android:defaultValue="auto"
+                app:singleLineTitle="false"
+                app:iconSpaceReserved="false"/>
+
+        <ListPreference
+                android:key="@string/danmaku_progress_interval_key"
+                android:title="@string/danmaku_progress_interval_title"
+                android:summary="%s"
+                android:entries="@array/danmaku_progress_interval_entries"
+                android:entryValues="@array/danmaku_progress_interval_values"
+                android:defaultValue="100"
+                app:singleLineTitle="false"
+                app:iconSpaceReserved="false"/>
+
+        <EditTextPreference
+                android:key="@string/llm_base_url_key"
+                android:title="@string/llm_base_url_title"
+                android:defaultValue="https://api.deepseek.com"
+                app:singleLineTitle="false"
+                app:iconSpaceReserved="false"/>
+
+        <EditTextPreference
+                android:key="@string/llm_api_key_key"
+                android:title="@string/llm_api_key_title"
+                android:defaultValue=""
+                app:singleLineTitle="false"
+                app:iconSpaceReserved="false"/>
+
+        <EditTextPreference
+                android:key="@string/llm_model_key"
+                android:title="@string/llm_model_title"
+                android:defaultValue="deepseek-chat"
+                app:singleLineTitle="false"
+                app:iconSpaceReserved="false"/>
+
+        <ListPreference
+                android:key="@string/danmaku_llm_source_key"
+                android:title="@string/danmaku_llm_source_title"
+                android:summary="@string/danmaku_llm_source_summary"
+                android:entries="@array/danmaku_llm_source_entries"
+                android:entryValues="@array/danmaku_llm_source_values"
+                android:defaultValue="cloud"
+                app:singleLineTitle="false"
+                app:iconSpaceReserved="false"/>
+
+        <EditTextPreference
+                android:key="@string/danmaku_llm_local_base_url_key"
+                android:title="@string/danmaku_llm_local_base_url_title"
+                android:defaultValue=""
+                app:singleLineTitle="false"
+                app:iconSpaceReserved="false"/>
+
+        <EditTextPreference
+                android:key="@string/danmaku_llm_local_model_key"
+                android:title="@string/danmaku_llm_local_model_title"
+                android:defaultValue="qwen2.5:7b"
+                app:singleLineTitle="false"
+                app:iconSpaceReserved="false"/>
+
+        <EditTextPreference
+                android:key="@string/danmaku_llm_local_key_key"
+                android:title="@string/danmaku_llm_local_key_title"
+                android:defaultValue="ollama"
+                app:singleLineTitle="false"
+                app:iconSpaceReserved="false"/>
+    </PreferenceCategory>
+
+    <PreferenceCategory
+            android:title="@string/danmaku_cache_category_title"
+            app:singleLineTitle="false"
+            app:iconSpaceReserved="false">
+
+        <Preference
+                android:key="@string/danmaku_cache_key"
+                android:title="@string/danmaku_cache_manage_title"
+                android:summary=""
+                app:singleLineTitle="false"
+                app:iconSpaceReserved="false"/>
+    </PreferenceCategory>
 </PreferenceScreen>

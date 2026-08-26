@@ -1577,6 +1577,22 @@
     <string name="max_bullet_comments_rows_bottom_key">max_bullet_comments_rows_bottom_key</string>
     <string name="max_bullet_comments_rows_regular_key">max_bullet_comments_rows_regular_key</string>
 
+    <string name="enable_danmaku_translation_key">enable_danmaku_translation_key</string>
+    <string name="danmaku_translation_provider_key">danmaku_translation_provider_key</string>
+    <string name="danmaku_translation_target_lang_key">danmaku_translation_target_lang_key</string>
+    <string name="llm_base_url_key">llm_base_url_key</string>
+    <string name="llm_api_key_key">llm_api_key_key</string>
+    <string name="llm_model_key">llm_model_key</string>
+    <string name="danmaku_llm_source_key">danmaku_llm_source_key</string>
+    <string name="danmaku_llm_local_base_url_key">danmaku_llm_local_base_url_key</string>
+    <string name="danmaku_llm_local_model_key">danmaku_llm_local_model_key</string>
+    <string name="danmaku_llm_local_key_key">danmaku_llm_local_key_key</string>
+    <string name="danmaku_show_original_key">danmaku_show_original_key</string>
+    <string name="danmaku_predownload_key">danmaku_predownload_key</string>
+    <string name="danmaku_source_lang_key">danmaku_source_lang_key</string>
+    <string name="danmaku_progress_interval_key">danmaku_progress_interval_key</string>
+    <string name="danmaku_cache_key">danmaku_cache_key</string>
+
     <string name="bullet_comments_outline_radius_key">bullet_comments_outline_radius_key</string>
     <string name="advanced_formats_key">advanced_formats_key</string>
     <string name="preferred_audio_language_key">preferred_audio_language_key</string>

@@ -9,6 +9,10 @@ import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Typeface;
 import android.os.Build;
+import android.text.SpannableString;
+import android.text.Spanned;
+import android.text.style.ForegroundColorSpan;
+import android.text.style.RelativeSizeSpan;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.util.TypedValue;
@@ -136,6 +140,10 @@ public final class BulletCommentsView extends ConstraintLayout {
     private String font;
     private int opacity; // 0~255, 0: hide
     private final List<AnimatedTextView> animatedTextViews = new ArrayList<>();
+    // Key by reference identity (not InfoItem.equals, which may collapse all danmaku of a
+    // video to one key); each on-screen danmaku is a distinct entry.
+    private final Map<BulletCommentsInfoItem, TextView> activeComments =
+            Collections.synchronizedMap(new IdentityHashMap<BulletCommentsInfoItem, TextView>());
 
     private int maxRowsTop = 1000000;
     private int maxRowsBottom = 1000000;
@@ -302,13 +310,22 @@ public final class BulletCommentsView extends ConstraintLayout {
                 color |= ((opacity & 0xFF) << 24);
             }
             textView.setTextColor(color);
-            textView.setText(item.getCommentText());
-            if(item.getCommentText().length() == 0){
+            final String content = item.getCommentText();
+            if (content.length() == 0) {
                 continue;
             }
+            // Two-line danmaku: line 1 = translated, line 2 = original (smaller + dimmer).
+            final int newline = content.indexOf('\n');
+            // Respect the "show original" toggle at render time, so switching it off hides the
+            // original even for text already baked into the download/cache (translated\noriginal).
+            final boolean showOrig = prefs.getBoolean(
+                    getContext().getString(R.string.danmaku_show_original_key), true);
+            final String display = (showOrig || newline < 0)
+                    ? content : content.substring(0, newline);
+            textView.setText(buildDisplay(display, color));
             textView.setTextSize(TypedValue.COMPLEX_UNIT_PX,
                     (float) (Math.min(height, width) * commentRelativeTextSize * item.getRelativeFontSize()));
-            textView.setMaxLines(1);
+            textView.setMaxLines(showOrig && newline >= 0 ? 2 : 1);
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                 textView.setTypeface(Typeface.create(fontToBeUsed, Typeface.BOLD, item.getPosition().equals(BulletCommentsInfoItem.Position.SUPERCHAT)));
             } else {
@@ -351,7 +368,12 @@ public final class BulletCommentsView extends ConstraintLayout {
                                 -textWidth
                         );
                     }
-                    textView.setY((float) (height * (0.5 + row) / calculatedCommentRowsCount - textHeight / 2));
+                    // Clamp Y inside the view so a taller two-line (translated+original) comment
+                    // is not pushed off the top/bottom edge and clipped.
+                    float y = (float) (height * (0.5 + row) / calculatedCommentRowsCount
+                            - textHeight / 2);
+                    y = Math.max(0f, Math.min(y, height - textHeight));
+                    textView.setY(y);
 
                     final AnimatedTextView animatedTextView = new AnimatedTextView(
                             textView, animator);
@@ -367,6 +389,7 @@ public final class BulletCommentsView extends ConstraintLayout {
                         public void onAnimationEnd(final Animator animation) {
                             binding.bulletCommentsContainer.removeView(textView);
                             animatedTextViews.remove(animatedTextView);
+                            activeComments.remove(item);
                         }
                     });
                     animator.start();
@@ -376,6 +399,53 @@ public final class BulletCommentsView extends ConstraintLayout {
                 //textView.setY(random.nextInt(maxTextViewPosY));
             }
             binding.bulletCommentsContainer.addView(textView);
+            // Register synchronously so the fast ML Kit translation callback can find it.
+            activeComments.put(item, textView);
+        }
+    }
+
+    /**
+     * Build the display text for a danmaku. If it contains a newline (translated + original),
+     * the second line is rendered smaller and dimmer.
+     */
+    private CharSequence buildDisplay(final String content, final int color) {
+        final int newline = content.indexOf('\n');
+        if (newline < 0) {
+            return content;
+        }
+        final SpannableString sp = new SpannableString(content);
+        sp.setSpan(new RelativeSizeSpan(0.62f),
+                newline + 1, content.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        final int dimColor = (color & 0x00FFFFFF) | ((((color >>> 24) & 0xFF) * 60 / 100) << 24);
+        sp.setSpan(new ForegroundColorSpan(dimColor),
+                newline + 1, content.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        return sp;
+    }
+
+    /**
+     * Two-phase update: once a danmaku's translation arrives, swap its on-screen text to
+     * "translated\noriginal" in place. Runs on the UI thread.
+     */
+    public void updateTranslation(final BulletCommentsInfoItem item, final String translation) {
+        if (item == null || translation == null) {
+            return;
+        }
+        final TextView tv = activeComments.get(item);
+        Log.d("BulletCommentsView", "updateTranslation: found=" + (tv != null)
+                + " tr=[" + translation + "]");
+        if (tv == null) {
+            return;
+        }
+        final String original = item.getCommentText();
+        final int color = tv.getCurrentTextColor();
+        final boolean showOriginal = prefs.getBoolean(
+                getContext().getString(R.string.danmaku_show_original_key), true);
+        if (showOriginal) {
+            tv.setText(buildDisplay(translation + "\n" + original, color));
+            tv.setMaxLines(2);
+        } else {
+            tv.setText(translation);
+            tv.setMaxLines(1);
         }
     }
 }

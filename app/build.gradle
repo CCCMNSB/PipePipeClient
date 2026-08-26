@@ -233,6 +233,10 @@ dependencies {
     implementation "com.google.android.exoplayer:exoplayer:${exoPlayerVersion}"
     implementation "com.google.android.exoplayer:extension-mediasession:${exoPlayerVersion}"
 
+    // On-device (offline) translation + language detection for danmaku
+    implementation 'com.google.mlkit:translate:17.0.3'
+    implementation 'com.google.mlkit:language-id:17.0.6'
+
     // Metadata generator for service descriptors
     compileOnly "com.google.auto.service:auto-service-annotations:${googleAutoServiceVersion}"
     kapt "com.google.auto.service:auto-service:${googleAutoServiceVersion}"
@@ -289,6 +293,7 @@ dependencies {
 
 //    implementation 'com.arthenica:ffmpeg-kit-https:6.0-2.LTS'
     implementation project(':ffmpeg')
+    implementation project(':translator')
     implementation 'com.arthenica:smart-exception-java:0.2.1'
 
 /** Instrumented integration tests **/

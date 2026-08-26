@@ -35,5 +35,6 @@ rootProject.name = "PipePipe"
 
 include ':app'
 include ':ffmpeg'
+include ':translator'
 
 includeBuild('../PipePipeExtractor')

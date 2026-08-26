@@ -1,0 +1,28 @@
+// PipePipe Danmaku Translator module.
+// Deliberately self-contained and Android-free in its core logic, so it does not
+// conflict with upstream NewPipe/PipePipe syncs. The only Android coupling is the
+// preference reading, which lives in the app (DanmakuTranslationBridge) not here.
+plugins {
+    id 'com.android.library'
+}
+
+android {
+    namespace 'com.pipepipe.translator'
+    compileSdk 37
+
+    defaultConfig {
+        minSdk 23
+        consumerProguardFiles 'proguard-rules.pro'
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    // org.json is provided by the Android platform (android.jar), so it needs no
+    // extra dependency for the Android build. It is supplied externally when the
+    // engine is compiled standalone for testing.
+}

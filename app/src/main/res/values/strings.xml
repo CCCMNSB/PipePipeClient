@@ -1008,6 +1008,95 @@
 <string name="max_bullet_comments_rows_regular_summary">Max rows for regular bullet comments</string>
 <string name="enable_max_rows_customization_title">Customize Max Rows</string>
 <string name="enable_max_rows_customization_summary">Enable to customize maximum rows for bullet comments</string>
+
+<string name="danmaku_translation_category">Danmaku auto-translation</string>
+<string name="enable_danmaku_translation_title">Auto-translate danmaku</string>
+<string name="enable_danmaku_translation_summary">Translate bullet comments automatically via Google or an LLM. The original is shown until a translation is ready; translations are cached.</string>
+<string name="danmaku_translation_provider_title">Translation engine</string>
+<string name="danmaku_translation_target_lang_title">Target language</string>
+<string name="llm_base_url_title">LLM API base URL</string>
+<string name="llm_api_key_title">LLM API key</string>
+<string name="llm_model_title">LLM model</string>
+<string name="danmaku_llm_source_title">LLM source</string>
+<string name="danmaku_llm_source_summary">Where the LLM runs. Local = your own machine on the LAN (e.g. Ollama); Cloud = an online API (e.g. DeepSeek).</string>
+<string-array name="danmaku_llm_source_entries">
+    <item>Cloud (online)</item>
+    <item>Local (LAN)</item>
+</string-array>
+<string-array name="danmaku_llm_source_values">
+    <item>cloud</item>
+    <item>local</item>
+</string-array>
+<string name="danmaku_llm_local_base_url_title">Local model base URL</string>
+<string name="danmaku_llm_local_model_title">Local model name</string>
+<string name="danmaku_llm_local_key_title">Local API key (optional)</string>
+<string name="danmaku_show_original_title">Show original below translation</string>
+<string name="danmaku_show_original_summary">When on, the original danmaku is shown smaller below the translation. Turn off to show only the translation.</string>
+<string name="danmaku_predownload_title">Download offline model now</string>
+<string name="danmaku_predownload_summary">Download the on-device translation model in the background right away (instead of on first use), so translation works offline. Used by ML Kit.</string>
+<string name="danmaku_source_lang_title">Source language</string>
+<string name="danmaku_source_lang_summary">Language of the danmaku. \"Auto\" detects it; picking a specific language is faster and more reliable for ML Kit.</string>
+
+<string-array name="danmaku_translation_provider_entries">
+    <item>ML Kit (on-device, offline)</item>
+    <item>Google (Web, unofficial)</item>
+    <item>LLM (OpenAI-compatible)</item>
+</string-array>
+<string-array name="danmaku_translation_provider_values">
+    <item>mlkit</item>
+    <item>google</item>
+    <item>llm</item>
+</string-array>
+<string-array name="danmaku_translation_target_lang_entries">
+    <item>简体中文</item>
+    <item>繁體中文</item>
+    <item>English</item>
+    <item>日本語</item>
+    <item>한국어</item>
+</string-array>
+<string-array name="danmaku_translation_target_lang_values">
+    <item>zh-CN</item>
+    <item>zh-TW</item>
+    <item>en</item>
+    <item>ja</item>
+    <item>ko</item>
+</string-array>
+<string-array name="danmaku_source_lang_entries">
+    <item>Auto (detect)</item>
+    <item>日本語</item>
+    <item>中文</item>
+    <item>English</item>
+    <item>한국어</item>
+</string-array>
+<string-array name="danmaku_source_lang_values">
+    <item>auto</item>
+    <item>ja</item>
+    <item>zh</item>
+    <item>en</item>
+    <item>ko</item>
+</string-array>
+<string name="danmaku_progress_interval_title">Download progress notification interval</string>
+<string name="danmaku_progress_interval_summary">How often to show a progress toast while downloading and translating. Lower = more frequent updates.</string>
+<string name="danmaku_cache_category_title">Danmaku cache</string>
+<string name="danmaku_cache_manage_title">Manage danmaku cache</string>
+<string name="danmaku_cache_manage_empty">No cached danmaku yet</string>
+<string name="danmaku_cache_delete_selected">Delete selected</string>
+<string name="danmaku_cache_clear_all">Clear all</string>
+<string name="danmaku_cache_summary_count">%1$d cached video(s), %2$s</string>
+<string-array name="danmaku_progress_interval_entries">
+    <item>Every 10 messages</item>
+    <item>Every 25 messages</item>
+    <item>Every 50 messages</item>
+    <item>Every 100 messages</item>
+    <item>Every 200 messages</item>
+</string-array>
+<string-array name="danmaku_progress_interval_values">
+    <item>10</item>
+    <item>25</item>
+    <item>50</item>
+    <item>100</item>
+    <item>200</item>
+</string-array>
 <string name="press_back_again_to_exit">Press back again to exit</string>
 <string name="always_list_mode_for_bookmark_title">Always use list mode for Bookmarks</string>
 <string name="select_channel_group_prompt">Select a channel group</string>

@@ -635,6 +635,7 @@ public final class Player implements
         binding.fullScreenButton.setOnClickListener(this);
         binding.screenRotationButton.setOnClickListener(this);
         binding.switchCommentsVisibility.setOnClickListener(this);
+        binding.downloadDanmakuTranslate.setOnClickListener(this);
         binding.playWithKodi.setOnClickListener(this);
         binding.openInBrowser.setOnClickListener(this);
         binding.playerCloseButton.setOnClickListener(this);
@@ -2518,7 +2519,32 @@ public final class Player implements
                 bcPlayer = new MovieBulletCommentsPlayer(binding.bulletCommentsView);
                 bcPlayer.setInitialData(currentMetadata.getServiceId(),
                         currentMetadata.getStreamUrl());
-                bcPlayer.init();
+                final String cacheKey = org.schabi.newpipe.player.bulletComments.DanmakuCache
+                        .videoKey(currentMetadata.getServiceId(), currentMetadata.getStreamUrl());
+                if (org.schabi.newpipe.player.bulletComments.DanmakuCache.has(context, cacheKey)) {
+                    // A cached translation exists for this video: load it on a background thread
+                    // and swap it in, skipping the live/streaming feed.
+                    final String ck = cacheKey;
+                    new Thread(() -> {
+                        final boolean showOrig = org.schabi.newpipe.player.bulletComments
+                                .DanmakuTranslationBridge.showOriginal(context);
+                        final List<org.schabi.newpipe.extractor.bulletComments.BulletCommentsInfoItem>
+                                cached = org.schabi.newpipe.player.bulletComments.DanmakuCache
+                                .load(context, ck, showOrig);
+                        new android.os.Handler(android.os.Looper.getMainLooper()).post(() -> {
+                            if (bcPlayer != null) {
+                                if (cached != null && !cached.isEmpty()) {
+                                    bcPlayer.loadDownloaded(cached);
+                                    Log.d(TAG, "Loaded cached translated danmaku: " + cached.size());
+                                } else {
+                                    bcPlayer.init();
+                                }
+                            }
+                        });
+                    }).start();
+                } else {
+                    bcPlayer.init();
+                }
                 Log.d(TAG, "BulletCommentsView initialized.");
             } else {
                 Log.i(TAG, "Current service does not have MediaCapability of BULLET_COMMENTS"
@@ -2621,6 +2647,54 @@ public final class Player implements
         } else {
             clearBCPlayer();
         }
+    }
+
+    /**
+     * Button in the player: download the full danmaku list and translate it, with visible
+     * progress via toasts, then load it into the bullet-comment player aligned to the timeline.
+     */
+    private void onDownloadDanmakuTranslateClicked() {
+        if (currentMetadata == null) {
+            return;
+        }
+        // NOTE: an AlertDialog can't be shown from the player service context (BadTokenException);
+        // confirm-as-dialog needs an Activity context, so for now start directly.
+        startDanmakuDownload(currentMetadata.getServiceId(), currentMetadata.getStreamUrl());
+    }
+
+    private void startDanmakuDownload(final int serviceId, final String url) {
+        android.widget.Toast.makeText(context, "开始下载弹幕并翻译…", android.widget.Toast.LENGTH_LONG).show();
+        org.schabi.newpipe.player.bulletComments.DanmakuDownloadHelper.start(
+                context, serviceId, url,
+                new org.schabi.newpipe.player.bulletComments.DanmakuDownloadHelper.Listener() {
+                    @Override
+                    public void onProgress(final String stage, final int cur, final int total) {
+                        new android.os.Handler(android.os.Looper.getMainLooper()).post(() ->
+                                android.widget.Toast.makeText(context,
+                                        stage + (total > 0
+                                                ? " " + cur + "/" + total
+                                                : " " + cur + " 条"),
+                                        android.widget.Toast.LENGTH_SHORT).show());
+                    }
+
+                    @Override
+                    public void onDone(final java.util.List<org.schabi.newpipe.extractor.bulletComments.BulletCommentsInfoItem> translated) {
+                        new android.os.Handler(android.os.Looper.getMainLooper()).post(() -> {
+                            if (bcPlayer != null) {
+                                bcPlayer.loadDownloaded(translated);
+                            }
+                            android.widget.Toast.makeText(context,
+                                    "翻译完成，已按时间轴加载", android.widget.Toast.LENGTH_LONG).show();
+                        });
+                    }
+
+                    @Override
+                    public void onError(final String msg) {
+                        new android.os.Handler(android.os.Looper.getMainLooper()).post(() ->
+                                android.widget.Toast.makeText(context,
+                                        "弹幕翻译失败: " + msg, android.widget.Toast.LENGTH_LONG).show());
+                    }
+                });
     }
 
     //endregion BulletCommentsPlayer
@@ -4649,6 +4723,8 @@ case ERROR_CODE_DECODER_INIT_FAILED: {
         } else if (v.getId() == binding.share.getId()) {
             ShareUtils.shareText(context, getVideoTitle(), getVideoUrlAtCurrentTime(),
                     currentItem.getThumbnailUrl());
+        } else if (v.getId() == binding.downloadDanmakuTranslate.getId()) {
+            onDownloadDanmakuTranslateClicked();
         } else if (v.getId() == binding.switchCommentsVisibility.getId()) {
             onSwitchBCPlayerVisibilityClicked();
         } else if (v.getId() == binding.playWithKodi.getId()) {
