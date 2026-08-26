@@ -193,7 +193,9 @@ class NewVersionWorker(
         private val DEBUG = MainActivity.DEBUG
         private val TAG = NewVersionWorker::class.java.simpleName
         private val RELEASE_APK_ABIS = listOf("armeabi-v7a", "arm64-v8a", "x86_64", "x86")
-        private const val NEWPIPE_API_URL = "https://api.github.com/repositories/490984887/releases"
+        // 更新源：指向作者自己的公开发布仓库（PipeDanmakuTranslate）的 GitHub Releases。
+        // 这样"检查更新"会查到作者自己的新版 APK（同一把串签名），能正常覆盖安装。
+        private const val NEWPIPE_API_URL = "https://api.github.com/repos/CCCMNSB/PipeDanmakuTranslate/releases"
         private const val IS_MANUAL = "isManual"
 
         private fun getReleaseApkAbi(name: String): String? {
