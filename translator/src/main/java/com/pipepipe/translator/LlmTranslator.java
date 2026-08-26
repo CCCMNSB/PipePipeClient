@@ -60,14 +60,16 @@ public class LlmTranslator implements DanmakuTranslator {
                 .put("role", "system")
                 .put("content",
                         "You are a concise translation engine. Translate the user's text into "
-                                + targetLang + ". Reply with ONLY the translation. Do not add "
-                                + "explanations, quotes, or notes.");
+                                + targetLang + ". Reply with ONLY the translation, nothing else. "
+                                + "Do not output thinking, reasoning, chain-of-thought, explanations, "
+                                + "quotes, or notes.");
         final JSONObject user = new JSONObject()
                 .put("role", "user")
                 .put("content", text);
         final JSONObject root = new JSONObject()
                 .put("model", model)
                 .put("temperature", 0)
+                .put("reasoning_effort", "low")
                 .put("messages", new JSONArray().put(system).put(user));
         final String response = post(root);
         return parseResponse(response);
@@ -88,13 +90,15 @@ public class LlmTranslator implements DanmakuTranslator {
                 .put("content",
                         "You are a translation engine. Translate each numbered line below into "
                                 + targetLang + ". Reply with exactly " + texts.size()
-                                + " lines, each being the translation of the corresponding "
-                                + "numbered input line, in the same order. Do not number them and "
-                                + "do not add explanations or notes.");
+                                + " lines, each being only the translation of the corresponding "
+                                + "numbered input line, in the same order. Do not number them, and do "
+                                + "not output thinking, reasoning, chain-of-thought, explanations, "
+                                + "or any extra text.");
         final JSONObject user = new JSONObject().put("role", "user").put("content", userContent.toString());
         final JSONObject root = new JSONObject()
                 .put("model", model)
                 .put("temperature", 0)
+                .put("reasoning_effort", "low")
                 .put("messages", new JSONArray().put(system).put(user));
         final String response = post(root);
         final String content = parseResponse(response);
@@ -117,37 +121,53 @@ public class LlmTranslator implements DanmakuTranslator {
     }
 
     private String post(final JSONObject root) {
-        try {
-            final String url = endpoint();
-            final HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
+        for (int attempt = 0; attempt < 3; attempt++) {
+            boolean transientFail = false;
+            String body = null;
+            int code = -1;
             try {
-                conn.setRequestMethod("POST");
-                conn.setConnectTimeout(connectTimeoutMs);
-                conn.setReadTimeout(readTimeoutMs);
-                conn.setRequestProperty("Content-Type", "application/json");
-                conn.setRequestProperty("Accept", "application/json");
-                if (apiKey != null && !apiKey.trim().isEmpty()) {
-                    conn.setRequestProperty("Authorization", "Bearer " + apiKey.trim());
+                final String url = endpoint();
+                final HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
+                try {
+                    conn.setRequestMethod("POST");
+                    conn.setConnectTimeout(connectTimeoutMs);
+                    conn.setReadTimeout(readTimeoutMs);
+                    conn.setRequestProperty("Content-Type", "application/json");
+                    conn.setRequestProperty("Accept", "application/json");
+                    if (apiKey != null && !apiKey.trim().isEmpty()) {
+                        conn.setRequestProperty("Authorization", "Bearer " + apiKey.trim());
+                    }
+                    conn.setDoOutput(true);
+                    try (OutputStream os = conn.getOutputStream()) {
+                        os.write(root.toString().getBytes(StandardCharsets.UTF_8));
+                    }
+                    code = conn.getResponseCode();
+                    final InputStream stream = code >= 400 ? conn.getErrorStream() : conn.getInputStream();
+                    body = (stream != null) ? readBody(stream) : null;
+                } finally {
+                    conn.disconnect();
                 }
-                conn.setDoOutput(true);
-                try (OutputStream os = conn.getOutputStream()) {
-                    os.write(root.toString().getBytes(StandardCharsets.UTF_8));
-                }
-                final int code = conn.getResponseCode();
-                final InputStream stream = code >= 400 ? conn.getErrorStream() : conn.getInputStream();
-                if (stream == null) {
+            } catch (final Exception e) {
+                transientFail = true;
+            }
+
+            // 429 (rate-limited) or a transient network error: back off briefly and retry.
+            if (attempt < 2 && (transientFail || code == 429)) {
+                try {
+                    Thread.sleep(transientFail ? 500L : 1000L);
+                } catch (final InterruptedException ie) {
+                    Thread.currentThread().interrupt();
                     return null;
                 }
-                final String body = readBody(stream);
-                return (code >= 400 || body == null || body.trim().isEmpty()) ? null : body;
-            } finally {
-                conn.disconnect();
+                continue;
             }
-        } catch (Exception e) {
-            // A failing translation should not break the batch queue: log + fall back.
-            android.util.Log.e("LlmTranslator", "translate request failed", e);
-            return null;
+            if (transientFail) {
+                android.util.Log.e("LlmTranslator", "translate request failed");
+                return null;
+            }
+            return (code >= 400 || body == null || body.trim().isEmpty()) ? null : body;
         }
+        return null;
     }
 
     private String endpoint() {

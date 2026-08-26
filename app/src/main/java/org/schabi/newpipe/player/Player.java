@@ -636,6 +636,7 @@ public final class Player implements
         binding.screenRotationButton.setOnClickListener(this);
         binding.switchCommentsVisibility.setOnClickListener(this);
         binding.downloadDanmakuTranslate.setOnClickListener(this);
+        binding.loadSubtitle.setOnClickListener(this);
         binding.playWithKodi.setOnClickListener(this);
         binding.openInBrowser.setOnClickListener(this);
         binding.playerCloseButton.setOnClickListener(this);
@@ -2483,6 +2484,7 @@ public final class Player implements
     }
 
     private MovieBulletCommentsPlayer bcPlayer = null;
+    private org.schabi.newpipe.player.subtitles.SubtitleOverlayView subtitleOverlayView = null;
 
     private Duration getCurrentPositionDuration() {
         if (currentItem == null) {
@@ -2698,6 +2700,78 @@ public final class Player implements
     }
 
     //endregion BulletCommentsPlayer
+
+    //region Online subtitles (manual load, can be disabled)
+    private String subtitleBaseUrlDefault() {
+        return "https://raw.githubusercontent.com/CCCMNSB/subtitles/main/subtitles";
+    }
+
+    /** Extract a repo id from the stream URL, or fall back to a normalized url string. */
+    private String subtitleIdFor(final String url) {
+        if (url == null) {
+            return "";
+        }
+        // YouTube: ?v=ID | youtu.be/ID
+        try {
+            final java.util.regex.Matcher v = java.util.regex.Pattern
+                    .compile("[?&]v=([A-Za-z0-9_-]{6,})")
+                    .matcher(url);
+            if (v.find()) {
+                return v.group(1);
+            }
+            final int i = url.indexOf("youtu.be/");
+            if (i >= 0) {
+                return url.substring(i + "youtu.be/".length()).split("[?/#]")[0];
+            }
+        } catch (final RuntimeException e) {
+            // ignore
+        }
+        return url;
+    }
+
+    private void onLoadSubtitleClicked() {
+        if (currentMetadata == null) {
+            return;
+        }
+        if (!prefs.getBoolean(context.getString(R.string.subtitle_enable_key), true)) {
+            android.widget.Toast.makeText(context, "字幕功能已关闭，请在设置中开启",
+                    android.widget.Toast.LENGTH_LONG).show();
+            return;
+        }
+        if (subtitleOverlayView == null) {
+            subtitleOverlayView = binding.subtitleOverlayView;
+        }
+        subtitleOverlayView.setFont(prefs.getString(context.getString(R.string.subtitle_font_key),
+                "lxgw_wenkai"));
+        final String baseUrl = prefs.getString(context.getString(R.string.subtitle_base_url_key),
+                subtitleBaseUrlDefault());
+        final String id = subtitleIdFor(currentMetadata.getStreamUrl());
+        if (id.isEmpty()) {
+            android.widget.Toast.makeText(context, "无法从此视频链接识别字幕 ID",
+                    android.widget.Toast.LENGTH_LONG).show();
+            return;
+        }
+        android.widget.Toast.makeText(context, "正在加载在线字幕 (" + id + ")…",
+                android.widget.Toast.LENGTH_LONG).show();
+        new Thread(() -> {
+            final java.util.List<org.schabi.newpipe.player.subtitles.SubtitleLine> lines =
+                    org.schabi.newpipe.player.subtitles.OnlineSubtitleFetcher.fetch(
+                            context, baseUrl, id, true);
+            new android.os.Handler(android.os.Looper.getMainLooper()).post(() -> {
+                if (lines != null && !lines.isEmpty()) {
+                    subtitleOverlayView.setLines(lines);
+                    android.widget.Toast.makeText(context,
+                            "已加载字幕，共 " + lines.size() + " 条",
+                            android.widget.Toast.LENGTH_LONG).show();
+                } else {
+                    android.widget.Toast.makeText(context,
+                            "未找到字幕: " + id + "（请核对仓库地址/ID）",
+                            android.widget.Toast.LENGTH_LONG).show();
+                }
+            });
+        }).start();
+    }
+    //endregion Online subtitles
 
     private void onPrepared(final boolean playWhenReady) {
         if (DEBUG) {
@@ -3472,6 +3546,9 @@ case ERROR_CODE_DECODER_INIT_FAILED: {
     private void updatePlayBackElementsCurrentDuration(final int currentProgress) {
         if (currentState != STATE_PAUSED_SEEK) {
             binding.playbackSeekBar.setProgress(currentProgress);
+        }
+        if (subtitleOverlayView != null) {
+            subtitleOverlayView.setPositionMs(currentProgress);
         }
         // YouTube livestreams use DASH and getCurrentPosition() works correctly
         // Other services (HLS) need startAt hack to show correct time
@@ -4725,6 +4802,8 @@ case ERROR_CODE_DECODER_INIT_FAILED: {
                     currentItem.getThumbnailUrl());
         } else if (v.getId() == binding.downloadDanmakuTranslate.getId()) {
             onDownloadDanmakuTranslateClicked();
+        } else if (v.getId() == binding.loadSubtitle.getId()) {
+            onLoadSubtitleClicked();
         } else if (v.getId() == binding.switchCommentsVisibility.getId()) {
             onSwitchBCPlayerVisibilityClicked();
         } else if (v.getId() == binding.playWithKodi.getId()) {

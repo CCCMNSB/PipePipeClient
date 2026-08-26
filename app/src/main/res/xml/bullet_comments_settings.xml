@@ -107,7 +107,7 @@
                 android:title="@string/danmaku_translation_provider_title"
                 android:entries="@array/danmaku_translation_provider_entries"
                 android:entryValues="@array/danmaku_translation_provider_values"
-                android:defaultValue="mlkit"
+                android:defaultValue="llm"
                 app:singleLineTitle="false"
                 app:iconSpaceReserved="false"/>
 
@@ -202,6 +202,40 @@
                 android:key="@string/danmaku_cache_key"
                 android:title="@string/danmaku_cache_manage_title"
                 android:summary=""
+                app:singleLineTitle="false"
+                app:iconSpaceReserved="false"/>
+
+    </PreferenceCategory>
+
+    <PreferenceCategory
+            android:key="subtitle_category"
+            android:title="@string/subtitle_category_title"
+            app:singleLineTitle="false"
+            app:iconSpaceReserved="false">
+
+        <SwitchPreferenceCompat
+                android:key="@string/subtitle_enable_key"
+                android:title="@string/subtitle_enable_title"
+                android:summary="@string/subtitle_enable_summary"
+                android:defaultValue="true"
+                app:singleLineTitle="false"
+                app:iconSpaceReserved="false"/>
+
+        <EditTextPreference
+                android:key="@string/subtitle_base_url_key"
+                android:title="@string/subtitle_base_url_title"
+                android:summary="@string/subtitle_base_url_summary"
+                android:defaultValue="https://raw.githubusercontent.com/CCCMNSB/subtitles/main/subtitles"
+                app:singleLineTitle="false"
+                app:iconSpaceReserved="false"/>
+
+        <ListPreference
+                android:key="@string/subtitle_font_key"
+                android:title="@string/subtitle_font_title"
+                android:summary="%s"
+                android:entries="@array/subtitle_font_entries"
+                android:entryValues="@array/subtitle_font_values"
+                android:defaultValue="@string/subtitle_font_default_value"
                 app:singleLineTitle="false"
                 app:iconSpaceReserved="false"/>
     </PreferenceCategory>

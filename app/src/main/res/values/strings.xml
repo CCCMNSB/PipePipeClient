@@ -1037,14 +1037,31 @@
 <string name="danmaku_source_lang_title">Source language</string>
 <string name="danmaku_source_lang_summary">Language of the danmaku. \"Auto\" detects it; picking a specific language is faster and more reliable for ML Kit.</string>
 
+<string name="subtitle_enable_title">Enable online subtitles</string>
+<string name="subtitle_category_title">Online subtitles</string>
+<string name="subtitle_enable_summary">Load subtitles for a video from a remote repository by tapping the subtitle button in the player.</string>
+<string name="subtitle_base_url_title">Subtitle repository base URL</string>
+<string name="subtitle_base_url_summary">Raw base URL of the subtitle repo (no trailing slash). The app requests &lt;baseUrl&gt;/&lt;videoId&gt;.ass then .srt.</string>
+<string name="subtitle_font_title">Subtitle font</string>
+<string-array name="subtitle_font_entries">
+    <item>霞鹜文楷 (LXGW WenKai)</item>
+    <item>Serif</item>
+    <item>Sans-serif</item>
+    <item>Monospace</item>
+</string-array>
+<string-array name="subtitle_font_values">
+    <item>lxgw_wenkai</item>
+    <item>serif</item>
+    <item>sans-serif</item>
+    <item>monospace</item>
+</string-array>
+
 <string-array name="danmaku_translation_provider_entries">
     <item>ML Kit (on-device, offline)</item>
-    <item>Google (Web, unofficial)</item>
     <item>LLM (OpenAI-compatible)</item>
 </string-array>
 <string-array name="danmaku_translation_provider_values">
     <item>mlkit</item>
-    <item>google</item>
     <item>llm</item>
 </string-array>
 <string-array name="danmaku_translation_target_lang_entries">

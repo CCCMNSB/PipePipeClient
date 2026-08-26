@@ -1071,4 +1071,68 @@
 <string name="channel_is_blocked">此频道在您的黑名单中</string>
 <string name="resize_pinch">捏合</string>
 <string name="pinch_to_zoom_selected">捏合以缩放。</string>
+
+<!-- 弹幕自动翻译（PipePipe-DanmakuTranslate 新增） -->
+<string name="danmaku_translation_category">弹幕自动翻译</string>
+<string name="enable_danmaku_translation_title">自动翻译弹幕</string>
+<string name="enable_danmaku_translation_summary">自动翻译弹幕。译文会缓存；在得到译文前先显示原文。</string>
+<string name="danmaku_translation_provider_title">翻译引擎</string>
+<string name="danmaku_translation_target_lang_title">目标语言</string>
+<string name="llm_base_url_title">LLM API 地址</string>
+<string name="llm_api_key_title">LLM API 密钥</string>
+<string name="llm_model_title">LLM 模型</string>
+<string name="danmaku_show_original_title">在译文下方显示原文</string>
+<string name="danmaku_show_original_summary">开启后，原文以更小字号显示在译文下方；关闭则只显示译文。</string>
+<string name="danmaku_predownload_title">立即下载离线模型</string>
+<string name="danmaku_predownload_summary">后台提前下载端上翻译模型（而非首次使用时），以便离线翻译。用于 ML Kit。</string>
+<string name="danmaku_source_lang_title">源语言</string>
+<string name="danmaku_source_lang_summary">弹幕的语言。"自动"会检测；指定语言更快更方便。</string>
+
+<string name="subtitle_enable_title">启用在线字幕</string>
+<string name="subtitle_enable_summary">在播放器点字幕按钮，从远程仓库按视频 ID 加载字幕。</string>
+<string name="subtitle_category_title">在线字幕</string>
+<string name="subtitle_base_url_title">字幕仓库基础地址</string>
+<string name="subtitle_base_url_summary">字幕仓库的 raw 根地址（末尾不要斜杠）。App 会请求 &lt;地址&gt;/&lt;视频ID&gt;.ass，其次 .srt。</string>
+<string name="subtitle_font_title">字幕字体</string>
+<string-array name="subtitle_font_entries">
+    <item>霞鹜文楷</item>
+    <item>衬线体 (Serif)</item>
+    <item>无衬线体 (Sans-serif)</item>
+    <item>等宽体 (Monospace)</item>
+</string-array>
+<string-array name="subtitle_font_values">
+    <item>lxgw_wenkai</item>
+    <item>serif</item>
+    <item>sans-serif</item>
+    <item>monospace</item>
+</string-array>
+<string name="danmaku_llm_source_title">LLM 来源</string>
+<string name="danmaku_llm_source_summary">LLM 运行在哪。本地＝你局域网内自己的电脑（如 Ollama）；云端＝在线 API（如 DeepSeek）。</string>
+<string name="danmaku_llm_local_base_url_title">本地模型 base URL</string>
+<string name="danmaku_llm_local_model_title">本地模型名</string>
+<string name="danmaku_llm_local_key_title">本地 API 密钥（可选）</string>
+<string name="danmaku_progress_interval_title">下载进度提示间隔</string>
+<string name="danmaku_progress_interval_summary">下载与翻译时多久弹一次进度提示，数值越小提示越频繁。</string>
+<string name="danmaku_cache_category_title">弹幕缓存</string>
+<string name="danmaku_cache_manage_title">管理弹幕缓存</string>
+<string name="danmaku_cache_manage_empty">暂无缓存弹幕</string>
+<string name="danmaku_cache_delete_selected">删除所选</string>
+<string name="danmaku_cache_clear_all">清空全部</string>
+<string name="danmaku_cache_summary_count">已缓存 %1$d 个视频，共 %2$s</string>
+
+<string-array name="danmaku_translation_provider_entries">
+    <item>ML Kit（端上离线）</item>
+    <item>LLM（OpenAI 兼容）</item>
+</string-array>
+<string-array name="danmaku_llm_source_entries">
+    <item>云端（在线）</item>
+    <item>本地（局域网）</item>
+</string-array>
+<string-array name="danmaku_progress_interval_entries">
+    <item>每 10 条</item>
+    <item>每 25 条</item>
+    <item>每 50 条</item>
+    <item>每 100 条</item>
+    <item>每 200 条</item>
+</string-array>
 </resources>

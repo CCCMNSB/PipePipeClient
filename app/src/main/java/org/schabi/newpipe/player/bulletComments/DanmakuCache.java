@@ -157,7 +157,9 @@ public final class DanmakuCache {
                 if (hasSeparate) {
                     final String orig = o.getString("orig", "");
                     final String trans = o.getString("trans", "");
-                    display = showOriginal ? trans + "\n" + orig : trans;
+                    // Always keep the full "translated\noriginal" text; the view decides whether to
+                    // show the original based on the current toggle, so switching it works repeatedly.
+                    display = trans + "\n" + orig;
                 } else {
                     display = text == null ? "" : text; // legacy: keep as-is
                 }

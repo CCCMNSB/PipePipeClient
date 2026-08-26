@@ -23,16 +23,14 @@ public final class DanmakuTranslationBridge {
     public static DanmakuTranslator getTranslator(final Context context) {
         final SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
         final String provider = prefs.getString(
-                context.getString(R.string.danmaku_translation_provider_key), "mlkit");
+                context.getString(R.string.danmaku_translation_provider_key), "llm");
         final String targetLang = prefs.getString(
                 context.getString(R.string.danmaku_translation_target_lang_key), "zh-CN");
         final String sourceLang = prefs.getString(
                 context.getString(R.string.danmaku_source_lang_key), "auto");
 
         final DanmakuTranslator translator;
-        if ("google".equals(provider)) {
-            translator = new com.pipepipe.translator.GoogleWebTranslator();
-        } else if ("llm".equals(provider) || "deepseek".equals(provider)) {
+        if ("llm".equals(provider) || "deepseek".equals(provider)) {
             // Two LLM presets, switched by "source": cloud (online API) or local (LAN e.g. Ollama).
             final String source = prefs.getString(
                     context.getString(R.string.danmaku_llm_source_key), "cloud");
@@ -57,6 +55,8 @@ public final class DanmakuTranslationBridge {
                     baseUrl = "https://api.deepseek.com";
                 }
             }
+            android.util.Log.d("DanmakuBridge", "llm source=" + source
+                    + " base=" + baseUrl + " model=" + model + " keySet=" + (apiKey != null && !apiKey.isEmpty()));
             translator = new LlmTranslator(baseUrl, apiKey, model);
         } else {
             translator = new MlKitTranslator(sourceLang);

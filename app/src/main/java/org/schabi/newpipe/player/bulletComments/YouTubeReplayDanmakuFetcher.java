@@ -126,7 +126,7 @@ public final class YouTubeReplayDanmakuFetcher {
             // pages so a long replay is not cut short.
             if (next != null && next.equals(prevContinuation) && newOffsetMs == offsetMs) {
                 stallCount++;
-                if (stallCount >= 3) {
+                if (stallCount >= 6) {
                     android.util.Log.d("YouTubeFetcher", "stuck at page " + pages
                             + " (continuation unchanged, offset unchanged)");
                     break;

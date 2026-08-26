@@ -113,8 +113,8 @@ public final class DanmakuDownloadHelper {
                 // Batch engines (Google Web, LLM) translate many texts per request -> far fewer
                 // calls. LLM runs the chunks concurrently for speed. Engines without batching
                 // (ML Kit) fall back to per-text in the loop below.
-                final boolean canBatch = translator instanceof com.pipepipe.translator.GoogleWebTranslator
-                        || translator instanceof com.pipepipe.translator.LlmTranslator;
+                final boolean canBatch =
+                        translator instanceof com.pipepipe.translator.LlmTranslator;
                 if (canBatch) {
                     final List<String> toTranslate = new ArrayList<>();
                     final java.util.Set<String> seenTexts = new java.util.HashSet<>();
@@ -124,18 +124,18 @@ public final class DanmakuDownloadHelper {
                             toTranslate.add(text);
                         }
                     }
-                    final int chunkSize = translator instanceof com.pipepipe.translator.LlmTranslator
-                            ? 40 : 300;
+                    final int chunkSize = 40;
                     final List<List<String>> chunks = new ArrayList<>();
                     for (int start = 0; start < toTranslate.size(); start += chunkSize) {
                         chunks.add(toTranslate.subList(start, Math.min(start + chunkSize,
                                 toTranslate.size())));
                     }
-                    // Sequential batches: cloud LLMs often rate-limit concurrent requests (HTTP 429),
-                    // which silently failed translations. Batching alone already cuts request count
-                    // ~100x, so concurrency is off by default for reliability.
-                    final boolean concurrent = false;
-                    final ExecutorService pool = concurrent ? Executors.newFixedThreadPool(3) : null;
+                    // Cloud LLMs (DeepSeek) handle a modest number of concurrent batches fine, so
+                    // run 3 threads to parallelize. The earlier "429" concern was a misdiagnosis
+                    // (the request had been routed to the local host, not DeepSeek).
+                    final boolean concurrent =
+                            translator instanceof com.pipepipe.translator.LlmTranslator;
+                    final ExecutorService pool = concurrent ? Executors.newFixedThreadPool(16) : null;
                     final AtomicInteger done = new AtomicInteger(0);
                     final List<Future<?>> futures = new ArrayList<>();
                     try {
@@ -161,7 +161,7 @@ public final class DanmakuDownloadHelper {
                                     }
                                 }
                                 for (int k = 0; k < chunk.size(); k++) {
-                                    cache.put(chunk.get(k), trs.get(k));
+                                    cache.put(chunk.get(k), cleanTranslation(trs.get(k)));
                                 }
                                 final int processed = done.addAndGet(chunk.size());
                                 listener.onProgress("翻译", Math.min(processed, toTranslate.size()),
@@ -199,7 +199,8 @@ public final class DanmakuDownloadHelper {
                             }
                             cache.put(text, translated);
                         }
-                        item.setCommentText(showOriginal ? (translated + "\n" + text) : translated);
+                        translated = cleanTranslation(translated);
+                        item.setCommentText(translated + "\n" + text);
                         // Keep original + translation separately so the "show original" toggle can
                         // be changed later without re-translating.
                         records.add(new DanmakuCache.Record(text, translated,
@@ -211,8 +212,11 @@ public final class DanmakuDownloadHelper {
                     }
                     out.add(item);
                     i++;
-                    // Throttle translation progress to once per interval messages (always report 100%).
-                    if (i % interval == 0 || i == total) {
+                    // Report progress only when this loop actually translates (ML Kit per-item).
+                    // For batch engines (Google Web / LLM) the translations were already reported by
+                    // the batch phase; this loop only assigns cached results, so don't re-spam the
+                    // counter (it used to reset to 0/total and looked like re-translating).
+                    if (!canBatch && (i % interval == 0 || i == total)) {
                         listener.onProgress("翻译", i, Math.max(1, total));
                     }
                 }
@@ -279,5 +283,18 @@ public final class DanmakuDownloadHelper {
         } catch (final Exception e) {
             return 100;
         }
+    }
+
+    /**
+     * Keep a translation on one line: collapse any newlines the model left in (a batch line can
+     * occasionally come back multi-line), and trim. Prevents the "original+translation+original"
+     * sandwich look when combined with the two-line display.
+     */
+    private static String cleanTranslation(final String s) {
+        if (s == null) {
+            return null;
+        }
+        final String t = s.replace('\n', ' ').replace('\r', ' ').trim();
+        return t.isEmpty() ? s.trim() : t;
     }
 }
