@@ -27,8 +27,8 @@ import java.util.Map;
  */
 public final class SubtitleCache {
 
-    /** How long (ms) to reuse a cached subtitle manifest without re-fetching. */
-    public static final long INDEX_TTL_MS = 10 * 60 * 1000L;
+    /** Short "no-request" window so rapid list re-opens don't hammer the server (ms). */
+    public static final long INDEX_MIN_CHECK_MS = 5 * 60 * 1000L;
 
     private SubtitleCache() {
     }
@@ -80,52 +80,95 @@ public final class SubtitleCache {
 
     // ------------------------------------------------------------------ index
 
-    /** Save the subtitle manifest plus a freshness timestamp, keyed to the url it came from. */
-    public static void saveIndex(final Context c, final String content, final String url) {
+    /** Save the subtitle manifest plus its source url and ETag (for conditional GET). */
+    public static void saveIndex(final Context c, final String content, final String url,
+                                 final String etag) {
         try {
             final File json = new File(indexDir(c), "index.json");
             try (FileOutputStream fos = new FileOutputStream(json)) {
                 fos.write((content == null ? "" : content).getBytes(StandardCharsets.UTF_8));
             }
-            final File ts = new File(indexDir(c), "index.ts");
-            try (FileOutputStream fos = new FileOutputStream(ts)) {
-                fos.write(String.valueOf(System.currentTimeMillis()).getBytes(StandardCharsets.UTF_8));
-            }
             final File u = new File(indexDir(c), "index.url");
             try (FileOutputStream fos = new FileOutputStream(u)) {
                 fos.write((url == null ? "" : url).getBytes(StandardCharsets.UTF_8));
+            }
+            final File e = new File(indexDir(c), "index.etag");
+            try (FileOutputStream fos = new FileOutputStream(e)) {
+                fos.write((etag == null ? "" : etag).getBytes(StandardCharsets.UTF_8));
+            }
+            touchIndex(c);
+        } catch (final Exception ex) {
+            // ignore
+        }
+    }
+
+    /** Cached manifest content if it was stored for {@code url}; otherwise {@code null}. */
+    @Nullable
+    public static String loadIndex(final Context c, final String url) {
+        try {
+            final File json = new File(indexDir(c), "index.json");
+            if (!json.exists() || !urlMatches(c, url)) {
+                return null;
+            }
+            return new String(readAll(json), StandardCharsets.UTF_8);
+        } catch (final Exception e) {
+            return null;
+        }
+    }
+
+    /** Stored ETag if the cache was stored for {@code url}; otherwise {@code null}. */
+    @Nullable
+    public static String indexEtag(final Context c, final String url) {
+        try {
+            if (!urlMatches(c, url)) {
+                return null;
+            }
+            final File e = new File(indexDir(c), "index.etag");
+            if (!e.exists()) {
+                return null;
+            }
+            final String s = new String(readAll(e), StandardCharsets.UTF_8);
+            return s.isEmpty() ? null : s;
+        } catch (final Exception e) {
+            return null;
+        }
+    }
+
+    /** Epoch ms of the last time the index was fetched/validated, or 0 if never. */
+    public static long lastFetchMs(final Context c) {
+        try {
+            final File ts = new File(indexDir(c), "index.ts");
+            if (!ts.exists()) {
+                return 0;
+            }
+            return Long.parseLong(new String(readAll(ts), StandardCharsets.UTF_8).trim());
+        } catch (final Exception e) {
+            return 0;
+        }
+    }
+
+    /** Record "now" as the last time the index was checked (after a 304). */
+    public static void touchIndex(final Context c) {
+        try {
+            final File ts = new File(indexDir(c), "index.ts");
+            try (FileOutputStream fos = new FileOutputStream(ts)) {
+                fos.write(String.valueOf(System.currentTimeMillis()).getBytes(StandardCharsets.UTF_8));
             }
         } catch (final Exception e) {
             // ignore
         }
     }
 
-    /**
-     * Load the cached manifest if it is fresher than {@link #INDEX_TTL_MS} and was stored for the
-     * given {@code url} (so switching the repo invalidates the cache); otherwise {@code null}.
-     */
-    @Nullable
-    public static String loadIndexIfFresh(final Context c, final String url) {
+    private static boolean urlMatches(final Context c, final String url) {
+        final File u = new File(indexDir(c), "index.url");
+        if (!u.exists()) {
+            return false;
+        }
         try {
-            final File json = new File(indexDir(c), "index.json");
-            final File ts = new File(indexDir(c), "index.ts");
-            if (!json.exists() || !ts.exists()) {
-                return null;
-            }
-            final long saved = Long.parseLong(new String(readAll(ts), StandardCharsets.UTF_8).trim());
-            if (System.currentTimeMillis() - saved > INDEX_TTL_MS) {
-                return null;
-            }
-            final File u = new File(indexDir(c), "index.url");
-            if (u.exists()) {
-                final String cachedUrl = new String(readAll(u), StandardCharsets.UTF_8);
-                if (url != null && !url.equals(cachedUrl)) {
-                    return null;
-                }
-            }
-            return new String(readAll(json), StandardCharsets.UTF_8);
+            final String cachedUrl = new String(readAll(u), StandardCharsets.UTF_8);
+            return url != null && url.equals(cachedUrl);
         } catch (final Exception e) {
-            return null;
+            return false;
         }
     }
 
@@ -242,7 +285,9 @@ public final class SubtitleCache {
         if ("__index__".equals(key)) {
             final boolean a = new File(indexDir(c), "index.json").delete();
             final boolean b = new File(indexDir(c), "index.ts").delete();
-            return a || b;
+            final boolean d = new File(indexDir(c), "index.url").delete();
+            final boolean e = new File(indexDir(c), "index.etag").delete();
+            return a || b || d || e;
         }
         final boolean a = new File(subDir(c), key + ".sub").delete();
         final boolean b = new File(subDir(c), key + ".id").delete();

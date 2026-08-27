@@ -15,9 +15,7 @@ import androidx.core.content.res.ResourcesCompat;
 import org.schabi.newpipe.R;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 /**
  * Draws active subtitle lines over the video surface, driven by the player's playback position.
@@ -33,18 +31,6 @@ public final class SubtitleOverlayView extends View {
     private long positionMs = -1;
     private final TextPaint paint = new TextPaint();
     private Typeface font;
-    private boolean autoColor = true;
-
-    private static final int[] SPEAKER_COLORS = {
-            0xFFFFFFFF, // white
-            0xFFFFD54F, // amber
-            0xFF4FC3F7, // cyan
-            0xFFFF8A65, // orange
-            0xFFBA68C8, // violet
-            0xFFAED581, // lime
-            0xFFF06292, // pink
-            0xFF90A4AE  // blue-grey
-    };
 
     public SubtitleOverlayView(final Context context) {
         super(context);
@@ -64,7 +50,8 @@ public final class SubtitleOverlayView extends View {
         }
         paint.setAntiAlias(true);
         paint.setTypeface(font);
-        paint.setShadowLayer(2f, 0f, 0f, 0x80000000);
+        // We draw a real ASS outline (stroke) ourselves; a shadow layer would muddy it into a
+        // "white-black-white" look, so no shadow is applied.
         setLayerType(LAYER_TYPE_SOFTWARE, null);
     }
 
@@ -107,9 +94,8 @@ public final class SubtitleOverlayView extends View {
         }
     }
 
-    /** Toggle automatic per-speaker border coloring. */
+    /** Toggle automatic per-speaker border coloring (kept for API compatibility; unused now). */
     public void setAutoColor(final boolean autoColor) {
-        this.autoColor = autoColor;
         invalidate();
     }
 
@@ -140,9 +126,6 @@ public final class SubtitleOverlayView extends View {
             return;
         }
 
-        final Map<String, Integer> speakerColor = new HashMap<>();
-        int colorIdx = 0;
-
         // Sort by vertical position so stacked lines render in a stable order.
         act.sort((a, b) -> Float.compare(a.yFraction, b.yFraction));
 
@@ -154,8 +137,12 @@ public final class SubtitleOverlayView extends View {
                     (int) (h * line.fontSizeRelative));
             paint.setTextSize(textSize);
 
-            final int border = borderFor(line, speakerColor, colorIdx);
-            final int fill = line.color == 0 ? 0xFFFFFFFF : line.color;
+            // Strictly use the ASS colors: text = PrimaryColour, border = OutlineColour.
+            final int border = line.outlineColor;
+            int fill = line.color;
+            if ((fill >>> 24) == 0) {
+                fill = 0xFF000000 | (fill & 0x00FFFFFF); // ensure opaque text
+            }
 
             float y = line.yFraction;
             // Vertical: for bottom-anchored, yFraction measured from bottom; offset up by 0.5 font.
@@ -183,27 +170,6 @@ public final class SubtitleOverlayView extends View {
 
             drawOutlined(canvas, displayText, tx, yPx, fill, border, textSize);
         }
-    }
-
-    private int borderFor(final SubtitleLine line, final Map<String, Integer> speakerColor,
-                          final int startIdx) {
-        if (!autoColor) {
-            return line.outlineColor;
-        }
-        // If the line already pins a distinct (non-black) outline, honor it.
-        final int noc = line.outlineColor & 0x00FFFFFF;
-        if (noc != 0 && line.outlineColor != 0xFF000000) {
-            return line.outlineColor;
-        }
-        if (line.speaker != null) {
-            Integer c = speakerColor.get(line.speaker);
-            if (c == null) {
-                c = SPEAKER_COLORS[speakerColor.size() % SPEAKER_COLORS.length];
-                speakerColor.put(line.speaker, c);
-            }
-            return c;
-        }
-        return SPEAKER_COLORS[startIdx % SPEAKER_COLORS.length];
     }
 
     private void drawOutlined(final Canvas canvas, final String text, final float x, final float y,

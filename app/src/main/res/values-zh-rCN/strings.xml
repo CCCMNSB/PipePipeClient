@@ -317,6 +317,8 @@
 <string name="subtitle_jump_empty">未找到字幕清单</string>
 <string name="subtitle_jump_error">未找到字幕清单</string>
 <string name="subtitle_jump_search_hint">搜索标题或视频 ID</string>
+<string name="subtitle_jump_refresh_hint">刷新</string>
+<string name="subtitle_jump_refresh_too_soon">刷新太频繁，请稍后再试</string>
 <string name="subtitle_jump_load_more">加载更多</string>
 <string name="delete_item_search_history">您要从搜索历史记录中删除此项吗？</string>
 <string name="title_last_played">上次播放</string>

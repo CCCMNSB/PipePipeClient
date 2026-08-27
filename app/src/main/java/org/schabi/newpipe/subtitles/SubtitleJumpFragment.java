@@ -20,6 +20,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 import org.schabi.newpipe.R;
 import org.schabi.newpipe.extractor.ServiceList;
@@ -41,6 +42,8 @@ import java.util.concurrent.Executors;
 public class SubtitleJumpFragment extends Fragment {
 
     private static final int BATCH_SIZE = 50;
+    /** Minimum interval between manual refreshes (client-side throttle). */
+    private static final long REFRESH_MIN_INTERVAL_MS = 30 * 1000L;
 
     private RecyclerView listView;
     private ProgressBar loadingView;
@@ -48,6 +51,8 @@ public class SubtitleJumpFragment extends Fragment {
     private EditText searchView;
     private Button loadMoreButton;
     private android.widget.ImageButton clearCacheButton;
+    private android.widget.ImageButton refreshButton;
+    private SwipeRefreshLayout swipeRefresh;
     private SubtitleRecyclerAdapter adapter;
 
     private ExecutorService executor;
@@ -58,6 +63,7 @@ public class SubtitleJumpFragment extends Fragment {
     private int displayCount = BATCH_SIZE;
     private boolean loaded = false;
     private String lastIndexUrl = null;
+    private long lastRefreshMs = 0;
 
     private final TextWatcher searchWatcher = new TextWatcher() {
         @Override
@@ -100,8 +106,26 @@ public class SubtitleJumpFragment extends Fragment {
                 org.schabi.newpipe.player.subtitles.SubtitleCache.clearAll(getContext());
                 android.widget.Toast.makeText(getContext(), getString(R.string.subtitle_cache_manage_empty),
                         android.widget.Toast.LENGTH_SHORT).show();
-                loadRepo();
+                loadRepo(false);
             });
+        }
+        refreshButton = view.findViewById(R.id.subtitle_jump_refresh);
+        if (refreshButton != null) {
+            refreshButton.setOnClickListener(v -> {
+                final long now = System.currentTimeMillis();
+                if (now - lastRefreshMs < REFRESH_MIN_INTERVAL_MS) {
+                    android.widget.Toast.makeText(getContext(),
+                            getString(R.string.subtitle_jump_refresh_too_soon),
+                            android.widget.Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                lastRefreshMs = now;
+                loadRepo(true);
+            });
+        }
+        swipeRefresh = view.findViewById(R.id.subtitle_jump_swipe);
+        if (swipeRefresh != null) {
+            swipeRefresh.setOnRefreshListener(() -> loadRepo(true));
         }
 
         adapter = new SubtitleRecyclerAdapter();
@@ -136,7 +160,7 @@ public class SubtitleJumpFragment extends Fragment {
             }
         });
 
-        loadRepo();
+        loadRepo(false);
     }
 
     @Override
@@ -154,7 +178,7 @@ public class SubtitleJumpFragment extends Fragment {
         if (loaded && lastIndexUrl != null) {
             final String cur = org.schabi.newpipe.subtitles.SubtitleRepoFetcher.currentIndexUrl(getContext());
             if (!lastIndexUrl.equals(cur)) {
-                loadRepo();
+                loadRepo(true);
             }
         }
     }
@@ -175,6 +199,8 @@ public class SubtitleJumpFragment extends Fragment {
         searchView = null;
         loadMoreButton = null;
         clearCacheButton = null;
+        refreshButton = null;
+        swipeRefresh = null;
         adapter = null;
     }
 
@@ -196,14 +222,14 @@ public class SubtitleJumpFragment extends Fragment {
     // Loading
     ///////////////////////////////////////////////////////////////////////////
 
-    private void loadRepo() {
+    private void loadRepo(final boolean force) {
         showLoading();
         executor = Executors.newSingleThreadExecutor();
         executor.execute(() -> {
             List<SubtitleVideoItem> result = new ArrayList<>();
             boolean failed = false;
             try {
-                result = SubtitleRepoFetcher.fetchRepoSubtitles(getContext());
+                result = SubtitleRepoFetcher.fetchRepoSubtitles(getContext(), force);
             } catch (final Exception e) {
                 failed = true;
             }
@@ -212,6 +238,9 @@ public class SubtitleJumpFragment extends Fragment {
             mainHandler.post(() -> {
                 if (!isAdded()) {
                     return;
+                }
+                if (swipeRefresh != null) {
+                    swipeRefresh.setRefreshing(false);
                 }
                 if (finalFailed) {
                     loaded = true;

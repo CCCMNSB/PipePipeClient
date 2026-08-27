@@ -2487,6 +2487,7 @@ public final class Player implements
     private org.schabi.newpipe.player.subtitles.SubtitleOverlayView subtitleOverlayView = null;
     private java.util.List<org.schabi.newpipe.player.subtitles.SubtitleLine> subtitleLines = null;
     private boolean subtitleShown = false;
+    private String subtitleStreamUrl = null;
 
     /** When set before opening a video, the player auto-loads the online subtitle matching this id. */
     private static String pendingAutoLoadSubtitleId = null;
@@ -2521,11 +2522,16 @@ public final class Player implements
      *////////////////////////////////////////////////
     //region BulletCommentsPlayer
     private void initBCPlayer() {
-        // Reset subtitle state for the newly prepared stream so old subs don't leak over.
-        subtitleLines = null;
-        subtitleShown = false;
-        if (subtitleOverlayView != null) {
-            subtitleOverlayView.setLines(new java.util.ArrayList<>());
+        // Only reset subtitle state when a genuinely new stream is loaded — not on every re-init
+        // (e.g. a seek), which would make the loaded subtitles vanish on a timeline drag.
+        final String stream = currentMetadata != null ? currentMetadata.getStreamUrl() : null;
+        if (stream != null && !stream.equals(subtitleStreamUrl)) {
+            subtitleStreamUrl = stream;
+            subtitleLines = null;
+            subtitleShown = false;
+            if (subtitleOverlayView != null) {
+                subtitleOverlayView.setLines(new java.util.ArrayList<>());
+            }
         }
         try {
             if (currentMetadata != null && NewPipe.getService(currentMetadata.getServiceId())

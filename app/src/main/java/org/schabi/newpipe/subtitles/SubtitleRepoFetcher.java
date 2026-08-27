@@ -61,35 +61,61 @@ public final class SubtitleRepoFetcher {
     }
 
     /**
-     * Fetch (or serve from the TTL cache) the subtitle manifest and return the items sorted newest
-     * first (by {@code date}) when dates are present, otherwise in manifest order.
+     * Fetch the subtitle manifest with a conditional GET (ETag). The full manifest body is only
+     * downloaded when it actually changed (HTTP 200); a 304 "not modified" reuses the local cache and
+     * transfers almost no data. A short no-request window avoids hammering on rapid list re-opens.
      *
-     * @throws IOException on an HTTP error or when no fresh cached manifest exists
+     * @throws IOException on an HTTP error or network failure
      */
     public static List<SubtitleVideoItem> fetchRepoSubtitles(final Context context)
             throws IOException {
+        return fetchRepoSubtitles(context, false);
+    }
+
+    /** @param force bypasses the short no-request window (used by the manual refresh button). */
+    public static List<SubtitleVideoItem> fetchRepoSubtitles(final Context context,
+                                                             final boolean force)
+            throws IOException {
         final String indexUrl = indexUrl(context);
-        @Nullable String body = SubtitleCache.loadIndexIfFresh(context, indexUrl);
-        if (body == null) {
-            final Response response;
-            try {
-                response = NewPipe.getDownloader().get(indexUrl);
-            } catch (final IOException e) {
-                throw e;
-            } catch (final Exception e) {
-                throw new IOException("Subtitle manifest request failed", e);
-            }
-            final int code = response.responseCode();
-            if (code < 200 || code >= 300) {
-                throw new IOException("Subtitle manifest returned HTTP " + code);
-            }
-            body = response.responseBody();
-            if (body == null || body.isEmpty()) {
-                throw new IOException("Empty response from subtitle manifest");
-            }
-            SubtitleCache.saveIndex(context, body, indexUrl);
+
+        // Always do a conditional GET: entering the list checks once, and the full body is only
+        // downloaded when the manifest actually changed (a 304 "not modified" transfers almost
+        // nothing). The ETag check is cheap, so no extra time-based window is applied.
+        final String etag = SubtitleCache.indexEtag(context, indexUrl);
+        final java.util.Map<String, java.util.List<String>> headers = new java.util.HashMap<>();
+        if (etag != null) {
+            headers.put("If-None-Match", java.util.Collections.singletonList(etag));
         }
 
+        final Response response;
+        try {
+            response = NewPipe.getDownloader().get(indexUrl, headers.isEmpty() ? null : headers);
+        } catch (final IOException e) {
+            throw e;
+        } catch (final Exception e) {
+            throw new IOException("Subtitle manifest request failed", e);
+        }
+        final int code = response.responseCode();
+        if (code == 304) {
+            SubtitleCache.touchIndex(context);
+            final String cached = SubtitleCache.loadIndex(context, indexUrl);
+            if (cached != null) {
+                return parseManifest(cached);
+            }
+            throw new IOException("Subtitle manifest 304 but no local cache");
+        }
+        if (code < 200 || code >= 300) {
+            throw new IOException("Subtitle manifest returned HTTP " + code);
+        }
+        final String body = response.responseBody();
+        if (body == null || body.isEmpty()) {
+            throw new IOException("Empty response from subtitle manifest");
+        }
+        SubtitleCache.saveIndex(context, body, indexUrl, etagOf(response));
+        return parseManifest(body);
+    }
+
+    private static List<SubtitleVideoItem> parseManifest(final String body) throws IOException {
         try {
             final JsonArray array = JsonParser.array().from(body);
             final List<SubtitleVideoItem> items = new ArrayList<>();
@@ -121,6 +147,22 @@ public final class SubtitleRepoFetcher {
         } catch (final Exception e) {
             throw new IOException("Failed to parse subtitle manifest JSON", e);
         }
+    }
+
+    /** Extract the ETag header (case-insensitive) from a response, or null. */
+    private static String etagOf(final Response response) {
+        try {
+            for (final java.util.Map.Entry<String, java.util.List<String>> e
+                    : response.responseHeaders().entrySet()) {
+                if (e.getKey() != null && e.getKey().equalsIgnoreCase("etag")
+                        && e.getValue() != null && !e.getValue().isEmpty()) {
+                    return e.getValue().get(0);
+                }
+            }
+        } catch (final Exception ignored) {
+            // fall through
+        }
+        return null;
     }
 
     /** Parse a manifest date to epoch millis, or -1 if absent/unparseable. */
