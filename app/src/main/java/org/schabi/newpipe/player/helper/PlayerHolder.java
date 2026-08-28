@@ -71,6 +71,11 @@ public final class PlayerHolder {
         return player != null;
     }
 
+    @Nullable
+    public Player getPlayer() {
+        return player;
+    }
+
     /**
      * Use this method to only allow the user to manipulate the play queue (e.g. by enqueueing via
      * the stream long press menu) when there actually is a play queue to manipulate.

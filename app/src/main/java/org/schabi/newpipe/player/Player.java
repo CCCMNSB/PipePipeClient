@@ -641,6 +641,7 @@ public final class Player implements
             cycleSubtitleFontSize();
             return true;
         });
+        binding.loadLocalSubtitle.setOnClickListener(v -> launchLocalSubtitlePicker());
         binding.playWithKodi.setOnClickListener(this);
         binding.openInBrowser.setOnClickListener(this);
         binding.playerCloseButton.setOnClickListener(this);
@@ -2788,6 +2789,43 @@ public final class Player implements
         subtitleOverlayView.setFontScale(next);
         android.widget.Toast.makeText(context, "字幕字号: " + (int) (next * 100) + "%",
                 android.widget.Toast.LENGTH_SHORT).show();
+    }
+
+    /** Launch the SAF picker for a local .ass/.srt file; the result is handled by
+     * {@code LocalSubtitlePickerActivity}. */
+    private void launchLocalSubtitlePicker() {
+        try {
+            final android.content.Intent intent =
+                    new android.content.Intent(context, org.schabi.newpipe.subtitles.LocalSubtitlePickerActivity.class);
+            intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
+            context.startActivity(intent);
+        } catch (final RuntimeException e) {
+            android.widget.Toast.makeText(context, "无法打开本地字幕选择器",
+                    android.widget.Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    /** Show locally-picked subtitle lines (from {@code LocalSubtitlePickerActivity}). */
+    public void showLocalSubtitleLines(
+            final java.util.List<org.schabi.newpipe.player.subtitles.SubtitleLine> lines) {
+        if (lines == null || lines.isEmpty()) {
+            android.widget.Toast.makeText(context, "未解析到本地字幕内容",
+                    android.widget.Toast.LENGTH_SHORT).show();
+            return;
+        }
+        if (subtitleOverlayView == null) {
+            subtitleOverlayView = binding.subtitleOverlayView;
+        }
+        subtitleOverlayView.setFont(prefs.getString(context.getString(R.string.subtitle_font_key),
+                "lxgw_wenkai"));
+        subtitleOverlayView.setFontScale(
+                prefs.getFloat(context.getString(R.string.subtitle_font_size_scale_key), 0.8f));
+        subtitleLines = lines;
+        subtitleShown = true;
+        subtitleOverlayView.setLines(lines);
+        android.widget.Toast.makeText(context,
+                "已加载本地字幕，共 " + lines.size() + " 条（再点字幕按钮可关闭）",
+                android.widget.Toast.LENGTH_LONG).show();
     }
 
     private void onLoadSubtitleClicked() {

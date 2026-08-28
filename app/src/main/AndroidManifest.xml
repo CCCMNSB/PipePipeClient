@@ -185,6 +185,12 @@
         </activity>
 
         <activity
+                android:name=".subtitles.LocalSubtitlePickerActivity"
+                android:theme="@android:style/Theme.Translucent.NoTitleBar"
+                android:excludeFromRecents="true"
+                android:exported="false" />
+
+        <activity
             android:name=".util.ImageViewerActivity"
             android:theme="@style/BlackTheme" />
 
