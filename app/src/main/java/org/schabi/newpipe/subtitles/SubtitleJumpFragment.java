@@ -208,10 +208,14 @@ public class SubtitleJumpFragment extends Fragment {
         // Set the pending auto-load id BEFORE opening the video, so the player can pick it up once
         // the stream is prepared.
         Player.setPendingAutoLoadSubtitleId(item.videoId);
+        // BV(B站) 与 YouTube 是两套机制：按 id 智能切换服务，避免把 B站 视频按 YouTube 打开。
+        final int serviceId = SubtitleRepoFetcher.isBilibiliId(item.videoId)
+                ? ServiceList.BiliBili.getServiceId()
+                : ServiceList.YouTube.getServiceId();
         NavigationHelper.openVideoDetailFragment(
                 requireContext(),
                 requireActivity().getSupportFragmentManager(),
-                ServiceList.YouTube.getServiceId(),
+                serviceId,
                 SubtitleRepoFetcher.watchUrlFor(item.videoId),
                 item.title == null ? item.videoId : item.title,
                 null,

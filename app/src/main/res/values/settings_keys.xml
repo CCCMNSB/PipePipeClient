@@ -1596,6 +1596,7 @@
     <string name="subtitle_enable_key">subtitle_enable_key</string>
     <string name="subtitle_base_url_key">subtitle_base_url_key</string>
     <string name="subtitle_font_key">subtitle_font_key</string>
+    <string name="subtitle_font_size_scale_key">subtitle_font_size_scale_key</string>
     <string name="subtitle_font_default_value">lxgw_wenkai</string>
     <string name="subtitle_cache_key">subtitle_cache_key</string>
 

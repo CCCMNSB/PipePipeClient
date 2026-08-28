@@ -42,6 +42,7 @@ public final class AssSubtitleParser {
 
     private static List<SubtitleLine> parseAss(final String content) {
         int playResY = 1080;
+        int playResX = 1920;
         final Map<String, Style> styles = new HashMap<>();
         final List<String> eventLines = new ArrayList<>();
         String[] eventFormat = null;
@@ -55,6 +56,12 @@ public final class AssSubtitleParser {
             if (line.startsWith("[") && line.endsWith("]")) {
                 section = line.substring(1, line.length() - 1);
                 continue;
+            }
+            if (line.startsWith("PlayResX:")) {
+                final int v = parseInt(line.substring(line.indexOf(':') + 1));
+                if (v > 0) {
+                    playResX = v;
+                }
             }
             if (line.startsWith("PlayResY:")) {
                 final int v = parseInt(line.substring(line.indexOf(':') + 1));
@@ -85,7 +92,7 @@ public final class AssSubtitleParser {
         final List<SubtitleLine> result = new ArrayList<>();
         for (final String e : eventLines) {
             final ParsedDialogue d = parseDialogue(e, idxStart, idxEnd, idxStyle, idxName,
-                    idxText, styles, playResY);
+                    idxText, styles, playResY, playResX);
             if (d != null && !d.text.isEmpty()) {
                 result.add(d.line);
             }
@@ -103,6 +110,7 @@ public final class AssSubtitleParser {
         final Pos pos = posIn(text);
         if (pos != null) {
             d.hasPos = true;
+            d.posX = pos.x;
             d.posY = pos.y;
         }
         // \N / \n -> literal newline; strip {..} style overrides for display text.
@@ -115,7 +123,7 @@ public final class AssSubtitleParser {
                                                 final int idxStyle, final int idxName,
                                                 final int idxText,
                                                 final Map<String, Style> styles,
-                                                final int playResY) {
+                                                final int playResY, final int playResX) {
         // Dialogue: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text
         final String body = line.substring(line.indexOf(':') + 1);
         final String[] parts = splitDialogue(body);
@@ -154,6 +162,10 @@ public final class AssSubtitleParser {
         if (d.hasPos && d.posY >= 0) {
             yFraction = d.posY / (float) playResY;
         }
+        float xFraction = -1f;
+        if (d.hasPos && d.posX >= 0) {
+            xFraction = d.posX / (float) playResX;
+        }
 
         // Speaker: Name field, else the Style name (so "说话人1..N" styles identify speakers).
         String speaker = !name.isEmpty() ? name : styleName;
@@ -162,7 +174,7 @@ public final class AssSubtitleParser {
         }
 
         d.line = new SubtitleLine(startMs, endMs, d.text, speaker, d.alignment, yFraction,
-                color, outline, fontSizeRelative);
+                color, outline, fontSizeRelative, xFraction);
         return d;
     }
 
@@ -421,6 +433,7 @@ public final class AssSubtitleParser {
         float yFraction = 0.9f;
         boolean hasPos;
         float posY = -1;
+        float posX = -1;
         SubtitleLine line;
     }
 }

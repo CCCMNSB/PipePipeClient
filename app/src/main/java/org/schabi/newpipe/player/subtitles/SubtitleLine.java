@@ -26,10 +26,13 @@ public final class SubtitleLine {
     public final int outlineColor;
     /** Font size relative to video height (PlayResY units / 1000). */
     public final float fontSizeRelative;
+    /** Horizontal anchor from \pos (as a fraction of width, 0..1), or -1 = use alignment margin. */
+    public final float xFraction;
 
     public SubtitleLine(final long startMs, final long endMs, final String text,
                         @Nullable final String speaker, final int alignment, final float yFraction,
-                        final int color, final int outlineColor, final float fontSizeRelative) {
+                        final int color, final int outlineColor, final float fontSizeRelative,
+                        final float xFraction) {
         this.startMs = startMs;
         this.endMs = endMs;
         this.text = text;
@@ -39,6 +42,13 @@ public final class SubtitleLine {
         this.color = color;
         this.outlineColor = outlineColor;
         this.fontSizeRelative = fontSizeRelative;
+        this.xFraction = xFraction;
+    }
+    // Convenience for callers without a \pos x (defaults to -1 = use alignment).
+    public SubtitleLine(final long startMs, final long endMs, final String text,
+                        @Nullable final String speaker, final int alignment, final float yFraction,
+                        final int color, final int outlineColor, final float fontSizeRelative) {
+        this(startMs, endMs, text, speaker, alignment, yFraction, color, outlineColor, fontSizeRelative, -1f);
     }
 
     /** Right edge alignment (1,4,7); bottom (1,2,3); top (7,8,9); center = 5. */

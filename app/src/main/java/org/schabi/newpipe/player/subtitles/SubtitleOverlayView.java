@@ -31,6 +31,13 @@ public final class SubtitleOverlayView extends View {
     private long positionMs = -1;
     private final TextPaint paint = new TextPaint();
     private Typeface font;
+    private float fontScale = 1.0f;
+
+    /** Set the subtitle font-size scale (1.0 = default); clamps to a sane range. */
+    public void setFontScale(final float scale) {
+        this.fontScale = Math.max(0.6f, Math.min(2.0f, scale));
+        invalidate();
+    }
 
     public SubtitleOverlayView(final Context context) {
         super(context);
@@ -133,8 +140,8 @@ public final class SubtitleOverlayView extends View {
         float lastY = -1;
 
         for (final SubtitleLine line : act) {
-            final int textSize = Math.max((int) (h * 0.04f),
-                    (int) (h * line.fontSizeRelative));
+            final int textSize = Math.max(12,
+                    (int) (Math.max((int) (h * 0.04f), (int) (h * line.fontSizeRelative)) * fontScale));
             paint.setTextSize(textSize);
 
             // Strictly use the ASS colors: text = PrimaryColour, border = OutlineColour.
@@ -158,20 +165,29 @@ public final class SubtitleOverlayView extends View {
             }
             lastY = yPx;
 
-            // Horizontal anchor from ASS alignment: %3 ==1 left, ==2 center, ==0 right.
+            // Horizontal anchor from ASS alignment (%3 ==1 left, ==2 center, ==0 right).
+            // \pos(x,y) pins the anchor at that x; otherwise fall back to alignment margins.
             final String displayText = display(line.text);
-            final float tw = paint.measureText(displayText);
             final int mod = line.alignment % 3;
-            final float tx = mod == 1 ? w * 0.06f
-                    : mod == 0 ? (w * 0.94f - tw)
-                    : (w / 2f - tw / 2f);
+            final boolean posAnchored = line.xFraction >= 0f;
+            final float anchorX;
+            if (posAnchored) {
+                anchorX = line.xFraction * w;
+            } else if (mod == 1) {
+                anchorX = w * 0.06f;
+            } else if (mod == 0) {
+                anchorX = w * 0.94f;
+            } else {
+                anchorX = w / 2f;
+            }
 
-            drawOutlined(canvas, displayText, tx, yPx, fill, border, textSize);
+            drawOutlined(canvas, displayText, anchorX, yPx, fill, border, textSize, mod, w);
         }
     }
 
-    private void drawOutlined(final Canvas canvas, final String text, final float x, final float y,
-                              final int fill, final int border, final int textSize) {
+    private void drawOutlined(final Canvas canvas, final String text, final float anchorX,
+                              final float y, final int fill, final int border, final int textSize,
+                              final int mod, final int w) {
         if (text.isEmpty()) {
             return;
         }
@@ -182,7 +198,20 @@ public final class SubtitleOverlayView extends View {
         if (lines.length > 1) {
             yy = y - (lines.length - 1) * lineH * 0.5f;
         }
+        paint.setStyle(Paint.Style.FILL);
         for (final String lineText : lines) {
+            // Anchor each line separately so wide multi-line blocks stay centered (measureText
+            // ignores "\n" and a whole-block width pushed the anchor off-screen to the left).
+            final float tw = paint.measureText(lineText);
+            float x;
+            if (mod == 1) {          // anchor is the line's LEFT edge
+                x = anchorX;
+            } else if (mod == 0) {   // anchor is the line's RIGHT edge
+                x = anchorX - tw;
+            } else {                 // anchor is the line's CENTER
+                x = anchorX - tw / 2f;
+            }
+            x = Math.max(0f, Math.min(x, Math.max(0f, w - tw)));
             drawOne(canvas, lineText, x, yy, fill, border, textSize);
             yy += lineH;
         }

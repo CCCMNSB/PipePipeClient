@@ -134,7 +134,8 @@ public final class SubtitleRepoFetcher {
                 if (title == null || title.isEmpty()) {
                     title = id;
                 }
-                items.add(new SubtitleVideoItem(id, title, thumbnailUrlFor(id),
+                items.add(new SubtitleVideoItem(id, title,
+                        isBilibiliId(id) ? bilibiliCoverUrl(id) : thumbnailUrlFor(id),
                         parseDate(entry.getString("date"))));
             }
             // Newest first when the manifest carries dates; otherwise keep manifest order.
@@ -183,13 +184,36 @@ public final class SubtitleRepoFetcher {
         return -1;
     }
 
-    /** YouTube thumbnail URL for a video id (no extra API call). */
+    /** True if the id is a Bilibili (BV…) id; otherwise YouTube. */
+    public static boolean isBilibiliId(final String videoId) {
+        return videoId != null && videoId.toUpperCase().startsWith("BV");
+    }
+
+    /** Thumbnail URL for a video id. YouTube: i.ytimg.com; Bilibili has no derivable cover, resolved in the loop. */
     public static String thumbnailUrlFor(final String videoId) {
+        if (isBilibiliId(videoId)) return null;
         return "https://i.ytimg.com/vi/" + videoId + "/mqdefault.jpg";
     }
 
-    /** Canonical YouTube watch URL for a video id. */
+    /** Best-effort Bilibili cover (data.pic) from the view API; null on failure. */
+    public static String bilibiliCoverUrl(final String videoId) {
+        try {
+            final Response r = NewPipe.getDownloader()
+                    .get("https://api.bilibili.com/x/web-interface/view?bvid=" + videoId,
+                            (java.util.Map<String, java.util.List<String>>) null);
+            if (r.responseCode() == 200) {
+                final JsonObject data = JsonParser.object().from(r.responseBody()).getObject("data");
+                if (data != null) return data.getString("pic");
+            }
+        } catch (final Exception ignored) {
+            // 拿不到封面就留空
+        }
+        return null;
+    }
+
+    /** Canonical watch URL for a video id: Bilibili for BV ids, otherwise YouTube. */
     public static String watchUrlFor(final String videoId) {
+        if (isBilibiliId(videoId)) return "https://www.bilibili.com/video/" + videoId;
         return "https://www.youtube.com/watch?v=" + videoId;
     }
 }

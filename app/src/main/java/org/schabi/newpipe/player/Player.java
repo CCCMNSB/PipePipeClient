@@ -637,6 +637,10 @@ public final class Player implements
         binding.switchCommentsVisibility.setOnClickListener(this);
         binding.downloadDanmakuTranslate.setOnClickListener(this);
         binding.loadSubtitle.setOnClickListener(this);
+        binding.loadSubtitle.setOnLongClickListener(v -> {
+            cycleSubtitleFontSize();
+            return true;
+        });
         binding.playWithKodi.setOnClickListener(this);
         binding.openInBrowser.setOnClickListener(this);
         binding.playerCloseButton.setOnClickListener(this);
@@ -2754,7 +2758,36 @@ public final class Player implements
         } catch (final RuntimeException e) {
             // ignore
         }
+        // Bilibili: BV... id (BV + 10 chars)
+        try {
+            final java.util.regex.Matcher bv = java.util.regex.Pattern
+                    .compile("(?<![A-Za-z0-9])BV[A-Za-z0-9]{10}")
+                    .matcher(url);
+            if (bv.find()) {
+                return bv.group();
+            }
+        } catch (final RuntimeException e) {
+            // ignore
+        }
         return url;
+    }
+
+    /** Long-press the subtitle button: cycle the subtitle font-size scale (persisted). */
+    private void cycleSubtitleFontSize() {
+        if (subtitleOverlayView == null) {
+            return;
+        }
+        final float cur = prefs.getFloat(context.getString(R.string.subtitle_font_size_scale_key), 0.8f);
+        final float[] scales = {0.5f, 0.8f, 1.2f};
+        int idx = 0;
+        for (int i = 0; i < scales.length; i++) {
+            if (Math.abs(scales[i] - cur) < 0.01f) { idx = i; break; }
+        }
+        final float next = scales[(idx + 1) % scales.length];
+        prefs.edit().putFloat(context.getString(R.string.subtitle_font_size_scale_key), next).apply();
+        subtitleOverlayView.setFontScale(next);
+        android.widget.Toast.makeText(context, "字幕字号: " + (int) (next * 100) + "%",
+                android.widget.Toast.LENGTH_SHORT).show();
     }
 
     private void onLoadSubtitleClicked() {
@@ -2782,6 +2815,8 @@ public final class Player implements
         }
         subtitleOverlayView.setFont(prefs.getString(context.getString(R.string.subtitle_font_key),
                 "lxgw_wenkai"));
+        subtitleOverlayView.setFontScale(
+                prefs.getFloat(context.getString(R.string.subtitle_font_size_scale_key), 0.8f));
 
         // Already loaded: toggle show/hide (no re-download).
         if (subtitleLines != null && !subtitleLines.isEmpty()) {
