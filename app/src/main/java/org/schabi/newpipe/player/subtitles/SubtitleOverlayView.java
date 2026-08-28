@@ -149,14 +149,12 @@ public final class SubtitleOverlayView extends View {
             final float textHalf = textSize / 2f;
             float yPx = isBottomAnchor(line) ? (h * y - textHalf - h * 0.03f)
                     : (h * y + textHalf + h * 0.03f);
-            // Keep subtitles out of the top/bottom control bars (progress bar / buttons), but
-            // otherwise respect the ASS position (lane staggering is preserved).
-            final float topLimit = h * 0.08f;
-            final float bottomLimit = h * 0.86f;
-            yPx = Math.max(topLimit + textSize, Math.min(yPx, bottomLimit));
-            // Nudge down if the previous line is at nearly the same y.
-            if (lastY >= 0 && Math.abs(yPx - lastY) < textSize * 1.2f) {
-                yPx = Math.min(bottomLimit, lastY + textSize * 1.1f);
+            // Respect the Aegisub position exactly. The overlay now renders BELOW the controls, so
+            // it never covers the progress bar; only keep the text inside the visible view.
+            yPx = Math.max(textSize, Math.min(yPx, h - textSize));
+            // Avoid exact overlap of two concurrent lines on the same lane (safety only).
+            if (lastY >= 0 && Math.abs(yPx - lastY) < textSize * 0.9f) {
+                yPx = Math.min(h - textSize, lastY + textSize * 0.9f);
             }
             lastY = yPx;
 
