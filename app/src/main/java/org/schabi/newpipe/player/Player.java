@@ -2870,16 +2870,22 @@ public final class Player implements
         android.widget.Toast.makeText(context, "正在加载在线字幕 (" + id + ")…",
                 android.widget.Toast.LENGTH_LONG).show();
         new Thread(() -> {
-            final java.util.List<org.schabi.newpipe.player.subtitles.SubtitleLine> lines =
+            java.util.List<org.schabi.newpipe.player.subtitles.SubtitleLine> lines =
                     org.schabi.newpipe.player.subtitles.OnlineSubtitleFetcher.fetch(
                             context, baseUrl, id, false);
+            if ((lines == null || lines.isEmpty()) && currentMetadata != null
+                    && currentMetadata.getServiceId() == ServiceList.YouTube.getServiceId()) {
+                lines = org.schabi.newpipe.player.subtitles.MemberSubtitleLoader.load(
+                        context, baseUrl, id, currentMetadata.getMaybeStreamInfo().orElse(null));
+            }
+            final java.util.List<org.schabi.newpipe.player.subtitles.SubtitleLine> fLines = lines;
             new android.os.Handler(android.os.Looper.getMainLooper()).post(() -> {
-                if (lines != null && !lines.isEmpty()) {
-                    subtitleLines = lines;
+                if (fLines != null && !fLines.isEmpty()) {
+                    subtitleLines = fLines;
                     subtitleShown = true;
-                    subtitleOverlayView.setLines(lines);
+                    subtitleOverlayView.setLines(fLines);
                     android.widget.Toast.makeText(context,
-                            "已加载字幕，共 " + lines.size() + " 条（再点字幕按钮可关闭）",
+                            "已加载字幕，共 " + fLines.size() + " 条（再点字幕按钮可关闭）",
                             android.widget.Toast.LENGTH_LONG).show();
                 } else {
                     android.widget.Toast.makeText(context,
