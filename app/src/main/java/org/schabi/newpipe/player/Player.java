@@ -389,6 +389,8 @@ public final class Player implements
     private ContentObserver settingsContentObserver;
 
     @NonNull private final SerialDisposable progressUpdateDisposable = new SerialDisposable();
+    /** High-frequency subtitle position update (independent of the 1s main progress loop). */
+    @NonNull private final SerialDisposable subtitleUpdateDisposable = new SerialDisposable();
     @NonNull private final CompositeDisposable databaseUpdateDisposable = new CompositeDisposable();
 
     /*//////////////////////////////////////////////////////////////////////////
@@ -1031,6 +1033,7 @@ public final class Player implements
         if (isProgressLoopRunning()) {
             stopProgressLoop();
         }
+        stopSubtitleUpdateLoop();
         if (playQueue != null) {
             playQueue.dispose();
         }
@@ -1902,6 +1905,23 @@ public final class Player implements
         progressUpdateDisposable.set(null);
     }
 
+    /** Start a high-frequency (100ms) position update dedicated to the subtitle overlay. */
+    private void startSubtitleUpdateLoop() {
+        subtitleUpdateDisposable.set(
+                Observable.interval(100, MILLISECONDS, AndroidSchedulers.mainThread())
+                        .subscribe(ignored -> {
+                            if (subtitleOverlayView != null && !exoPlayerIsNull() && isPlaying()) {
+                                subtitleOverlayView.setPositionMs(
+                                        (int) simpleExoPlayer.getCurrentPosition());
+                            }
+                        }, error -> Log.e(TAG, "Subtitle position update: ", error))
+        );
+    }
+
+    private void stopSubtitleUpdateLoop() {
+        subtitleUpdateDisposable.set(null);
+    }
+
     private boolean isProgressLoopRunning() {
         return progressUpdateDisposable.get() != null;
     }
@@ -2216,6 +2236,7 @@ public final class Player implements
         if (!isProgressLoopRunning()) {
             startProgressLoop();
         }
+        startSubtitleUpdateLoop();
         if (wasPlaying) {
             showControlsThenHide();
         }
@@ -2407,11 +2428,13 @@ public final class Player implements
         if (!isLoading) {
             if(currentState == STATE_PAUSED && isProgressLoopRunning()){
                 stopProgressLoop();
+                stopSubtitleUpdateLoop();
             }
         } else {
             if(!isProgressLoopRunning()){
                 startProgressLoop();
             }
+            startSubtitleUpdateLoop();
         }
     }
 
@@ -2938,6 +2961,7 @@ public final class Player implements
         if (!isProgressLoopRunning()) {
             startProgressLoop();
         }
+        startSubtitleUpdateLoop();
 
         // if we are e.g. switching players, hide controls
         hideControls(DEFAULT_CONTROLS_DURATION, 0);
@@ -2965,6 +2989,7 @@ public final class Player implements
         if (!isProgressLoopRunning()) {
             startProgressLoop();
         }
+        startSubtitleUpdateLoop();
 
         updateStreamRelatedViews();
 
@@ -3024,6 +3049,7 @@ public final class Player implements
         if (isProgressLoopRunning()) {
             stopProgressLoop();
         }
+        stopSubtitleUpdateLoop();
 
         // Don't let UI elements popup during double tap seeking. This state is entered sometimes
         // during seeking/loading. This if-else check ensures that the controls aren't popping up.
@@ -3091,6 +3117,7 @@ public final class Player implements
         if (isProgressLoopRunning()) {
             stopProgressLoop();
         }
+        stopSubtitleUpdateLoop();
 
         // When a (short) video ends the elements have to display the correct values - see #6180
         updatePlayBackElementsCurrentDuration(binding.playbackSeekBar.getMax());

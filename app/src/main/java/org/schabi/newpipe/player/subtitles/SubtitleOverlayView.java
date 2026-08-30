@@ -1,6 +1,7 @@
 package org.schabi.newpipe.player.subtitles;
 
 import android.content.Context;
+import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.Typeface;
@@ -20,11 +21,10 @@ import java.util.List;
 /**
  * Draws active subtitle lines over the video surface, driven by the player's playback position.
  *
- * <p>Each parsed line carries an ASS alignment + normalized vertical position (fixed in Aegisub, so
- * different speakers appear at different lanes) and a border color. When the subtitle does not pin
- * its own outline color (e.g. black default), the view assigns a distinct border color per speaker
- * so speakers are visually separated. Text is drawn with the project's CJK font (or the configured
- * one), scaled to the view size, and clamped on-screen.
+ * <p><b>Performance:</b> all subtitle lines are <i>pre-rendered</i> into {@link Bitmap}s when
+ * the subtitle is loaded (or when the view size changes). The per-frame {@code onDraw} contains
+ * only a single {@code drawBitmap} call per active line (GPU-accelerated), with zero text
+ * rendering, zero measureText, zero split — eliminating first-frame rendering latency.
  *
  * <p><b>Overlap prevention</b> (ported from the PC-side ass-subtitle-overlay userscript):
  * concurrent lines at the same position are displaced vertically so they don't paint on top of
@@ -43,6 +43,9 @@ public final class SubtitleOverlayView extends View {
     /** Position cache: once a line's Y is resolved, it stays fixed until the line expires. */
     private final HashMap<SubtitleLine, Float> stackYCache = new HashMap<>();
 
+    /** Pre-rendered bitmap cache: each line's text block (text + 8-direction outline). */
+    private final HashMap<SubtitleLine, Bitmap> bitmapCache = new HashMap<>();
+
     // ─── per-frame layout record ─────────────────────────────────────────────
     private static final class Layout {
         final SubtitleLine line;
@@ -54,9 +57,13 @@ public final class SubtitleOverlayView extends View {
         float baseTop;
         /** Final resolved top (after overlap avoidance). */
         float finalTop;
+        /** Pre-rendered bitmap for this line. */
+        Bitmap bitmap;
+        /** Max text width (for horizontal positioning). */
+        float maxTextW;
 
         Layout(final SubtitleLine line, final int textSize, final float lineH,
-               final int numLines, final float blockH, final float baseTop) {
+                final int numLines, final float blockH, final float baseTop) {
             this.line = line;
             this.textSize = textSize;
             this.lineH = lineH;
@@ -70,9 +77,12 @@ public final class SubtitleOverlayView extends View {
         float bottom() { return finalTop + blockH; }
     }
 
-    /** Set the subtitle font-size scale (1.0 = default); clamps to a sane range. */
+    // ─── Public API ──────────────────────────────────────────────────────────
+
+    /** Set the subtitle font-size scale (1.0 = default); clamps to [0.6, 2.0]. */
     public void setFontScale(final float scale) {
         this.fontScale = Math.max(0.6f, Math.min(2.0f, scale));
+        preRenderAll();
         invalidate();
     }
 
@@ -94,7 +104,7 @@ public final class SubtitleOverlayView extends View {
         }
         paint.setAntiAlias(true);
         paint.setTypeface(font);
-        setLayerType(LAYER_TYPE_SOFTWARE, null);
+        paint.setStyle(Paint.Style.FILL);
     }
 
     public void setFont(final String name) {
@@ -118,6 +128,7 @@ public final class SubtitleOverlayView extends View {
             }
         }
         paint.setTypeface(font);
+        preRenderAll();
         invalidate();
     }
 
@@ -126,7 +137,9 @@ public final class SubtitleOverlayView extends View {
         if (list != null) {
             lines.addAll(list);
         }
-        stackYCache.clear(); // new subtitle → clear all position caches
+        stackYCache.clear();
+        // Pre-render all bitmaps so onDraw has zero rendering work.
+        preRenderAll();
         invalidate();
     }
 
@@ -141,6 +154,41 @@ public final class SubtitleOverlayView extends View {
     public void setAutoColor(final boolean autoColor) {
         invalidate();
     }
+
+    // ─── Pre-rendering ───────────────────────────────────────────────────────
+
+    /** Pre-render all subtitle lines into bitmaps (called on load / size change / font change). */
+    private void preRenderAll() {
+        final int h = getHeight();
+        if (h == 0 || lines.isEmpty()) return;
+
+        bitmapCache.clear();
+        for (final SubtitleLine line : lines) {
+            final int textSize = computeTextSize(line, h);
+            final Bitmap bm = renderToBitmap(line, textSize);
+            if (bm != null) {
+                bitmapCache.put(line, bm);
+            }
+        }
+    }
+
+    @Override
+    protected void onSizeChanged(final int w, final int h, final int oldw, final int oldh) {
+        super.onSizeChanged(w, h, oldw, oldh);
+        // Re-render bitmaps with the new size (textSize depends on h).
+        if (h > 0 && !lines.isEmpty()) {
+            preRenderAll();
+            invalidate();
+        }
+    }
+
+    /** Compute the text size for a line given the view height. */
+    private int computeTextSize(final SubtitleLine line, final int h) {
+        return Math.max(12,
+                (int) (Math.max((int) (h * 0.04f), (int) (h * line.fontSizeRelative)) * fontScale));
+    }
+
+    // ─── Per-frame rendering ─────────────────────────────────────────────────
 
     /** Extract the active lines at the current playback position. */
     private List<SubtitleLine> active() {
@@ -162,7 +210,7 @@ public final class SubtitleOverlayView extends View {
         final List<SubtitleLine> act = active();
         if (act.isEmpty()) {
             stackYCache.clear();
-            return;
+            return; // Don't clear bitmapCache here — keep pre-rendered bitmaps for next play.
         }
         final int w = getWidth();
         final int h = getHeight();
@@ -170,24 +218,17 @@ public final class SubtitleOverlayView extends View {
             return;
         }
 
-        // ── ① Compute per-line metrics ──────────────────────────────────────
+        // ── ① Compute per-line metrics (no measureText / split / drawText) ──
         final List<Layout> layouts = new ArrayList<>(act.size());
         for (final SubtitleLine line : act) {
-            final int textSize = Math.max(12,
-                    (int) (Math.max((int) (h * 0.04f), (int) (h * line.fontSizeRelative)) * fontScale));
-            paint.setTextSize(textSize);
-            final String text = display(line.text);
-            final String[] textLines = text.split("\n");
-            final int numLines = Math.max(1, textLines.length);
+            final int textSize = computeTextSize(line, h);
             final float lineH = textSize * 1.25f;
+            final int numLines = countLines(display(line.text));
             final float blockH = numLines * lineH;
 
             // Base top: where the block would sit without any overlap avoidance.
-            // Convert from the "anchor fraction" to block-top pixels.
             float baseTop;
             if (line.xFraction >= 0f) {
-                // \pos absolute: yFraction is the anchor point (top=0, bottom=h in ASS space).
-                // Use the same bottom/top/center logic as non-pos.
                 final float anchorPx = h * line.yFraction;
                 if (line.isBottomAnchored()) {
                     baseTop = Math.max(0f, anchorPx - blockH);
@@ -197,7 +238,6 @@ public final class SubtitleOverlayView extends View {
                     baseTop = anchorPx - blockH / 2f;
                 }
             } else {
-                // Style alignment (no \pos): yFraction is the lane position.
                 if (line.isBottomAnchored()) {
                     baseTop = Math.max(0f, h * line.yFraction - blockH);
                 } else if (line.isTopAnchored()) {
@@ -208,28 +248,37 @@ public final class SubtitleOverlayView extends View {
             }
             baseTop = Math.max(0f, Math.min(baseTop, h - blockH));
 
-            layouts.add(new Layout(line, textSize, lineH, numLines, blockH, baseTop));
+            // Get bitmap from pre-rendered cache (fallback: render on the fly).
+            Bitmap bm = bitmapCache.get(line);
+            if (bm == null) {
+                bm = renderToBitmap(line, textSize);
+                if (bm != null) {
+                    bitmapCache.put(line, bm);
+                }
+            }
+
+            Layout lay = new Layout(line, textSize, lineH, numLines, blockH, baseTop);
+            lay.bitmap = bm;
+            layouts.add(lay);
         }
 
-        // ── ② Clear cache for lines that are no longer active ───────────────
+        // ── ② Clear stale cache for lines that are no longer active ─────────
         for (SubtitleLine cached : new ArrayList<>(stackYCache.keySet())) {
             if (cached.startMs > positionMs || positionMs >= cached.endMs) {
                 stackYCache.remove(cached);
+                bitmapCache.remove(cached);
             }
         }
 
         // ── ③ Overlap resolution ─────────────────────────────────────────────
-        // Occupied vertical intervals (top-exclusive, bottom-exclusive overlap check).
-        final List<float[]> occupied = new ArrayList<>(); // each: {top, bottom}
+        final List<float[]> occupied = new ArrayList<>();
 
         // Phase A: place \pos-anchored lines (fixed) + already-cached lines.
         for (final Layout a : layouts) {
             if (a.line.xFraction >= 0f) {
-                // \pos lines are absolute: always at their base position, never displaced.
                 a.finalTop = a.baseTop;
                 occupied.add(new float[]{a.finalTop, a.finalTop + a.blockH});
             } else if (stackYCache.containsKey(a.line)) {
-                // Cached line: keep its resolved position (stability).
                 a.finalTop = stackYCache.get(a.line);
                 occupied.add(new float[]{a.finalTop, a.finalTop + a.blockH});
             }
@@ -242,18 +291,15 @@ public final class SubtitleOverlayView extends View {
                 newOnes.add(a);
             }
         }
-        // Sort: bottom (larger baseTop) first — they're the "anchors" that others should avoid.
         newOnes.sort((a, b) -> Float.compare(b.baseTop, a.baseTop));
 
         for (final Layout a : newOnes) {
             final float bH = a.blockH;
-            // Direction: top-anchored (align >= 7) → search downward; else → search upward.
             final boolean downward = a.line.isTopAnchored();
 
             if (!overlaps(a.baseTop, a.baseTop + bH, occupied)) {
                 a.finalTop = a.baseTop;
             } else if (downward) {
-                // Search downward (y increases), clamp to h - bH.
                 boolean found = false;
                 for (float step = 8f; step <= h && !found; step += 8f) {
                     final float yy = Math.min(a.baseTop + step, h - bH);
@@ -266,7 +312,6 @@ public final class SubtitleOverlayView extends View {
                     a.finalTop = Math.max(0f, Math.min(a.baseTop, h - bH));
                 }
             } else {
-                // Search upward (y decreases), clamp to 0.
                 boolean found = false;
                 for (float step = 8f; step <= h && !found; step += 8f) {
                     final float yy = Math.max(a.baseTop - step, 0f);
@@ -284,40 +329,129 @@ public final class SubtitleOverlayView extends View {
             occupied.add(new float[]{a.finalTop, a.finalTop + bH});
         }
 
-        // ── ④ Render ─────────────────────────────────────────────────────────
+        // ── ④ Render: single drawBitmap per line (GPU, zero text work) ──────
         for (final Layout a : layouts) {
+            final Bitmap bm = a.bitmap;
+            if (bm == null) continue;
             final SubtitleLine line = a.line;
-            final int textSize = a.textSize;
 
-            // Colors.
-            final int border = line.outlineColor;
-            int fill = line.color;
-            if ((fill >>> 24) == 0) {
-                fill = 0xFF000000 | (fill & 0x00FFFFFF);
-            }
-
-            // Convert block-top → baseline Y for drawOutlined (which centers around the baseline).
-            final float yBaseline = a.finalTop + a.blockH / 2f;
-
-            // Horizontal anchor.
+            final float stroke = strokeFor(a.textSize);
             final int mod = line.alignment % 3;
-            final float anchorX;
-            if (line.xFraction >= 0f) {
-                anchorX = line.xFraction * w;
-            } else if (mod == 1) {
-                anchorX = w * 0.06f;
-            } else if (mod == 0) {
-                anchorX = w * 0.94f;
-            } else {
-                anchorX = w / 2f;
-            }
 
-            drawOutlined(canvas, display(line.text), anchorX, yBaseline, fill, border,
-                    textSize, mod, w);
+            // Horizontal: compute left edge of the bitmap.
+            float xLeft;
+            if (line.xFraction >= 0f) {
+                xLeft = line.xFraction * w - bm.getWidth() / 2f;
+            } else if (mod == 1) {
+                xLeft = w * 0.06f - stroke;
+            } else if (mod == 0) {
+                xLeft = w * 0.94f - bm.getWidth() + stroke;
+            } else {
+                xLeft = w / 2f - bm.getWidth() / 2f;
+            }
+            final float bmW = bm.getWidth();
+            xLeft = Math.max(0f, Math.min(xLeft, w - bmW));
+
+            // Vertical: position bitmap so first baseline aligns with finalTop + lineH/2.
+            final float topPad = stroke + a.textSize * 0.85f;
+            final float yTop = a.finalTop + a.lineH / 2f - topPad;
+
+            canvas.drawBitmap(bm, xLeft, yTop, null);
         }
     }
 
-    /** Check if rectangle [top, top+height) overlaps any occupied interval. */
+    // ─── Bitmap rendering (pre-render, not per-frame) ────────────────────────
+
+    /** Render a subtitle line's text block (with 8-direction outline) into a Bitmap. */
+    private Bitmap renderToBitmap(final SubtitleLine line, final int textSize) {
+        final String text = display(line.text);
+        if (text.isEmpty()) return null;
+
+        paint.setTextSize(textSize);
+        paint.setTypeface(font);
+        paint.setStyle(Paint.Style.FILL);
+
+        final String[] textLines = text.split("\n");
+        final int numLines = textLines.length;
+        final float lineH = textSize * 1.25f;
+        final float stroke = strokeFor(textSize);
+
+        // Padding: enough to fit stroke + text ascenders/descenders (CJK-safe).
+        final float topPad = stroke + textSize * 0.85f;
+        final float botPad = stroke + textSize * 0.25f;
+
+        // Measure max line width.
+        float maxW = 0f;
+        for (final String l : textLines) {
+            final float lw = paint.measureText(l);
+            if (lw > maxW) maxW = lw;
+        }
+
+        final int bmpW = (int) maxW + (int) (2f * stroke) + 2;
+        final int bmpH = (int) (topPad + (numLines - 1) * lineH + botPad) + 2;
+        if (bmpW < 1 || bmpH < 1) return null;
+
+        final Bitmap bm = Bitmap.createBitmap(bmpW, bmpH, Bitmap.Config.ARGB_8888);
+        final Canvas bmCanvas = new Canvas(bm);
+
+        // Colors.
+        int fill = line.color;
+        if ((fill >>> 24) == 0) {
+            fill = 0xFF000000 | (fill & 0x00FFFFFF);
+        }
+        final int border = line.outlineColor;
+
+        // 8-direction offsets for the outline.
+        final float[] offs = {
+                0, -stroke, -stroke, 0, stroke, 0, 0, stroke,
+                -stroke, -stroke, stroke, stroke, -stroke, stroke, stroke, -stroke
+        };
+
+        final int mod = line.alignment % 3;
+
+        for (int i = 0; i < numLines; i++) {
+            final String l = textLines[i];
+            final float tw = paint.measureText(l);
+            float tx;
+            if (mod == 1) {
+                tx = stroke; // left-aligned
+            } else if (mod == 0) {
+                tx = bmpW - stroke - tw; // right-aligned
+            } else {
+                tx = bmpW / 2f - tw / 2f; // centered
+            }
+            final float ty = topPad + i * lineH;
+
+            // 8-direction outline.
+            paint.setColor(border);
+            for (int j = 0; j < offs.length; j += 2) {
+                bmCanvas.drawText(l, tx + offs[j], ty + offs[j + 1], paint);
+            }
+            // Fill.
+            paint.setColor(fill);
+            bmCanvas.drawText(l, tx, ty, paint);
+        }
+
+        return bm;
+    }
+
+    // ─── Helpers ─────────────────────────────────────────────────────────────
+
+    private static float strokeFor(final int textSize) {
+        return Math.max(1.5f, textSize * 0.05f);
+    }
+
+    /** Count newlines without creating a String[] (avoids per-frame allocation). */
+    private static int countLines(final String s) {
+        if (s == null || s.isEmpty()) return 1;
+        int count = 1;
+        for (int i = 0; i < s.length(); i++) {
+            if (s.charAt(i) == '\n') count++;
+        }
+        return count;
+    }
+
+    /** Check if rectangle [top, bottom) overlaps any occupied interval. */
     private static boolean overlaps(final float top, final float bottom, final List<float[]> occupied) {
         for (final float[] o : occupied) {
             if (top < o[1] && bottom > o[0]) {
@@ -325,56 +459,6 @@ public final class SubtitleOverlayView extends View {
             }
         }
         return false;
-    }
-
-    private void drawOutlined(final Canvas canvas, final String text, final float anchorX,
-                              final float y, final int fill, final int border, final int textSize,
-                              final int mod, final int w) {
-        if (text.isEmpty()) {
-            return;
-        }
-        final String[] textLines = text.split("\n");
-        final float lineH = textSize * 1.25f;
-        // Center the multi-line block on the anchor y.
-        float yy = y;
-        if (textLines.length > 1) {
-            yy = y - (textLines.length - 1) * lineH * 0.5f;
-        }
-        paint.setStyle(Paint.Style.FILL);
-        for (final String lineText : textLines) {
-            final float tw = paint.measureText(lineText);
-            float x;
-            if (mod == 1) {
-                x = anchorX;
-            } else if (mod == 0) {
-                x = anchorX - tw;
-            } else {
-                x = anchorX - tw / 2f;
-            }
-            x = Math.max(0f, Math.min(x, Math.max(0f, w - tw)));
-            drawOne(canvas, lineText, x, yy, fill, border, textSize);
-            yy += lineH;
-        }
-    }
-
-    private void drawOne(final Canvas canvas, final String text, final float x, final float y,
-                          final int fill, final int border, final int textSize) {
-        if (text.isEmpty()) {
-            return;
-        }
-        final float stroke = Math.max(2f, textSize * 0.06f);
-        paint.setStyle(Paint.Style.STROKE);
-        paint.setStrokeWidth(stroke);
-        paint.setColor(border);
-        paint.setTypeface(font);
-        final float[] offs = {0, -stroke, 0, stroke, -stroke, 0, stroke, 0,
-                -stroke, -stroke, stroke, stroke, -stroke, stroke, stroke, -stroke};
-        for (int i = 0; i < offs.length; i += 2) {
-            canvas.drawText(text, x + offs[i], y + offs[i + 1], paint);
-        }
-        paint.setStyle(Paint.Style.FILL);
-        paint.setColor(fill);
-        canvas.drawText(text, x, y, paint);
     }
 
     private String display(final String text) {
