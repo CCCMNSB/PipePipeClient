@@ -118,28 +118,54 @@ public final class SubtitleRepoFetcher {
 
     private static List<SubtitleVideoItem> parseManifest(final String body) throws IOException {
         try {
-            final JsonArray array = JsonParser.array().from(body);
             final List<SubtitleVideoItem> items = new ArrayList<>();
-            final int size = array.size();
-            for (int i = 0; i < size; i++) {
-                final Object raw = array.get(i);
-                if (!(raw instanceof JsonObject)) {
-                    continue;
+            if (isColumnarManifest(body)) {
+                // 列式：{ schema:["id","title","date","list","author"], rows:[[...],...] }
+                final JsonObject root = JsonParser.object().from(body);
+                final JsonArray schema = root.getArray("schema");
+                final JsonArray rows = root.getArray("rows");
+                if (schema == null || rows == null) {
+                    throw new IOException("Bad columnar manifest: missing schema/rows");
                 }
-                final JsonObject entry = (JsonObject) raw;
-                final String id = entry.getString("id");
-                if (id == null || id.isEmpty()) {
-                    continue;
+                final int cols = schema.size();
+                for (int r = 0; r < rows.size(); r++) {
+                    final JsonArray row = rows.getArray(r);
+                    final String id = columnValue(row, schema, cols, "id");
+                    if (id == null || id.isEmpty()) {
+                        continue;
+                    }
+                    final String title = orColumnDefault(
+                            columnValue(row, schema, cols, "title"), id);
+                    items.add(new SubtitleVideoItem(id, title,
+                            isBilibiliId(id) ? bilibiliCoverUrl(id) : thumbnailUrlFor(id),
+                            parseDate(columnValue(row, schema, cols, "date")),
+                            columnValue(row, schema, cols, "list"),
+                            columnValue(row, schema, cols, "author")));
                 }
-                String title = entry.getString("title");
-                if (title == null || title.isEmpty()) {
-                    title = id;
+            } else {
+                // 扁平数组：[{id,title,date,list,author}]
+                final JsonArray array = JsonParser.array().from(body);
+                final int size = array.size();
+                for (int i = 0; i < size; i++) {
+                    final Object raw = array.get(i);
+                    if (!(raw instanceof JsonObject)) {
+                        continue;
+                    }
+                    final JsonObject entry = (JsonObject) raw;
+                    final String id = entry.getString("id");
+                    if (id == null || id.isEmpty()) {
+                        continue;
+                    }
+                    String title = entry.getString("title");
+                    if (title == null || title.isEmpty()) {
+                        title = id;
+                    }
+                    items.add(new SubtitleVideoItem(id, title,
+                            isBilibiliId(id) ? bilibiliCoverUrl(id) : thumbnailUrlFor(id),
+                            parseDate(entry.getString("date")),
+                            entry.getString("list"),
+                            entry.getString("author")));
                 }
-                items.add(new SubtitleVideoItem(id, title,
-                        isBilibiliId(id) ? bilibiliCoverUrl(id) : thumbnailUrlFor(id),
-                        parseDate(entry.getString("date")),
-                        entry.getString("list"),
-                        entry.getString("author")));
             }
             // Newest first when the manifest carries dates; otherwise keep manifest order.
             final boolean anyDate = items.stream().anyMatch(SubtitleVideoItem::hasDate);
@@ -151,6 +177,31 @@ public final class SubtitleRepoFetcher {
         } catch (final Exception e) {
             throw new IOException("Failed to parse subtitle manifest JSON", e);
         }
+    }
+
+    /** True when the manifest uses the columnar {@code {schema, rows}} format (vs a flat array). */
+    private static boolean isColumnarManifest(final String body) {
+        final String t = body == null ? "" : body.trim();
+        return t.startsWith("{") && t.contains("\"schema\"") && t.contains("\"rows\"");
+    }
+
+    /** Read a column value from a columnar row by matching the {@code schema} name to its index. */
+    private static String columnValue(final JsonArray row, final JsonArray schema,
+                                      final int cols, final String key) {
+        for (int i = 0; i < cols; i++) {
+            if (key.equals(schema.getString(i))) {
+                if (i >= row.size()) {
+                    return null;
+                }
+                final Object v = row.get(i);
+                return v == null ? null : String.valueOf(v);
+            }
+        }
+        return null;
+    }
+
+    private static String orColumnDefault(final String value, final String fallback) {
+        return value == null || value.isEmpty() ? fallback : value;
     }
 
     /** Extract the ETag header (case-insensitive) from a response, or null. */
