@@ -235,6 +235,19 @@ public final class SubtitleRepoFetcher {
         } catch (final Exception ignored) {
             // fall through
         }
+        // 兼容任意位年（如 5 位年 10000-01-01，ISO 要求带 + 号）：按 "-" 拆出 年/月/日
+        try {
+            final String[] p = s.trim().split("-");
+            if (p.length == 3) {
+                final int year = Integer.parseInt(p[0]);
+                final int month = Integer.parseInt(p[1]);
+                final int day = Integer.parseInt(p[2]);
+                return LocalDate.of(year, month, day).atStartOfDay(ZoneOffset.UTC)
+                        .toInstant().toEpochMilli();
+            }
+        } catch (final Exception ignored) {
+            // fall through
+        }
         return -1;
     }
 
