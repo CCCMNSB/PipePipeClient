@@ -13,8 +13,11 @@ import org.schabi.newpipe.R;
 import org.schabi.newpipe.util.OnClickGesture;
 import org.schabi.newpipe.util.PicassoHelper;
 
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 
 /** RecyclerView adapter for the subtitle-jump list. */
 public final class SubtitleRecyclerAdapter
@@ -22,6 +25,10 @@ public final class SubtitleRecyclerAdapter
 
     private final List<SubtitleVideoItem> items = new ArrayList<>();
     private OnClickGesture<SubtitleVideoItem> listener;
+
+    // Main-thread only (RecyclerView binding), so a shared instance is safe.
+    private static final SimpleDateFormat DATE_FORMAT =
+            new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
 
     public void setItems(final List<SubtitleVideoItem> newItems) {
         items.clear();
@@ -61,15 +68,25 @@ public final class SubtitleRecyclerAdapter
     static final class SubtitleViewHolder extends RecyclerView.ViewHolder {
         private final ImageView thumbnail;
         private final TextView title;
+        private final TextView dateBadge;
 
         SubtitleViewHolder(@NonNull final View itemView) {
             super(itemView);
             thumbnail = itemView.findViewById(R.id.subtitle_jump_thumbnail);
             title = itemView.findViewById(R.id.subtitle_jump_title);
+            dateBadge = itemView.findViewById(R.id.subtitle_jump_duration);
         }
 
         void bind(final SubtitleVideoItem item, final OnClickGesture<SubtitleVideoItem> listener) {
             title.setText(item.title == null ? item.videoId : item.title);
+            if (dateBadge != null) {
+                if (item.hasDate()) {
+                    dateBadge.setText(DATE_FORMAT.format(new Date(item.dateMs)));
+                    dateBadge.setVisibility(View.VISIBLE);
+                } else {
+                    dateBadge.setVisibility(View.GONE);
+                }
+            }
             PicassoHelper.loadScaledDownThumbnail(itemView.getContext(), item.thumbnailUrl)
                     .into(thumbnail);
             itemView.setOnClickListener(v -> {

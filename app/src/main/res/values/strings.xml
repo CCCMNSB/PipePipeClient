@@ -351,6 +351,11 @@
 <string name="subtitle_jump_refresh_hint">Refresh</string>
 <string name="subtitle_jump_refresh_too_soon">Please wait a moment before refreshing</string>
 <string name="subtitle_jump_load_more">Load more</string>
+<string name="subtitle_jump_tab_videos">Videos</string>
+<string name="subtitle_jump_tab_collections">Collections</string>
+<string name="subtitle_jump_clear_filter">Clear filter</string>
+<string name="subtitle_collection_uncategorized">Uncategorized</string>
+<string name="subtitle_collection_count_format">%1$d videos</string>
 <string name="delete_item_search_history">Do you want to delete this item from search history?</string>
 <string name="title_last_played">Last Played</string>
 <string name="title_most_played">Most Played</string>

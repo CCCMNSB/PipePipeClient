@@ -6,6 +6,20 @@
     android:layout_height="match_parent"
     android:orientation="vertical">
 
+    <!-- Channel-style top tabs: 视频 / 合集. Hidden while the manifest has no collections.
+         Styled like fragment_channel.xml (colorPrimary background, white tab text + indicator). -->
+    <com.google.android.material.tabs.TabLayout
+        android:id="@+id/subtitle_jump_tabs"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="?attr/colorPrimary"
+        android:visibility="gone"
+        app:tabIndicatorColor="@color/white"
+        app:tabMode="scrollable"
+        app:tabRippleColor="@color/white"
+        app:tabTextColor="@color/white"
+        tools:visibility="visible" />
+
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -47,6 +61,40 @@
             android:contentDescription="@string/subtitle_jump_refresh_hint"
             android:padding="10dp"
             android:src="@drawable/ic_refresh"
+            app:tint="?attr/colorAccent" />
+    </LinearLayout>
+
+    <!-- Active collection filter (video tab only): chip with the collection name + clear button. -->
+    <LinearLayout
+        android:id="@+id/subtitle_jump_filter_row"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="16dp"
+        android:paddingEnd="8dp"
+        android:visibility="gone"
+        tools:visibility="visible">
+
+        <com.google.android.material.chip.Chip
+            android:id="@+id/subtitle_jump_filter_chip"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:minWidth="0dp"
+            android:textColor="?attr/tag_text_color"
+            android:textSize="13sp"
+            android:theme="@style/Theme.MaterialComponents.DayNight.Bridge"
+            app:chipBackgroundColor="?attr/card_item_contrast_color"
+            tools:text="Acacia放送局" />
+
+        <ImageButton
+            android:id="@+id/subtitle_jump_filter_clear"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/subtitle_jump_clear_filter"
+            android:padding="8dp"
+            android:src="@drawable/ic_close"
             app:tint="?attr/colorAccent" />
     </LinearLayout>
 

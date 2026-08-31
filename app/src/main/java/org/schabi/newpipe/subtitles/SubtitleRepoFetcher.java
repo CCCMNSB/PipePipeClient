@@ -26,7 +26,8 @@ import java.util.List;
 
 /**
  * Fetches the subtitle manifest {@code index.json} from the subtitle repository and turns every
- * {@code {"id": <videoId>, "title": <title>}} entry into a {@link SubtitleVideoItem}.
+ * {@code {"id": <videoId>, "title": <title>, "list": <collection>}} entry into a
+ * {@link SubtitleVideoItem} ({@code list} is optional; entries without it are "uncategorized").
  *
  * <p>The repository owns the ordering of the array (newest first), so the list keeps the manifest
  * order rather than sorting itself. A missing title falls back to the video id.</p>
@@ -136,7 +137,8 @@ public final class SubtitleRepoFetcher {
                 }
                 items.add(new SubtitleVideoItem(id, title,
                         isBilibiliId(id) ? bilibiliCoverUrl(id) : thumbnailUrlFor(id),
-                        parseDate(entry.getString("date"))));
+                        parseDate(entry.getString("date")),
+                        entry.getString("list")));
             }
             // Newest first when the manifest carries dates; otherwise keep manifest order.
             final boolean anyDate = items.stream().anyMatch(SubtitleVideoItem::hasDate);

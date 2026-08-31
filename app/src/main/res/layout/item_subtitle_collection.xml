@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Channel-style video card, shown in a 2-column grid (like a channel's VIDEOS tab). -->
+<!-- Channel-style collection card, shown in a 2-column grid (like a channel's tab). -->
 <androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
@@ -9,7 +9,7 @@
     android:background="?attr/selectableItemBackground">
 
     <ImageView
-        android:id="@+id/subtitle_jump_thumbnail"
+        android:id="@+id/subtitle_collection_cover"
         android:layout_width="0dp"
         android:layout_height="0dp"
         android:contentDescription="@string/tab_subtitles"
@@ -21,23 +21,7 @@
         tools:src="@drawable/dummy_thumbnail" />
 
     <TextView
-        android:id="@+id/subtitle_jump_duration"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_margin="6dp"
-        android:background="#BB000000"
-        android:paddingStart="6dp"
-        android:paddingEnd="6dp"
-        android:paddingTop="2dp"
-        android:paddingBottom="2dp"
-        android:textColor="@color/white"
-        android:textSize="11sp"
-        app:layout_constraintBottom_toBottomOf="@id/subtitle_jump_thumbnail"
-        app:layout_constraintEnd_toEndOf="@id/subtitle_jump_thumbnail"
-        tools:text="08-31" />
-
-    <TextView
-        android:id="@+id/subtitle_jump_title"
+        android:id="@+id/subtitle_collection_name"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_marginTop="6dp"
@@ -47,7 +31,21 @@
         android:textSize="15sp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/subtitle_jump_thumbnail"
-        tools:text="9FLSPQT12mA" />
+        app:layout_constraintTop_toBottomOf="@id/subtitle_collection_cover"
+        tools:text="Acacia放送局" />
+
+    <TextView
+        android:id="@+id/subtitle_collection_meta"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:textColor="?android:textColorSecondary"
+        android:textSize="12sp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/subtitle_collection_name"
+        tools:text="7 集 · 2026-08-31" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

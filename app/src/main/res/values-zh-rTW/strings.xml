@@ -138,6 +138,11 @@
 <string name="subtitle_jump_refresh_hint">重新整理</string>
 <string name="subtitle_jump_refresh_too_soon">整理太頻繁，請稍後再試</string>
 <string name="subtitle_jump_load_more">載入更多</string>
+<string name="subtitle_jump_tab_videos">影片</string>
+<string name="subtitle_jump_tab_collections">合集</string>
+<string name="subtitle_jump_clear_filter">清除篩選</string>
+<string name="subtitle_collection_uncategorized">未分類</string>
+<string name="subtitle_collection_count_format">%1$d 集</string>
 <string name="delete_item_search_history">確定要刪除此項搜尋紀錄嗎？</string>
 <string name="no_player_found_toast">找不到串流播放器（您可以安裝 VLC 來播放）。</string>
 <string name="default_content_country_title">預設內容國家</string>
