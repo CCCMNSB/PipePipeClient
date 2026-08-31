@@ -50,4 +50,18 @@
         app:layout_constraintTop_toBottomOf="@id/subtitle_jump_thumbnail"
         tools:text="9FLSPQT12mA" />
 
+    <TextView
+        android:id="@+id/subtitle_jump_author"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:textColor="?android:textColorSecondary"
+        android:textSize="12sp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/subtitle_jump_title"
+        tools:text="猫屋敷美红" />
+
 </androidx.constraintlayout.widget.ConstraintLayout>

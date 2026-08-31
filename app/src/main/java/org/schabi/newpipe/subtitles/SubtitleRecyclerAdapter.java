@@ -69,16 +69,26 @@ public final class SubtitleRecyclerAdapter
         private final ImageView thumbnail;
         private final TextView title;
         private final TextView dateBadge;
+        private final TextView author;
 
         SubtitleViewHolder(@NonNull final View itemView) {
             super(itemView);
             thumbnail = itemView.findViewById(R.id.subtitle_jump_thumbnail);
             title = itemView.findViewById(R.id.subtitle_jump_title);
             dateBadge = itemView.findViewById(R.id.subtitle_jump_duration);
+            author = itemView.findViewById(R.id.subtitle_jump_author);
         }
 
         void bind(final SubtitleVideoItem item, final OnClickGesture<SubtitleVideoItem> listener) {
             title.setText(item.title == null ? item.videoId : item.title);
+            if (author != null) {
+                if (item.hasAuthor()) {
+                    author.setText(item.author);
+                    author.setVisibility(View.VISIBLE);
+                } else {
+                    author.setVisibility(View.GONE);
+                }
+            }
             if (dateBadge != null) {
                 if (item.hasDate()) {
                     dateBadge.setText(DATE_FORMAT.format(new Date(item.dateMs)));

@@ -74,6 +74,8 @@ public class SubtitleJumpFragment extends Fragment {
 
     private ExecutorService executor;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    /** Debounced search recompute: runs 150ms after the last keystroke. */
+    private final Runnable searchDebounce = this::recompute;
 
     private List<SubtitleVideoItem> allItems = new ArrayList<>();
     private List<SubtitleVideoItem> filteredItems = new ArrayList<>();
@@ -96,7 +98,9 @@ public class SubtitleJumpFragment extends Fragment {
         @Override
         public void onTextChanged(final CharSequence s, final int start, final int before,
                                    final int count) {
-            recompute();
+            // 防抖：停止输入 150ms 后才重算，避免每敲一个字就全量过滤
+            mainHandler.removeCallbacks(searchDebounce);
+            mainHandler.postDelayed(searchDebounce, 150);
         }
 
         @Override
@@ -252,6 +256,7 @@ public class SubtitleJumpFragment extends Fragment {
         if (searchView != null) {
             searchView.removeTextChangedListener(searchWatcher);
         }
+        mainHandler.removeCallbacks(searchDebounce);
         if (executor != null) {
             executor.shutdownNow();
             executor = null;

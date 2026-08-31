@@ -138,7 +138,8 @@ public final class SubtitleRepoFetcher {
                 items.add(new SubtitleVideoItem(id, title,
                         isBilibiliId(id) ? bilibiliCoverUrl(id) : thumbnailUrlFor(id),
                         parseDate(entry.getString("date")),
-                        entry.getString("list")));
+                        entry.getString("list"),
+                        entry.getString("author")));
             }
             // Newest first when the manifest carries dates; otherwise keep manifest order.
             final boolean anyDate = items.stream().anyMatch(SubtitleVideoItem::hasDate);
