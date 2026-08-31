@@ -1,5 +1,6 @@
 package org.schabi.newpipe.subtitles;
 
+import android.content.Context;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -8,6 +9,7 @@ import android.text.TextWatcher;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.ImageButton;
 import android.widget.ProgressBar;
 import android.widget.TextView;
@@ -278,6 +280,7 @@ public class SubtitleJumpFragment extends Fragment {
     }
 
     private void onItemSelected(final SubtitleVideoItem item) {
+        hideKeyboard();   // 点视频跳走时收起搜索框的键盘
         // Set the pending auto-load id BEFORE opening the video, so the player can pick it up once
         // the stream is prepared.
         Player.setPendingAutoLoadSubtitleId(item.videoId);
@@ -296,12 +299,39 @@ public class SubtitleJumpFragment extends Fragment {
     }
 
     private void onCollectionSelected(final SubtitleCollection collection) {
+        hideKeyboard();   // 点合集跳到详情时也收起键盘
         activeCollection = collection.name;
         // Jump back to the videos tab with the collection filter applied.
         if (tabLayout != null && tabLayout.getVisibility() == View.VISIBLE) {
             tabLayout.selectTab(tabLayout.getTabAt(0));
         }
         switchToMode(MODE_VIDEO);
+    }
+
+    /** Hide the soft keyboard when leaving the search box (e.g. jumping to a video). */
+    private void hideKeyboard() {
+        if (getContext() == null) {
+            return;
+        }
+        final InputMethodManager imm = (InputMethodManager)
+                getContext().getSystemService(Context.INPUT_METHOD_SERVICE);
+        if (imm == null) {
+            return;
+        }
+        if (searchView != null) {
+            searchView.clearFocus();
+        }
+        // 优先用 Activity decor 窗口的 token（最稳），退化到 searchView/getView 的 token
+        if (getActivity() != null && getActivity().getWindow() != null
+                && getActivity().getWindow().getDecorView() != null) {
+            imm.hideSoftInputFromWindow(
+                    getActivity().getWindow().getDecorView().getWindowToken(), 0);
+        } else {
+            final View v = searchView != null ? searchView : getView();
+            if (v != null) {
+                imm.hideSoftInputFromWindow(v.getWindowToken(), 0);
+            }
+        }
     }
 
     private void clearCollectionFilter() {

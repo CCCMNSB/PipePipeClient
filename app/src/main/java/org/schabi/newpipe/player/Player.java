@@ -5183,10 +5183,11 @@ case ERROR_CODE_DECODER_INIT_FAILED: {
     //region Video size, resize, orientation, fullscreen
 
     private void setupScreenRotationButton() {
-        binding.screenRotationButton.setVisibility(videoPlayerSelected()
-                && (globalScreenOrientationLocked(context) || isVerticalVideo
-                        || DeviceUtils.isTablet(context))
-                ? View.VISIBLE : View.GONE);
+        // FORK CUSTOMIZATION: rotation/fullscreen button ALWAYS visible in the main player.
+        // Official PipePipe hides it unless (vertical video || orientation locked || tablet),
+        // relying on auto-rotate. We deviate to always offer a tappable fullscreen button.
+        // ⚠️ Upstream Sync 后此逻辑会被还原，需重应用（见 pipipe-danmaku skill）。
+        binding.screenRotationButton.setVisibility(videoPlayerSelected() ? View.VISIBLE : View.GONE);
         binding.screenRotationButton.setImageDrawable(AppCompatResources.getDrawable(context,
                 isFullscreen ? R.drawable.ic_fullscreen_exit
                 : R.drawable.ic_fullscreen));
