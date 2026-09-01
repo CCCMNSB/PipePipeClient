@@ -102,12 +102,31 @@
                 app:singleLineTitle="false"
                 app:iconSpaceReserved="false"/>
 
+        <SeekBarPreference
+                android:defaultValue="80"
+                android:key="@string/danmaku_font_size_scale_key"
+                android:max="200"
+                android:summary="@string/danmaku_font_size_summary"
+                android:title="@string/danmaku_font_size_title"
+                app:singleLineTitle="false"
+                app:iconSpaceReserved="false"/>
+
+        <ListPreference
+                android:key="@string/danmaku_fps_key"
+                android:title="@string/danmaku_fps_title"
+                android:summary="@string/danmaku_fps_summary"
+                android:entries="@array/danmaku_fps_entries"
+                android:entryValues="@array/danmaku_fps_values"
+                android:defaultValue="60"
+                app:singleLineTitle="false"
+                app:iconSpaceReserved="false"/>
+
         <ListPreference
                 android:key="@string/danmaku_translation_provider_key"
                 android:title="@string/danmaku_translation_provider_title"
                 android:entries="@array/danmaku_translation_provider_entries"
                 android:entryValues="@array/danmaku_translation_provider_values"
-                android:defaultValue="llm"
+                android:defaultValue="online"
                 app:singleLineTitle="false"
                 app:iconSpaceReserved="false"/>
 

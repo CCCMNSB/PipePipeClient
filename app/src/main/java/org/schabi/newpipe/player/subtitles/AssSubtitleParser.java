@@ -113,6 +113,16 @@ public final class AssSubtitleParser {
             d.posX = pos.x;
             d.posY = pos.y;
         }
+        final Move mv = moveIn(text);
+        if (mv != null) {
+            d.hasMove = true;
+            d.moveX1 = mv.x1;
+            d.moveY1 = mv.y1;
+            d.moveX2 = mv.x2;
+            d.moveY2 = mv.y2;
+            d.moveT1 = mv.t1;
+            d.moveT2 = mv.t2;
+        }
         // \N / \n -> literal newline; strip {..} style overrides for display text.
         d.text = text.replace("\\N", "\n").replace("\\n", "\n")
                 .replaceAll("\\{[^}]*\\}", "").trim();
@@ -173,8 +183,26 @@ public final class AssSubtitleParser {
             speaker = null;
         }
 
+        // \move: convert PlayRes pixel coordinates to fractions
+        boolean hasMove = d.hasMove;
+        float moveXF1 = 0f, moveYF1 = 0f, moveXF2 = 0f, moveYF2 = 0f;
+        long moveT1 = 0L, moveT2 = (endMs - startMs);
+        if (hasMove) {
+            moveXF1 = d.moveX1 / (float) playResX;
+            moveYF1 = d.moveY1 / (float) playResY;
+            moveXF2 = d.moveX2 / (float) playResX;
+            moveYF2 = d.moveY2 / (float) playResY;
+            moveT1 = d.moveT1;
+            if (d.moveT2 < 0) {
+                moveT2 = (endMs - startMs); // default: full line duration
+            } else {
+                moveT2 = d.moveT2;
+            }
+        }
+
         d.line = new SubtitleLine(startMs, endMs, d.text, speaker, d.alignment, yFraction,
-                color, outline, fontSizeRelative, xFraction);
+                color, outline, fontSizeRelative, xFraction,
+                hasMove, moveXF1, moveYF1, moveXF2, moveYF2, moveT1, moveT2);
         return d;
     }
 
@@ -434,6 +462,80 @@ public final class AssSubtitleParser {
         boolean hasPos;
         float posY = -1;
         float posX = -1;
+        // \move parameters (in PlayRes pixel space, converted to fractions at parse time)
+        boolean hasMove;
+        float moveX1;
+        float moveY1;
+        float moveX2;
+        float moveY2;
+        long moveT1;
+        long moveT2;
         SubtitleLine line;
+    }
+
+    /** A \move(x1,y1,x2,y2[,t1,t2]) tag with PlayRes-space coordinates. */
+    private static final class Move {
+        float x1, y1, x2, y2;
+        long t1, t2;
+    }
+
+    /**
+     * Detects a \move tag in the text.
+     * Format: {\move(x1,y1,x2,y2[,t1,t2])}
+     * Coordinates are in PlayRes pixels (can be negative or exceed PlayRes).
+     * Times are optional (default: t1=0, t2=line duration).
+     */
+    private static Move moveIn(final String text) {
+        // Look for \move( inside a {..} block
+        final String startMarker = "\\move(";
+        final int ms = text.indexOf(startMarker);
+        if (ms < 0) {
+            return null;
+        }
+        final int open = ms + startMarker.length() - 1; // position of '('
+        final int close = text.indexOf(')', open);
+        if (close < 0) {
+            return null;
+        }
+        final String args = text.substring(open + 1, close).trim();
+        // Split by comma (coordinates), but be careful: times may contain commas too
+        // \move(x1,y1,x2,y2) or \move(x1,y1,x2,y2,t1,t2)
+        // Coordinates are integers (possibly negative), times may be "H:MM:SS.cc" or just seconds
+        final String[] parts = args.split(",");
+        if (parts.length < 4) {
+            return null;
+        }
+        try {
+            final Move m = new Move();
+            m.x1 = Float.parseFloat(parts[0].trim());
+            m.y1 = Float.parseFloat(parts[1].trim());
+            m.x2 = Float.parseFloat(parts[2].trim());
+            m.y2 = Float.parseFloat(parts[3].trim());
+            if (parts.length >= 6) {
+                m.t1 = parseMoveTime(parts[4].trim());
+                m.t2 = parseMoveTime(parts[5].trim());
+            } else {
+                m.t1 = 0;
+                m.t2 = -1; // signals "use line duration"
+            }
+            return m;
+        } catch (final Exception e) {
+            return null;
+        }
+    }
+
+    /** Parses a \move time value: "H:MM:SS.cc" or plain seconds. Returns ms. */
+    private static long parseMoveTime(final String s) {
+        if (s.isEmpty()) {
+            return 0;
+        }
+        try {
+            if (s.contains(":")) {
+                return parseAssTime(s);
+            }
+            return (long) (Float.parseFloat(s) * 1000f);
+        } catch (final Exception e) {
+            return 0;
+        }
     }
 }

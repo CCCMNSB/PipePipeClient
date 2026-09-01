@@ -12,6 +12,7 @@ import com.pipepipe.translator.DanmakuTranslator;
 import org.schabi.newpipe.extractor.bulletComments.BulletCommentsInfo;
 import org.schabi.newpipe.extractor.bulletComments.BulletCommentsInfoItem;
 import org.schabi.newpipe.extractor.bulletComments.BulletCommentsExtractor;
+import org.schabi.newpipe.player.subtitles.SubtitleLine;
 import org.schabi.newpipe.util.ExtractorHelper;
 
 import java.util.ArrayList;
@@ -39,6 +40,14 @@ public final class DanmakuDownloadHelper {
         void onProgress(String stage, int current, int total);
         void onDone(List<BulletCommentsInfoItem> translated);
         void onError(String message);
+        /**
+         * Called when the online danmaku (ASS-based, rendered via the subtitle overlay)
+         * has been loaded. The lines include \move entries (rolling danmaku) and any
+         * regular subtitle lines, all ready for the SubtitleOverlayView.
+         */
+        default void onOnlineDanmakuLoaded(List<SubtitleLine> lines) {
+            // Default: no-op (for backward compatibility).
+        }
     }
 
     public static void start(final Context context, final int serviceId, final String url,
@@ -47,11 +56,33 @@ public final class DanmakuDownloadHelper {
             try {
                 final android.content.SharedPreferences prefs = androidx.preference.PreferenceManager
                         .getDefaultSharedPreferences(context);
-                final String provider = prefs.getString(context.getString(
-                        org.schabi.newpipe.R.string.danmaku_translation_provider_key), "mlkit");
+                String provider = prefs.getString(context.getString(
+                        org.schabi.newpipe.R.string.danmaku_translation_provider_key), "online");
                 // How many messages between progress toasts (download + translate).
                 final int interval = parseInterval(prefs.getString(context.getString(
                         org.schabi.newpipe.R.string.danmaku_progress_interval_key), "100"));
+
+                // 0) "在线加载"：从仓库拉取 danmaku/<videoId>.ass（PC 端在线弹幕同步），无需翻译。
+                //    始终使用所选引擎，不自动回退。ASS 格式与字幕相同，通过字幕管线渲染。
+                if ("online".equals(provider)) {
+                    try {
+                        final List<SubtitleLine> online =
+                                org.schabi.newpipe.player.bulletComments.OnlineDanmakuLoader
+                                        .load(context, serviceId, url);
+                        if (online != null && !online.isEmpty()) {
+                            Log.d("DanmakuDownload", "online danmaku loaded (ASS): " + online.size() + " lines");
+                            listener.onProgress("完成", online.size(), online.size());
+                            listener.onOnlineDanmakuLoaded(online);
+                            return;
+                        }
+                        Log.d("DanmakuDownload", "no online danmaku for this video");
+                        listener.onError("在线弹幕仓库没有此视频的弹幕");
+                    } catch (final Exception e) {
+                        Log.e("DanmakuDownload", "online danmaku load failed", e);
+                        listener.onError("在线弹幕加载失败: " + (e.getMessage() != null ? e.getMessage() : e.toString()));
+                    }
+                    return;
+                }
 
                 // 1) Ensure the on-device model is available (ML Kit only). Only notify if the
                 // model actually needs downloading; if it is already present there is no toast.

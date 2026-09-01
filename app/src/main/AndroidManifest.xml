@@ -79,6 +79,14 @@
             </intent-filter>
         </receiver>
 
+        <!-- Clean up subtitle/danmaku cache on uninstall -->
+        <receiver android:name=".player.subtitles.SubtitleCacheCleanupReceiver"
+                   android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.DELETE" />
+            </intent-filter>
+        </receiver>
+
 
         <receiver android:name=".sleep.TimerStopReceiver"/>
         <service

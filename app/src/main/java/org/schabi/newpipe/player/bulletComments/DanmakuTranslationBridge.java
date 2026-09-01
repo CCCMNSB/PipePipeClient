@@ -22,8 +22,12 @@ public final class DanmakuTranslationBridge {
 
     public static DanmakuTranslator getTranslator(final Context context) {
         final SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
-        final String provider = prefs.getString(
+        String provider = prefs.getString(
                 context.getString(R.string.danmaku_translation_provider_key), "llm");
+        // "在线加载"（默认）没有自己的 translator：仓库里拉不到在线弹幕时回退到 LLM 翻译。
+        if ("online".equals(provider)) {
+            provider = "llm";
+        }
         final String targetLang = prefs.getString(
                 context.getString(R.string.danmaku_translation_target_lang_key), "zh-CN");
         final String sourceLang = prefs.getString(

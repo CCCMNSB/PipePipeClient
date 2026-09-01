@@ -1086,6 +1086,10 @@
 <string name="llm_model_title">LLM 模型</string>
 <string name="danmaku_show_original_title">在譯文下方顯示原文</string>
 <string name="danmaku_show_original_summary">開啟後，原文以較小字體顯示在譯文下方；關閉則只顯示譯文。</string>
+<string name="danmaku_font_size_title">彈幕字號</string>
+<string name="danmaku_font_size_summary">在線彈幕（ASS）字號縮放，獨立於字幕字號。80% 為預設。</string>
+<string name="danmaku_fps_title">彈幕刷新頻率</string>
+<string name="danmaku_fps_summary">彈幕捲動動畫的幀率。越高越流暢，但耗電更多。60 為預設。</string>
 <string name="danmaku_predownload_title">立即下載離線模型</string>
 <string name="danmaku_predownload_summary">於背景提前下載裝置端翻譯模型（而非首次使用時），以便離線翻譯。用於 ML Kit。</string>
 <string name="danmaku_source_lang_title">來源語言</string>
@@ -1130,6 +1134,7 @@
 <string name="danmaku_cache_summary_count">已快取 %1$d 個影片，共 %2$s</string>
 
 <string-array name="danmaku_translation_provider_entries">
+    <item>在線載入（倉庫）</item>
     <item>ML Kit（裝置端離線）</item>
     <item>LLM（OpenAI 相容）</item>
 </string-array>

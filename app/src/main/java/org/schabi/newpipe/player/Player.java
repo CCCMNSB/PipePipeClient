@@ -1905,10 +1905,22 @@ public final class Player implements
         progressUpdateDisposable.set(null);
     }
 
-    /** Start a high-frequency (100ms) position update dedicated to the subtitle overlay. */
+    /** Start a position update loop dedicated to the subtitle overlay, at the configured danmaku FPS. */
     private void startSubtitleUpdateLoop() {
+        final android.content.SharedPreferences prefs =
+                androidx.preference.PreferenceManager.getDefaultSharedPreferences(context);
+        final String fpsStr = prefs.getString(context.getString(R.string.danmaku_fps_key), "60");
+        int fps = 60;
+        try {
+            fps = Integer.parseInt(fpsStr);
+        } catch (final Exception ignored) {
+        }
+        if (fps < 10 || fps > 120) {
+            fps = 60; // fallback to safe range
+        }
+        final long intervalMs = 1000L / fps;
         subtitleUpdateDisposable.set(
-                Observable.interval(100, MILLISECONDS, AndroidSchedulers.mainThread())
+                Observable.interval(intervalMs, MILLISECONDS, AndroidSchedulers.mainThread())
                         .subscribe(ignored -> {
                             if (subtitleOverlayView != null && !exoPlayerIsNull() && isPlaying()) {
                                 subtitleOverlayView.setPositionMs(
@@ -2516,6 +2528,25 @@ public final class Player implements
     private java.util.List<org.schabi.newpipe.player.subtitles.SubtitleLine> subtitleLines = null;
     private boolean subtitleShown = false;
     private String subtitleStreamUrl = null;
+    /** Online danmaku lines (ASS \move lines, loaded via the subtitle pipeline). */
+    private java.util.List<org.schabi.newpipe.player.subtitles.SubtitleLine> danmakuLines = null;
+    private boolean danmakuShown = true;
+
+    /** Merge subtitle lines and danmaku lines, then push to the overlay. */
+    private void updateSubtitleOverlay() {
+        if (subtitleOverlayView == null) {
+            subtitleOverlayView = binding.subtitleOverlayView;
+        }
+        final java.util.List<org.schabi.newpipe.player.subtitles.SubtitleLine> merged =
+                new java.util.ArrayList<>();
+        if (subtitleShown && subtitleLines != null) {
+            merged.addAll(subtitleLines);
+        }
+        if (danmakuShown && danmakuLines != null) {
+            merged.addAll(danmakuLines);
+        }
+        subtitleOverlayView.setLines(merged);
+    }
 
     /** When set before opening a video, the player auto-loads the online subtitle matching this id. */
     private static String pendingAutoLoadSubtitleId = null;
@@ -2557,6 +2588,8 @@ public final class Player implements
             subtitleStreamUrl = stream;
             subtitleLines = null;
             subtitleShown = false;
+            danmakuLines = null;
+            danmakuShown = false;
             if (subtitleOverlayView != null) {
                 subtitleOverlayView.setLines(new java.util.ArrayList<>());
             }
@@ -2708,15 +2741,66 @@ public final class Player implements
     }
 
     /**
-     * Button in the player: download the full danmaku list and translate it, with visible
-     * progress via toasts, then load it into the bullet-comment player aligned to the timeline.
+     * Button in the player: toggle online danmaku. First tap loads (from cache or download),
+     * subsequent taps hide/show without re-downloading.
      */
     private void onDownloadDanmakuTranslateClicked() {
         if (currentMetadata == null) {
             return;
         }
-        // NOTE: an AlertDialog can't be shown from the player service context (BadTokenException);
-        // confirm-as-dialog needs an Activity context, so for now start directly.
+        // If danmaku is already loaded: toggle show/hide (no re-download).
+        if (danmakuLines != null && !danmakuLines.isEmpty()) {
+            danmakuShown = !danmakuShown;
+            updateSubtitleOverlay();
+            android.widget.Toast.makeText(context,
+                    danmakuShown ? "弹幕已显示" : "弹幕已隐藏",
+                    android.widget.Toast.LENGTH_SHORT).show();
+            return;
+        }
+        // Check cache first: if the danmaku ASS is already cached, load directly (instant).
+        final String vid = org.schabi.newpipe.player.bulletComments.OnlineDanmakuLoader
+                .videoId(currentMetadata.getStreamUrl());
+        if (vid != null) {
+            final String cacheKey = "danmaku:" + vid;
+            final String cached = org.schabi.newpipe.player.subtitles.SubtitleCache.load(context, cacheKey);
+            if (cached != null) {
+                // Cached: load directly on a background thread.
+                new Thread(() -> {
+                    try {
+                        final java.util.List<org.schabi.newpipe.player.subtitles.SubtitleLine> lines =
+                                org.schabi.newpipe.player.subtitles.AssSubtitleParser.parse(cached);
+                        final android.content.SharedPreferences prefs =
+                                androidx.preference.PreferenceManager.getDefaultSharedPreferences(context);
+                        new android.os.Handler(android.os.Looper.getMainLooper()).post(() -> {
+                            danmakuLines = lines;
+                            danmakuShown = true;
+                            if (subtitleOverlayView == null) {
+                                subtitleOverlayView = binding.subtitleOverlayView;
+                            }
+                            subtitleOverlayView.setFont(
+                                    prefs.getString(context.getString(R.string.subtitle_font_key), "lxgw_wenkai"));
+                            subtitleOverlayView.setFontScale(
+                                    prefs.getFloat(context.getString(R.string.subtitle_font_size_scale_key), 0.8f));
+                            final int dmFontSize = prefs.getInt(context.getString(R.string.danmaku_font_size_scale_key), 80);
+                            subtitleOverlayView.setDanmakuFontScale(dmFontSize / 100f);
+                            final boolean showOrig = prefs.getBoolean(context.getString(R.string.danmaku_show_original_key), true);
+                            subtitleOverlayView.setShowOriginal(showOrig);
+                            updateSubtitleOverlay();
+                            android.widget.Toast.makeText(context,
+                                    "在线弹幕已加载 (缓存, " + lines.size() + " 条)",
+                                    android.widget.Toast.LENGTH_LONG).show();
+                        });
+                    } catch (final Exception e) {
+                        android.util.Log.e("Player", "Cached danmaku load failed", e);
+                        new android.os.Handler(android.os.Looper.getMainLooper()).post(() ->
+                                android.widget.Toast.makeText(context, "弹幕加载失败: " + e.getMessage(),
+                                        android.widget.Toast.LENGTH_LONG).show());
+                    }
+                }).start();
+                return;
+            }
+        }
+        // Not cached: download.
         startDanmakuDownload(currentMetadata.getServiceId(), currentMetadata.getStreamUrl());
     }
 
@@ -2751,6 +2835,35 @@ public final class Player implements
                         new android.os.Handler(android.os.Looper.getMainLooper()).post(() ->
                                 android.widget.Toast.makeText(context,
                                         "弹幕翻译失败: " + msg, android.widget.Toast.LENGTH_LONG).show());
+                    }
+
+                    @Override
+                    public void onOnlineDanmakuLoaded(final java.util.List<org.schabi.newpipe.player.subtitles.SubtitleLine> lines) {
+                        new android.os.Handler(android.os.Looper.getMainLooper()).post(() -> {
+                            danmakuLines = lines;
+                            danmakuShown = true;
+                            // Ensure the overlay view is set up with the correct font.
+                            final android.content.SharedPreferences prefs =
+                                    androidx.preference.PreferenceManager.getDefaultSharedPreferences(context);
+                            if (subtitleOverlayView == null) {
+                                subtitleOverlayView = binding.subtitleOverlayView;
+                            }
+                            subtitleOverlayView.setFont(
+                                    prefs.getString(context.getString(R.string.subtitle_font_key), "lxgw_wenkai"));
+                            subtitleOverlayView.setFontScale(
+                                    prefs.getFloat(context.getString(R.string.subtitle_font_size_scale_key), 0.8f));
+                            // Set danmaku-specific font scale (independent from subtitle).
+                            final int dmFontSize = prefs.getInt(context.getString(R.string.danmaku_font_size_scale_key), 80);
+                            subtitleOverlayView.setDanmakuFontScale(dmFontSize / 100f);
+                            // Set show-original flag for danmaku (hides \N second line when off).
+                            final boolean showOrig = prefs.getBoolean(context.getString(R.string.danmaku_show_original_key), true);
+                            subtitleOverlayView.setShowOriginal(showOrig);
+                            // Merge danmaku lines with any existing subtitle lines.
+                            updateSubtitleOverlay();
+                            android.widget.Toast.makeText(context,
+                                    "在线弹幕已加载 (" + lines.size() + " 条)，与字幕同步渲染",
+                                    android.widget.Toast.LENGTH_LONG).show();
+                        });
                     }
                 });
     }
@@ -2845,7 +2958,7 @@ public final class Player implements
                 prefs.getFloat(context.getString(R.string.subtitle_font_size_scale_key), 0.8f));
         subtitleLines = lines;
         subtitleShown = true;
-        subtitleOverlayView.setLines(lines);
+        updateSubtitleOverlay();
         android.widget.Toast.makeText(context,
                 "已加载本地字幕，共 " + lines.size() + " 条（再点字幕按钮可关闭）",
                 android.widget.Toast.LENGTH_LONG).show();
@@ -2882,7 +2995,7 @@ public final class Player implements
         // Already loaded: toggle show/hide (no re-download).
         if (subtitleLines != null && !subtitleLines.isEmpty()) {
             subtitleShown = !subtitleShown;
-            subtitleOverlayView.setLines(subtitleShown ? subtitleLines : new java.util.ArrayList<>());
+            updateSubtitleOverlay();
             android.widget.Toast.makeText(context, subtitleShown ? "已显示字幕" : "已隐藏字幕",
                     android.widget.Toast.LENGTH_SHORT).show();
             return;
@@ -2906,7 +3019,7 @@ public final class Player implements
                 if (fLines != null && !fLines.isEmpty()) {
                     subtitleLines = fLines;
                     subtitleShown = true;
-                    subtitleOverlayView.setLines(fLines);
+                    updateSubtitleOverlay();
                     android.widget.Toast.makeText(context,
                             "已加载字幕，共 " + fLines.size() + " 条（再点字幕按钮可关闭）",
                             android.widget.Toast.LENGTH_LONG).show();

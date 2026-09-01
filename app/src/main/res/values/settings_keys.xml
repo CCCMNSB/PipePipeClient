@@ -1597,6 +1597,8 @@
     <string name="subtitle_base_url_key">subtitle_base_url_key</string>
     <string name="subtitle_font_key">subtitle_font_key</string>
     <string name="subtitle_font_size_scale_key">subtitle_font_size_scale_key</string>
+    <string name="danmaku_font_size_scale_key">danmaku_font_size_scale_key</string>
+    <string name="danmaku_fps_key">danmaku_fps_key</string>
     <string name="subtitle_font_default_value">lxgw_wenkai</string>
     <string name="subtitle_cache_key">subtitle_cache_key</string>
 

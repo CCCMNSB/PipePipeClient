@@ -1045,6 +1045,22 @@
 <string name="danmaku_llm_local_key_title">Local API key (optional)</string>
 <string name="danmaku_show_original_title">Show original below translation</string>
 <string name="danmaku_show_original_summary">When on, the original danmaku is shown smaller below the translation. Turn off to show only the translation.</string>
+<string name="danmaku_font_size_title">Danmaku font size</string>
+<string name="danmaku_font_size_summary">Font size scale for online danmaku (ASS), independent from subtitle font size. 80% = default.</string>
+<string name="danmaku_fps_title">Danmaku refresh rate</string>
+<string name="danmaku_fps_summary">Frame rate for danmaku scrolling animation. Higher = smoother, but uses more battery. 60 = default.</string>
+<string-array name="danmaku_fps_entries">
+    <item>30 fps</item>
+    <item>60 fps</item>
+    <item>90 fps</item>
+    <item>120 fps</item>
+</string-array>
+<string-array name="danmaku_fps_values">
+    <item>30</item>
+    <item>60</item>
+    <item>90</item>
+    <item>120</item>
+</string-array>
 <string name="danmaku_predownload_title">Download offline model now</string>
 <string name="danmaku_predownload_summary">Download the on-device translation model in the background right away (instead of on first use), so translation works offline. Used by ML Kit.</string>
 <string name="danmaku_source_lang_title">Source language</string>
@@ -1076,10 +1092,12 @@
 </string-array>
 
 <string-array name="danmaku_translation_provider_entries">
+    <item>在线加载 (Online repo)</item>
     <item>ML Kit (on-device, offline)</item>
     <item>LLM (OpenAI-compatible)</item>
 </string-array>
 <string-array name="danmaku_translation_provider_values">
+    <item>online</item>
     <item>mlkit</item>
     <item>llm</item>
 </string-array>

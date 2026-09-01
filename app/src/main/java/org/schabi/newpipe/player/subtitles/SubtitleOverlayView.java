@@ -39,6 +39,10 @@ public final class SubtitleOverlayView extends View {
     private final TextPaint paint = new TextPaint();
     private Typeface font;
     private float fontScale = 1.0f;
+    /** Font scale for \move (danmaku) lines, independent from subtitle fontScale. */
+    private float danmakuFontScale = 1.0f;
+    /** Whether to show the original text (second line after \n) for \move danmaku lines. */
+    private boolean showOriginal = true;
 
     /** Position cache: once a line's Y is resolved, it stays fixed until the line expires. */
     private final HashMap<SubtitleLine, Float> stackYCache = new HashMap<>();
@@ -61,6 +65,10 @@ public final class SubtitleOverlayView extends View {
         Bitmap bitmap;
         /** Max text width (for horizontal positioning). */
         float maxTextW;
+        /** For \move lines: the resolved screen X center (as a fraction of width). */
+        float moveScreenX;
+        /** For \move lines: the resolved screen Y center (as a fraction of height). */
+        float moveScreenY;
 
         Layout(final SubtitleLine line, final int textSize, final float lineH,
                 final int numLines, final float blockH, final float baseTop) {
@@ -84,6 +92,22 @@ public final class SubtitleOverlayView extends View {
         this.fontScale = Math.max(0.6f, Math.min(2.0f, scale));
         preRenderAll();
         invalidate();
+    }
+
+    /** Set the font-size scale for \move (danmaku) lines, independent from {@link #setFontScale}. */
+    public void setDanmakuFontScale(final float scale) {
+        this.danmakuFontScale = Math.max(0.6f, Math.min(2.0f, scale));
+        preRenderAll();
+        invalidate();
+    }
+
+    /** Set whether to show the original text (second \n line) for \move danmaku lines. */
+    public void setShowOriginal(final boolean show) {
+        if (this.showOriginal != show) {
+            this.showOriginal = show;
+            preRenderAll();
+            invalidate();
+        }
     }
 
     public SubtitleOverlayView(final Context context) {
@@ -184,8 +208,9 @@ public final class SubtitleOverlayView extends View {
 
     /** Compute the text size for a line given the view height. */
     private int computeTextSize(final SubtitleLine line, final int h) {
+        final float scale = line.hasMove ? danmakuFontScale : fontScale;
         return Math.max(12,
-                (int) (Math.max((int) (h * 0.04f), (int) (h * line.fontSizeRelative)) * fontScale));
+                (int) (Math.max((int) (h * 0.04f), (int) (h * line.fontSizeRelative)) * scale));
     }
 
     // ─── Per-frame rendering ─────────────────────────────────────────────────
@@ -223,7 +248,7 @@ public final class SubtitleOverlayView extends View {
         for (final SubtitleLine line : act) {
             final int textSize = computeTextSize(line, h);
             final float lineH = textSize * 1.25f;
-            final int numLines = countLines(display(line.text));
+            final int numLines = countLines(displayText(line));
             final float blockH = numLines * lineH;
 
             // Base top: where the block would sit without any overlap avoidance.
@@ -259,6 +284,23 @@ public final class SubtitleOverlayView extends View {
 
             Layout lay = new Layout(line, textSize, lineH, numLines, blockH, baseTop);
             lay.bitmap = bm;
+
+            // \move lines: compute current position from playback time.
+            if (line.hasMove) {
+                // If no explicit t2 (== 0), the movement spans until the line ends.
+                final long moveEnd = (line.moveT2 == 0) ? line.endMs : (line.startMs + line.moveT2);
+                // If no explicit t1 (== 0), the movement starts at the line start.
+                final long moveStart = line.startMs + line.moveT1;
+                final long dur = Math.max(1L, moveEnd - moveStart);
+                final long elapsed = positionMs - moveStart;
+                final float progress = (float) Math.max(0L, Math.min(elapsed, dur)) / dur;
+                lay.moveScreenX = line.moveXF1 + (line.moveXF2 - line.moveXF1) * progress;
+                lay.moveScreenY = line.moveYF1 + (line.moveYF2 - line.moveYF1) * progress;
+                // For \move, the block is centered on the move Y position.
+                lay.finalTop = (line.moveYF1 + (line.moveYF2 - line.moveYF1) * progress) * h - blockH / 2f;
+                lay.finalTop = Math.max(0f, Math.min(lay.finalTop, h - blockH));
+            }
+
             layouts.add(lay);
         }
 
@@ -273,9 +315,14 @@ public final class SubtitleOverlayView extends View {
         // ── ③ Overlap resolution ─────────────────────────────────────────────
         final List<float[]> occupied = new ArrayList<>();
 
-        // Phase A: place \pos-anchored lines (fixed) + already-cached lines.
+        // Phase A: place \move lines (fixed by their move position), \pos-anchored lines,
+        // and already-cached lines.
         for (final Layout a : layouts) {
-            if (a.line.xFraction >= 0f) {
+            if (a.line.hasMove) {
+                // \move lines are positioned by their computed move position (set in ①).
+                // They occupy their vertical slot but do not participate in overlap avoidance.
+                occupied.add(new float[]{a.finalTop, a.finalTop + a.blockH});
+            } else if (a.line.xFraction >= 0f) {
                 a.finalTop = a.baseTop;
                 occupied.add(new float[]{a.finalTop, a.finalTop + a.blockH});
             } else if (stackYCache.containsKey(a.line)) {
@@ -284,10 +331,10 @@ public final class SubtitleOverlayView extends View {
             }
         }
 
-        // Phase B: place new (uncached) non-pos lines, avoiding occupied intervals.
+        // Phase B: place new (uncached) non-pos, non-move lines, avoiding occupied intervals.
         final List<Layout> newOnes = new ArrayList<>();
         for (final Layout a : layouts) {
-            if (a.line.xFraction < 0f && !stackYCache.containsKey(a.line)) {
+            if (!a.line.hasMove && a.line.xFraction < 0f && !stackYCache.containsKey(a.line)) {
                 newOnes.add(a);
             }
         }
@@ -336,21 +383,37 @@ public final class SubtitleOverlayView extends View {
             final SubtitleLine line = a.line;
 
             final float stroke = strokeFor(a.textSize);
-            final int mod = line.alignment % 3;
 
             // Horizontal: compute left edge of the bitmap.
             float xLeft;
-            if (line.xFraction >= 0f) {
+            if (line.hasMove) {
+                // \move: center the bitmap on the computed move X position.
+                xLeft = a.moveScreenX * w - bm.getWidth() / 2f;
+            } else if (line.xFraction >= 0f) {
                 xLeft = line.xFraction * w - bm.getWidth() / 2f;
-            } else if (mod == 1) {
-                xLeft = w * 0.06f - stroke;
-            } else if (mod == 0) {
-                xLeft = w * 0.94f - bm.getWidth() + stroke;
             } else {
-                xLeft = w / 2f - bm.getWidth() / 2f;
+                final int mod = line.alignment % 3;
+                if (mod == 1) {
+                    xLeft = w * 0.06f - stroke;
+                } else if (mod == 0) {
+                    xLeft = w * 0.94f - bm.getWidth() + stroke;
+                } else {
+                    xLeft = w / 2f - bm.getWidth() / 2f;
+                }
             }
             final float bmW = bm.getWidth();
-            xLeft = Math.max(0f, Math.min(xLeft, w - bmW));
+            if (line.hasMove) {
+                // \move: draw at the ACTUAL position (may be partially
+                // off-screen). The canvas clips to the view bounds
+                // automatically, so the danmaku appears to be "pushed in"
+                // from the edge — exactly like Aegisub / desktop plugins.
+                // Only skip when the entire bitmap is off-screen.
+                if (xLeft + bmW <= 0f || xLeft >= w) continue;
+                // No clamping — let the canvas handle the clipping.
+            } else {
+                // Regular subtitles: clamp to the visible area.
+                xLeft = Math.max(0f, Math.min(xLeft, w - bmW));
+            }
 
             // Vertical: position bitmap so first baseline aligns with finalTop + lineH/2.
             final float topPad = stroke + a.textSize * 0.85f;
@@ -364,7 +427,7 @@ public final class SubtitleOverlayView extends View {
 
     /** Render a subtitle line's text block (with 8-direction outline) into a Bitmap. */
     private Bitmap renderToBitmap(final SubtitleLine line, final int textSize) {
-        final String text = display(line.text);
+        final String text = displayText(line);
         if (text.isEmpty()) return null;
 
         paint.setTextSize(textSize);
@@ -463,5 +526,21 @@ public final class SubtitleOverlayView extends View {
 
     private String display(final String text) {
         return text == null ? "" : text;
+    }
+
+    /**
+     * Get the display text for a specific line, respecting the showOriginal flag.
+     * For \move (danmaku) lines with showOriginal=false, only the first line (translated)
+     * is shown; the original text after \n is hidden.
+     */
+    private String displayText(final SubtitleLine line) {
+        final String text = line.text == null ? "" : line.text;
+        if (!showOriginal && line.hasMove) {
+            final int nl = text.indexOf('\n');
+            if (nl >= 0) {
+                return text.substring(0, nl);
+            }
+        }
+        return text;
     }
 }
