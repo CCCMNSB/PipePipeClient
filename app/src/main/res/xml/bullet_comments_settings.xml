@@ -105,9 +105,10 @@
         <SeekBarPreference
                 android:defaultValue="80"
                 android:key="@string/danmaku_font_size_scale_key"
-                android:max="200"
+                android:max="130"
                 android:summary="@string/danmaku_font_size_summary"
                 android:title="@string/danmaku_font_size_title"
+                app:showSeekBarValue="true"
                 app:singleLineTitle="false"
                 app:iconSpaceReserved="false"/>
 
